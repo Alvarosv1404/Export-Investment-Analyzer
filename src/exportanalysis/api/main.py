@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ..config import load_catalog
+from ..pipeline import comparison
 from ..pipeline.analyze import analyze_product
 
 log = logging.getLogger(__name__)
@@ -149,6 +150,17 @@ def index(request: Request, slug: str | None = None, target_share: float | None 
             "target_share": target_share,
         },
     )
+@app.get("/api/comparison")
+def compare_products(slugs: str = Query(default="", description="slugs separados por coma")) -> JSONResponse:
+    try:
+        items = [x.strip() for x in slugs.split(",") if x.strip()]
+        if not items:
+            items = comparison.all_product_slugs()
+        res = comparison.compare_products(items)
+        return JSONResponse(content=_json_safe(res))
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
 @app.get("/simple", response_class=HTMLResponse)
 def simple(request: Request, hs6: str = "081040", year: int = 2024):
     from ..pipeline import excel_analysis
