@@ -1,7 +1,3 @@
-# Data
-Carpetas por producto con archivos Trade Map/SUNAT ordenados.
-- 081040 arandano
-- 080610 uva fresca
-- interim/ temporal
-- processed/ salida limpia
-- raw/ plantillas/aux
+# Data organizada por producto
+Cada carpeta corresponde a HS6 con nombre descriptivo.
+Formatos Trade Map: exporting/importing + perus exports by importer + indicadores 2025.
