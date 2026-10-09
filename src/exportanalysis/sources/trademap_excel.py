@@ -27,3 +27,9 @@ def load_peru_by_partner(hs6: str) -> pd.DataFrame:
     df["reporterCd"] = df["reporterCd"].astype(str).str.zfill(3)
     df["partnerCd"] = df["partnerCd"].astype(str).str.zfill(3)
     return df
+def load_indicadores_2025(hs6: str) -> pd.DataFrame:
+    p = _find(hs6, "perus-indicadores-exports-to-world-in-2025-by-importer_{hs6}.xlsx")
+    df = pd.read_excel(p)
+    df = df[df["partnerLabel"] != "World"]
+    df["partnerCd"] = df["partnerCd"].astype(str).str.zfill(3)
+    return df
