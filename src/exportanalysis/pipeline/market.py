@@ -1,8 +1,12 @@
 """Metricas de mercado: tamaño, crecimiento, precio y concentracion.
 
-Todo lo que se deriva de la data de UN Comtrade. No inventado: cada numero
-sale de una serie publication. Lo que NO se puede derivar de la data (arancel,
-flete real, costo propio) vive en otras capas y se marca como supuesto.
+Todo lo que se deriva de la data de Trade Map (Excel local). No inventado: cada
+numero sale de una serie publicada. Lo que NO se puede derivar de la data
+(arancel, flete real, costo propio) vive en otras capas y se marca como
+supuesto.
+
+Las funciones reciben DataFrames ya normalizados por
+`pipeline.excel_analysis`; no consultan la red.
 """
 
 from __future__ import annotations
@@ -16,7 +20,12 @@ def annual_totals(trade: pd.DataFrame) -> pd.DataFrame:
     totals = (
         trade[trade["is_world"]]
         .groupby("year", as_index=False)
-        .agg(fob_usd=("fob_usd", "sum"), volume_kg=("net_weight_kg", "sum"))
+        .agg(
+            fob_usd=("fob_usd", "sum"),
+            # min_count=1 conserva el hueco real: un anio sin volumen publicado
+            # queda en NaN, no en 0. Un 0 se leeria como "no se exporto nada".
+            volume_kg=("net_weight_kg", lambda s: s.sum(min_count=1)),
+        )
         .sort_values("year")
         .reset_index(drop=True)
     )
@@ -73,7 +82,9 @@ def market_summary(trade: pd.DataFrame) -> dict:
         "available": True,
         "latest_year": latest_year,
         "latest_fob_usd": latest_value,
-        "latest_volume_kg": float(latest["volume_kg"] or 0),
+        "latest_volume_kg": (
+            float(latest["volume_kg"]) if pd.notna(latest["volume_kg"]) else None
+        ),
         "latest_unit_value_usd": (
             float(latest["unit_value_usd"]) if pd.notna(latest["unit_value_usd"]) else None
         ),
@@ -113,7 +124,8 @@ def destination_breakdown(trade: pd.DataFrame, year: int | None = None) -> pd.Da
 
     total = frame["fob_usd"].sum()
     frame = frame.groupby(["partner_code", "partner_name"], as_index=False).agg(
-        fob_usd=("fob_usd", "sum"), volume_kg=("net_weight_kg", "sum")
+        fob_usd=("fob_usd", "sum"),
+        volume_kg=("net_weight_kg", lambda s: s.sum(min_count=1)),
     )
     frame["share"] = frame["fob_usd"] / total if total else np.nan
     frame["unit_value_usd"] = np.where(
@@ -121,17 +133,3 @@ def destination_breakdown(trade: pd.DataFrame, year: int | None = None) -> pd.Da
     )
     frame["year"] = year
     return frame.sort_values("fob_usd", ascending=False).reset_index(drop=True)
-
-
-def demand_gap(trade: pd.DataFrame, product_hs6: str, partner: int | None = None) -> pd.DataFrame:
-    """Demanda de un mercado: importaciones de un socio desde todo el mundo.
-
-    Sirve para responder "si este pais ya importa el producto, de quien lo
-    compra hoy y cuanta parte poderia capturar Peru".
-    """
-    from ..sources import comtrade
-
-    frame = comtrade.fetch_trade(product_hs6, reporter=partner, flow="M") if partner else None
-    if frame is None or frame.empty:
-        return pd.DataFrame()
-    return destination_breakdown(frame.rename(columns={"partner_name": "origin_name"}), year=frame["year"].max())

@@ -15,9 +15,8 @@ las opciones el 2026-09-30 y asi quedaron:
 
   WITS / World Bank  (arancel bilateral a nivel HS-6, el mas completo)
       El endpoint documentado responde 400/403/405 segun la variante de URL.
-      Se dejo `wits.py` con el contrato correcto segun la documentacion oficial
-      (SDMX, reporter en M49 numerico) pero NO esta verificado contra
-      respuesta 200. Activalo solo si lo validas a mano.
+      El adaptador se retiro del proyecto: el modelo corre offline y el arancel
+      entra por este CSV, no por red.
 
   WTO API            Requiere registro y subscription key. Gratis, pero signup.
 

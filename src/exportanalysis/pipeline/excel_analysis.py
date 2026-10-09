@@ -1,77 +1,183 @@
-﻿"""Analisis desde Excel Trade Map organizados por HS6."""
+﻿"""Analisis desde Excel Trade Map organizados por HS6.
+
+Este modulo es la unica puerta de entrada a los datos de mercado. Lee los
+cuatro Excel que Trade Map exporta por producto, sin red, sin claves y sin
+cache: `data/<hs6> <nombre>/`.
+
+Nombres de archivo esperados (exactos):
+    1. exporting-economies_<hs6>.xlsx                 exportadores mundiales
+    2. importing-economies_<hs6>.xlsx                 importadores mundiales
+    3. perus-exports-to-world-by-importer_<hs6>.xlsx  serie historica por destino (USD Thousand)
+    4. perus-exports-to-world-in-2025-by-importer_<hs6>.xlsx  snapshot 2025 (Value kUSD, Quantity, Unit Value)
+"""
 from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from ..config import DATA_DIR
 
 
 def _find(hs6: str, pattern: str) -> Path:
+    """Busca un Excel por HS6 en data/, ignorando la carpeta de cache."""
     for p in DATA_DIR.rglob(pattern.format(hs6=hs6)):
         if "_cache" not in str(p):
             return p
     raise FileNotFoundError(pattern.format(hs6=hs6))
 
 
+def _year_columns(df: pd.DataFrame) -> list[str]:
+    """Columnas de anio ("2024 (USD Thousand)") de un Excel de Trade Map."""
+    return [c for c in df.columns if str(c).split(" ")[0].isdigit()]
+
+
 def peru_exports_ts(hs6: str) -> pd.DataFrame:
-    """Exportaciones peruanas por socio (time series con valor en USD Thousand)."""
+    """Exportaciones peruanas por socio (serie historica, valor en USD).
+
+    Excluye la fila de total "World": las series por destino no la necesitan y
+    sumarla duplicaria el total. Para el total usa `peru_exports_trade`.
+    """
     p = _find(hs6, "perus-exports-to-world-by-importer_{hs6}.xlsx")
     df = pd.read_excel(p)
     df = df[df["partnerLabel"] != "World"].copy()
-    year_cols = [c for c in df.columns if str(c).split(" ")[0].isdigit()]
-    df_m = pd.melt(df, id_vars=["partnerCd", "partnerLabel", "productCd", "productLabel"],
-                   value_vars=year_cols, var_name="year", value_name="fob_usd_thousand")
-    df_m["year"] = df_m["year"].str.split(" ", n=1).str[0].astype(int)
-    df_m["fob_usd"] = df_m["fob_usd_thousand"] * 1000.0
-    return df_m[["year", "partnerCd", "partnerLabel", "fob_usd"]].dropna()
+    year_cols = _year_columns(df)
+    df_m = pd.melt(
+        df,
+        id_vars=["partnerCd", "partnerLabel", "productCd", "productLabel"],
+        value_vars=year_cols,
+        var_name="year",
+        value_name="fob_usd_thousand",
+    )
+    df_m["year"] = df_m["year"].astype(str).str.split(" ", n=1).str[0].astype(int)
+    df_m["fob_usd"] = pd.to_numeric(df_m["fob_usd_thousand"], errors="coerce") * 1000.0
+    return df_m[["year", "partnerCd", "partnerLabel", "fob_usd"]].dropna(subset=["fob_usd"])
+
+
+def peru_exports_trade(hs6: str) -> pd.DataFrame:
+    """Exportaciones peruanas por destino en formato compatible con `market.py`.
+
+    Incluye la fila de total "World" (partner 0) porque los totales anuales y la
+    concentracion se calculan sobre ella. El volumen (`net_weight_kg`) solo
+    existe en el snapshot 2025 (Quantity, Tons); los demas anios quedan sin
+    volumen, que es un hueco real de la fuente, no un cero.
+    """
+    p = _find(hs6, "perus-exports-to-world-by-importer_{hs6}.xlsx")
+    df = pd.read_excel(p)
+    year_cols = _year_columns(df)
+
+    df = df[["partnerCd", "partnerLabel", *year_cols]].copy()
+    df["partner_code"] = pd.to_numeric(df["partnerCd"], errors="coerce").astype("Int64")
+    df["partner_name"] = df["partnerLabel"]
+    df["is_world"] = df["partner_code"] == 0
+    df = df.drop(columns=["partnerCd", "partnerLabel"])
+
+    melted = pd.melt(
+        df,
+        id_vars=["partner_code", "partner_name", "is_world"],
+        value_vars=year_cols,
+        var_name="year",
+        value_name="fob_usd_thousand",
+    )
+    melted["year"] = melted["year"].astype(str).str.split(" ", n=1).str[0].astype(int)
+    melted["fob_usd"] = pd.to_numeric(melted["fob_usd_thousand"], errors="coerce") * 1000.0
+    melted["net_weight_kg"] = np.nan
+
+    # Volumen del ultimo anio (2025): el unico Excel que publica cantidad.
+    try:
+        ind = peru_exports_indicators_2025(hs6, include_world=True)
+        qty = {
+            int(code): float(kg)
+            for code, kg in zip(ind["partner_code"], ind["quantity_kg"], strict=False)
+            if pd.notna(kg) and pd.notna(code)
+        }
+        is_latest = melted["year"] == 2025
+        melted.loc[is_latest, "net_weight_kg"] = melted.loc[is_latest, "partner_code"].map(qty)
+    except (FileNotFoundError, KeyError, ValueError):
+        pass
+
+    return (
+        melted[["year", "partner_code", "partner_name", "is_world", "fob_usd", "net_weight_kg"]]
+        .sort_values(["year", "fob_usd"], ascending=[True, False])
+        .reset_index(drop=True)
+    )
 
 
 def world_exports(hs6: str) -> pd.DataFrame:
+    """Exportaciones por pais exportador (partner = World), serie historica."""
     p = _find(hs6, "exporting-economies_{hs6}.xlsx")
     df = pd.read_excel(p)
-    year_cols = [c for c in df.columns if str(c).split(" ")[0].isdigit()]
-    df_m = pd.melt(df, id_vars=["reporterCd", "reporterLabel", "partnerCd", "partnerLabel"],
-                   value_vars=year_cols, var_name="year", value_name="fob_usd_thousand")
-    df_m["year"] = df_m["year"].str.split(" ", n=1).str[0].astype(int)
-    df_m["fob_usd"] = df_m["fob_usd_thousand"] * 1000.0
+    year_cols = _year_columns(df)
+    df_m = pd.melt(
+        df,
+        id_vars=["reporterCd", "reporterLabel", "partnerCd", "partnerLabel"],
+        value_vars=year_cols,
+        var_name="year",
+        value_name="fob_usd_thousand",
+    )
+    df_m["year"] = df_m["year"].astype(str).str.split(" ", n=1).str[0].astype(int)
+    df_m["fob_usd"] = pd.to_numeric(df_m["fob_usd_thousand"], errors="coerce") * 1000.0
     return df_m
 
 
 def world_imports(hs6: str) -> pd.DataFrame:
+    """Importaciones por pais importador (partner = World), serie historica."""
     p = _find(hs6, "importing-economies_{hs6}.xlsx")
     df = pd.read_excel(p)
-    year_cols = [c for c in df.columns if str(c).split(" ")[0].isdigit()]
-    df_m = pd.melt(df, id_vars=["reporterCd", "reporterLabel", "partnerCd", "partnerLabel"],
-                   value_vars=year_cols, var_name="year", value_name="cif_usd_thousand")
-    df_m["year"] = df_m["year"].str.split(" ", n=1).str[0].astype(int)
-    df_m["cif_usd"] = df_m["cif_usd_thousand"] * 1000.0
+    year_cols = _year_columns(df)
+    df_m = pd.melt(
+        df,
+        id_vars=["reporterCd", "reporterLabel", "partnerCd", "partnerLabel"],
+        value_vars=year_cols,
+        var_name="year",
+        value_name="cif_usd_thousand",
+    )
+    df_m["year"] = df_m["year"].astype(str).str.split(" ", n=1).str[0].astype(int)
+    df_m["cif_usd"] = pd.to_numeric(df_m["cif_usd_thousand"], errors="coerce") * 1000.0
     return df_m
 
-def peru_exports_indicators_2025(hs6: str) -> pd.DataFrame:
-    p = _find(hs6, "perus-indicadores-exports-to-world-in-2025-by-importer_{hs6}.xlsx")
+
+def peru_exports_indicators_2025(hs6: str, *, include_world: bool = False) -> pd.DataFrame:
+    """Snapshot 2025 por destino: Value (kUSD), Quantity, Unit Value.
+
+    `quantity_kg` normaliza la cantidad a kilos cuando Trade Map la publica en
+    toneladas (Quantity Unit = "Tons"). El precio (`unit_value_usd_per_unit`)
+    queda en la unidad original de la fuente.
+    """
+    p = _find(hs6, "perus-exports-to-world-in-2025-by-importer_{hs6}.xlsx")
     df = pd.read_excel(p)
-    df = df[df["partnerLabel"] != "World"].copy()
+    if not include_world:
+        df = df[df["partnerLabel"] != "World"].copy()
     df["partnerCd"] = df["partnerCd"].astype(str).str.zfill(3)
-    out = df[["partnerCd", "partnerLabel", "Value (kUSD)", "Quantity", "Quantity Unit", "Unit Value"]].copy()
+    df["partner_code"] = pd.to_numeric(df["partnerCd"], errors="coerce").astype("Int64")
+
+    out = df[
+        ["partnerCd", "partner_code", "partnerLabel", "Value (kUSD)", "Quantity", "Quantity Unit", "Unit Value"]
+    ].copy()
     out["fob_usd_thousand"] = pd.to_numeric(out["Value (kUSD)"], errors="coerce")
     out["quantity"] = pd.to_numeric(out["Quantity"], errors="coerce")
     out["unit_value_usd_per_unit"] = pd.to_numeric(out["Unit Value"], errors="coerce")
+    unit = out["Quantity Unit"].astype(str).str.lower()
+    out["quantity_kg"] = out["quantity"] * unit.str.contains("ton").map({True: 1000.0, False: 1.0})
     out["fob_usd"] = out["fob_usd_thousand"] * 1000.0
     out["year"] = 2025
     return out
 
 
 def peru_exports_ts_with_quantity(hs6: str) -> pd.DataFrame:
-    ts = peru_exports_ts(hs6)
-    ts = ts.copy()
-    ts["partnerCd"] = ts["partnerCd"].astype(str)
+    """Serie por destino con la cantidad (kg) de 2025 donde exista."""
+    ts = peru_exports_ts(hs6).copy()
+    ts["partnerCd"] = ts["partnerCd"].astype(str).str.zfill(3)
     try:
         ind = peru_exports_indicators_2025(hs6)
-        ind = ind.copy()
-        ind["partnerCd"] = ind["partnerCd"].astype(str)
-        ind = ind[["partnerCd", "partnerLabel", "quantity", "unit_value_usd_per_unit", "year"]]
-        return ts.merge(ind, on=["year", "partnerCd", "partnerLabel"], how="left")
-    except Exception:
-        return ts.copy()
+        ind = ind[["partnerCd", "year", "quantity", "quantity_kg", "unit_value_usd_per_unit"]]
+        return ts.merge(ind, on=["partnerCd", "year"], how="left")
+    except (FileNotFoundError, KeyError):
+        return ts
+
+
+def available_years(hs6: str) -> list[int]:
+    """Anios con data en el Excel historico, ordenados y sin depender de la red."""
+    df = peru_exports_ts(hs6)
+    return sorted(df["year"].dropna().astype(int).unique().tolist())

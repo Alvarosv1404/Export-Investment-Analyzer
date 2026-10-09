@@ -16,8 +16,8 @@ from ..model.financials import ProjectInputs, annual_pnl, build_cashflows
 from ..model.unit_economics import analyze_unit_economics
 from ..model.valuation import breakeven, run_sensitivity, summarize
 from ..pipeline import competitors, market
-from ..sources import comtrade, manual_tariffs
-from . import pricing
+from ..sources import manual_tariffs
+from . import excel_analysis, pricing
 from .landed_cost import landed_cost, price_positioning
 
 log = logging.getLogger(__name__)
@@ -95,27 +95,34 @@ def _records(frame: pd.DataFrame) -> list[dict]:
     return frame.where(pd.notna(frame), None).to_dict("records")
 
 
-def analyze_product(slug: str, *, target_share: float | None = None) -> dict[str, Any]:
+def analyze_product(
+    slug: str,
+    *,
+    target_share: float | None = None,
+    price_usd_per_kg: float | None = None,
+) -> dict[str, Any]:
     """Analisis completo de un producto del catalogo.
 
     target_share: participacion de mercado objetivo. Si es None se deriva como
     "share actual + 2 puntos porcentuales" (ver competitors.default_target_share),
     que es la unica forma de que la pregunta tenga sentido para cualquier producto.
+
+    price_usd_per_kg: precio FOB de venta en USD/kg. Si se pasa, sobrescribe el
+    default calculado de los historicos y el reporte lo marca como ajustado por
+    el usuario.
     """
     product = get_product(slug)
     catalog = load_catalog()
     reporter = catalog.defaults.reporter
     model_defaults = load_assumptions().defaults
-    years = comtrade.year_window(model_defaults.project_years)
 
     log.info("Analizando %s (%s)", product.name, product.hs6)
 
-    trade = comtrade.fetch_trade(
-        product.hs6,
-        reporter=reporter,
-        flow=catalog.defaults.flow,
-        years=years,
-    )
+    # Datos 100% locales: Trade Map en Excel. La ventana de anos sale de los
+    # anios que realmente trae el archivo, no de una funcion que asuma red.
+    trade = excel_analysis.peru_exports_trade(product.hs6)
+    years = sorted(trade["year"].dropna().astype(int).unique().tolist())
+
     market_summary = market.market_summary(trade)
     if not market_summary.get("available"):
         return {
@@ -127,11 +134,23 @@ def analyze_product(slug: str, *, target_share: float | None = None) -> dict[str
 
     comp = competitors.share_trends(product.hs6, reporter, product.competitors)
 
-    # Precio de referencia: el unit value del ultimo anio con data.
-    price = market_summary.get("latest_unit_value_usd")
-    fob_price = price if price else 0.0
+    # Precio de venta: input editable. Orden de resolucion:
+    #   1. lo que paso el usuario
+    #   2. estimado de los historicos (pricing)
+    #   3. unit value del Excel como ultimo respaldo
     price_calc = pricing.estimated_fob_price_usd_per_kg(product.hs6)
-    price_calc.get("price_usd_per_kg") if price_calc.get("price_usd_per_kg") is not None else fob_price
+    if price_usd_per_kg is not None:
+        fob_price = float(price_usd_per_kg)
+        price_origin = pricing.PRICE_ORIGIN_USER
+    elif price_calc.get("price_usd_per_kg") is not None:
+        fob_price = float(price_calc["price_usd_per_kg"])
+        price_origin = pricing.PRICE_ORIGIN_CALCULATED
+    else:
+        excel_price = market_summary.get("latest_unit_value_usd")
+        fob_price = float(excel_price) if excel_price else 0.0
+        price_origin = pricing.PRICE_ORIGIN_EXCEL
+    price_calc = {**price_calc, "price_usd_per_kg": fob_price, "origin": price_origin}
+
     capex_inputs = load_assumptions().for_product(slug)
     capacity = capex_inputs["capacity_kg_year"]
 
@@ -230,8 +249,9 @@ def analyze_product(slug: str, *, target_share: float | None = None) -> dict[str
             "breakeven": breakeven(assumed),
         },
         "data_quality": {
-            "market_data_source": "UN Comtrade (API publica)",
-            "years_with_data": sorted(trade["year"].dropna().unique().tolist()),
+            "market_data_source": "Trade Map (Excel local)",
+            "price_source": price_origin,
+            "years_with_data": years,
             "tariff_source": "data/raw/tariffs/tariffs.csv (carga manual)",
             "assumptions_source": "config/assumptions.yaml (supuestos, no data)",
             "warning": (

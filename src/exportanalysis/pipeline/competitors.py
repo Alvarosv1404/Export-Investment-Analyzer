@@ -2,39 +2,50 @@
 
 El calculo que interesa para decidir invertir no es "el mercado crece", es
 "hay espacio que Peru no esta tomando". Eso sale de comparar el share de Peru
-en un mercado contra el share de sus vecinos.
+en un mercado contra el share de sus vecinos, leyendo el Excel local de
+exportadores mundiales (`exporting-economies_<hs6>.xlsx`).
+
+Trade Map publica ahi solo valor (USD Thousand), no volumen. Por eso el
+`volume_kg` y el precio unitario de los competidores salen `None`: es un dato
+que la fuente no da, no un cero.
 """
 
 from __future__ import annotations
 
 import pandas as pd
 
-from ..sources import comtrade
+from . import excel_analysis
 
 
 def export_comparison(hs6: str, reporter: int, competitors: list[int]) -> pd.DataFrame:
     """Exportaciones del producto por pais competidor, anio a anio."""
-    codes = [reporter, *[c for c in competitors if c != reporter]]
-    frames = [comtrade.fetch_trade(hs6, reporter=code, flow="X", partner=0) for code in codes]
-    frames = [f for f in frames if not f.empty]
-    if not frames:
+    try:
+        world = excel_analysis.world_exports(hs6)
+    except FileNotFoundError:
+        return pd.DataFrame()
+    if world.empty:
         return pd.DataFrame()
 
-    out = pd.concat(frames, ignore_index=True)
-    out = out[out["is_world"]]
-    out = out.rename(columns={"reporter_name": "country", "reporter_code": "country_code"})
-    out["is_origin_country"] = out["country_code"] == reporter
+    # En `exporting-economies` cada fila es un pais exportador con partner=World.
+    world = world[world["partnerCd"].astype(int) == 0].copy()
+    codes = [reporter, *[c for c in competitors if c != reporter]]
+    world["country_code"] = world["reporterCd"].astype(int)
+    world = world[world["country_code"].isin(codes)]
+    if world.empty:
+        return pd.DataFrame()
 
     grouped = (
-        out.groupby(["country_code", "country", "year"], as_index=False)
-        .agg(value_usd=("fob_usd", "sum"), volume_kg=("net_weight_kg", "sum"))
+        world.groupby(["country_code", "reporterLabel", "year"], as_index=False)
+        .agg(value_usd=("fob_usd", "sum"))
+        .rename(columns={"reporterLabel": "country"})
     )
-    # El groupby se come la columna de bandera: se re-deriva del codigo.
+    grouped["volume_kg"] = pd.NA
+    grouped["unit_value_usd"] = pd.NA
+    # El groupby se come la bandera; se re-deriva del codigo.
     grouped["is_origin_country"] = grouped["country_code"] == reporter
 
     totals = grouped.groupby("year")["value_usd"].transform("sum")
     grouped["share"] = grouped["value_usd"] / totals.replace(0, pd.NA)
-    grouped["unit_value_usd"] = grouped["value_usd"] / grouped["volume_kg"].replace(0, pd.NA)
     return grouped.sort_values(["year", "value_usd"], ascending=[True, False]).reset_index(drop=True)
 
 

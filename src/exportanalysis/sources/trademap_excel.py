@@ -1,9 +1,14 @@
-﻿"""Carga de archivos Excel exportados desde Trade Map.
+﻿"""Carga cruda de archivos Excel exportados desde Trade Map.
+
+Este modulo es un adaptador de bajo nivel (sin transformacion). La logica de
+negocio vive en `exportanalysis.pipeline.excel_analysis`; aqui solo se abren
+los Excel y se devuelve el DataFrame tal cual, util para inspeccion puntual o
+para scripts.
 
 Formatos esperados:
 - exporting-economies_*.xlsx / importing-economies_*: por pais exportador/importador, valor en (USD Thousand) por año
 - perus-exports-to-world-by-importer_*.xlsx: exportaciones peruanas por socio, valor en (USD Thousand)
-- perus-indicadores-exports-to-world-in-2025-by-importer_*: snapshot 2025 con Value (kUSD), Quantity, Unit Value
+- perus-exports-to-world-in-2025-by-importer_*: snapshot 2025 con Value (kUSD), Quantity, Unit Value
 """
 from __future__ import annotations
 
@@ -28,8 +33,10 @@ def load_peru_by_partner(hs6: str) -> pd.DataFrame:
     df["reporterCd"] = df["reporterCd"].astype(str).str.zfill(3)
     df["partnerCd"] = df["partnerCd"].astype(str).str.zfill(3)
     return df
+
+
 def load_indicadores_2025(hs6: str) -> pd.DataFrame:
-    p = _find(hs6, "perus-indicadores-exports-to-world-in-2025-by-importer_{hs6}.xlsx")
+    p = _find(hs6, "perus-exports-to-world-in-2025-by-importer_{hs6}.xlsx")
     df = pd.read_excel(p)
     df = df[df["partnerLabel"] != "World"]
     df["partnerCd"] = df["partnerCd"].astype(str).str.zfill(3)
