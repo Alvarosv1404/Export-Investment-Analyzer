@@ -1,0 +1,47 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Export Investment Analyzer - Datos desde Excel</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;margin:0;padding:20px;background:#f7f9fc;color:#222}
+    h1{margin:0 0 12px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+    .card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.05);padding:12px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #eef2f7;padding:6px;text-align:right;font-size:13px}
+    th:first-child,td:first-child{text-align:left}
+    small{color:#6b7280}
+  </style>
+</head>
+<body>
+  <h1>Export Investment Analyzer</h1>
+  <small>Datos cargados directamente desde archivos Excel en data/</small>
+  <div class="grid">
+    <div class="card">
+      <h3>Destinos Perú ({{ hs6 }}) - 2024</h3>
+      <canvas id="barChart" height="180"></canvas>
+    </div>
+    <div class="card">
+      <h3>Top destinos 2024</h3>
+      <table>
+        <thead><tr><th>Destino</th><th>FOB USD</th><th>%</th></tr></thead>
+        <tbody>
+          {% for r in top %}
+          <tr><td>{{ r.partnerLabel }}</td><td>{{ "{:,.0f}".format(r.fob_usd) }}</td><td>{{ "{:.1f}%".format(r.share*100) }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    const ctx=document.getElementById('barChart').getContext('2d');
+    new Chart(ctx,{type:'bar',data:{
+      labels:{{ labels|tojson }},
+      datasets:[{label:'FOB USD (2024)',data:{{ values|tojson }},borderRadius:4}]
+    },options:{plugins:{legend:{display:false}},responsive:true,scales:{y:{ticks:{callback:v=>v.toLocaleString()}}}}});
+  </script>
+</body>
+</html>
