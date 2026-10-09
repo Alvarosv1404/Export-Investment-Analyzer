@@ -47,3 +47,30 @@ def world_imports(hs6: str) -> pd.DataFrame:
     df_m["year"] = df_m["year"].str.split(" ", n=1).str[0].astype(int)
     df_m["cif_usd"] = df_m["cif_usd_thousand"] * 1000.0
     return df_m
+
+def peru_exports_indicators_2025(hs6: str) -> pd.DataFrame:
+    p = _find(hs6, "perus-indicadores-exports-to-world-in-2025-by-importer_{hs6}.xlsx")
+    df = pd.read_excel(p)
+    df = df[df["partnerLabel"] != "World"].copy()
+    df["partnerCd"] = df["partnerCd"].astype(str).str.zfill(3)
+    out = df[["partnerCd", "partnerLabel", "Value (kUSD)", "Quantity", "Quantity Unit", "Unit Value"]].copy()
+    out["fob_usd_thousand"] = pd.to_numeric(out["Value (kUSD)"], errors="coerce")
+    out["quantity"] = pd.to_numeric(out["Quantity"], errors="coerce")
+    out["unit_value_usd_per_unit"] = pd.to_numeric(out["Unit Value"], errors="coerce")
+    out["fob_usd"] = out["fob_usd_thousand"] * 1000.0
+    out["year"] = 2025
+    return out
+
+
+def peru_exports_ts_with_quantity(hs6: str) -> pd.DataFrame:
+    ts = peru_exports_ts(hs6)
+    ts = ts.copy()
+    ts["partnerCd"] = ts["partnerCd"].astype(str)
+    try:
+        ind = peru_exports_indicators_2025(hs6)
+        ind = ind.copy()
+        ind["partnerCd"] = ind["partnerCd"].astype(str)
+        ind = ind[["partnerCd", "partnerLabel", "quantity", "unit_value_usd_per_unit", "year"]]
+        return ts.merge(ind, on=["year", "partnerCd", "partnerLabel"], how="left")
+    except Exception:
+        return ts.copy()
