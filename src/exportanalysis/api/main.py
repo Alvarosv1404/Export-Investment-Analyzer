@@ -150,21 +150,25 @@ def index(request: Request, slug: str | None = None, target_share: float | None 
         },
     )
 @app.get("/simple", response_class=HTMLResponse)
-def simple(request: Request, hs6: str = "081040"):
+def simple(request: Request, hs6: str = "081040", year: int = 2024):
     from ..pipeline import excel_analysis
     ts = excel_analysis.peru_exports_ts(hs6)
-    y2024 = ts[ts['year'] == 2024].copy()
-    total = y2024['fob_usd'].sum()
-    y2024['share'] = y2024['fob_usd'] / total if total else 0
-    y2024 = y2024.sort_values('fob_usd', ascending=False).head(15)
-    labels = y2024['partnerLabel'].tolist()
-    values = y2024['fob_usd'].tolist()
+    y = ts[ts["year"] == year].copy()
+    if y.empty:
+        year = int(ts["year"].max())
+        y = ts[ts["year"] == year].copy()
+    total = y["fob_usd"].sum()
+    y["share"] = y["fob_usd"] / total if total else 0
+    y = y.sort_values("fob_usd", ascending=False).head(15)
+    labels = y["partnerLabel"].tolist()
+    values = y["fob_usd"].tolist()
     return templates.TemplateResponse(
         request,
         "simple.html",
         {
             "hs6": hs6,
-            "top": y2024.to_dict('records'),
+            "year": year,
+            "top": y.to_dict("records"),
             "labels": labels,
             "values": values,
         },
