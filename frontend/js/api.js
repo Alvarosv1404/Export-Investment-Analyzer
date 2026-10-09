@@ -27,10 +27,19 @@ async function getJSON(path) {
 }
 
 export const getProducts = () => getJSON('/api/products')
-export const getAnalysis = (slug, targetShare) => {
-  const q = targetShare === null || targetShare === undefined || targetShare === ''
-    ? ''
-    : `?target_share=${encodeURIComponent(targetShare)}`
-  return getJSON(`/api/analysis/${encodeURIComponent(slug)}${q}`)
+export const getAnalysis = (slug, targetShare, price) => {
+  const params = new URLSearchParams()
+  if (targetShare !== null && targetShare !== undefined && targetShare !== '') {
+    params.set('target_share', targetShare)
+  }
+  if (price !== null && price !== undefined && price !== '') {
+    params.set('price_usd_per_kg', price)
+  }
+  const q = params.toString()
+  return getJSON(`/api/analysis/${encodeURIComponent(slug)}${q ? `?${q}` : ''}`)
+}
+export const getComparison = (slugs = []) => {
+  const q = slugs.length ? `?slugs=${encodeURIComponent(slugs.join(','))}` : ''
+  return getJSON(`/api/comparison${q}`)
 }
 export const getHealth = () => getJSON('/health')

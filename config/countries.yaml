@@ -1,5 +1,5 @@
 # Codigos de pais M49 (ONU) + ISO3. Formato: M49: {nombre, iso3}.
-# M49 es lo que usan UN Comtrade y WITS como `partnerCode` / `reporterCode`.
+# M49 es el codigo de pais que usa Trade Map como `partnerCd` / `reporterCd`.
 # Fuente: https://unstats.un.org/unsd/methodology/m49/
 
 PERU: {code: 604, iso3: PER, name: Peru}

@@ -136,6 +136,37 @@ class TestAnalysis:
         assert client.get("/api/analysis/cafe_verde?target_share=1.5").status_code == 422
         assert client.get("/api/analysis/cafe_verde?target_share=-0.1").status_code == 422
 
+    def test_precio_explicito_se_usa_y_se_marca(self, client):
+        data = client.get("/api/analysis/cafe_verde?price_usd_per_kg=6.5").json()
+        assert data["unit_economics"]["fob_price_usd_per_kg"] == 6.5
+        assert data["data_quality"]["price_source"] == "ajustado por el usuario"
+
+    def test_precio_por_defecto_es_calculado(self, client):
+        data = client.get("/api/analysis/cafe_verde").json()
+        assert data["data_quality"]["price_source"] == "calculado de históricos"
+        assert data["unit_economics"]["fob_price_usd_per_kg"] > 0
+
+    def test_precio_invalido_da_422(self, client):
+        assert client.get("/api/analysis/cafe_verde?price_usd_per_kg=0").status_code == 422
+        assert client.get("/api/analysis/cafe_verde?price_usd_per_kg=-1").status_code == 422
+
+    def test_la_fuente_declarada_es_offline(self, client):
+        data = client.get("/api/analysis/cafe_verde").json()
+        assert data["data_quality"]["market_data_source"] == "Trade Map (Excel local)"
+
+
+class TestComparison:
+    def test_comparacion_es_json_valido(self, client):
+        response = client.get("/api/comparison?slugs=cafe_verde,uva_fresca")
+        assert response.status_code == 200
+        data = response.json()
+        _assert_json_valid(data)
+        assert data["available_count"] >= 2
+
+    def test_comparacion_sin_slugs_usa_todos(self, client):
+        data = client.get("/api/comparison").json()
+        assert data["available_count"] >= 1
+
 
 class TestHtml:
     def test_raiz_renderiza(self, client):

@@ -16,6 +16,15 @@ Por producto se esperan 4 archivos Excel (nombres exactos):
 - Trade Map (ITC) - datos publicos de comercio internacional
 - Datos cargados localmente desde Excel (sin APIs ni claves)
 
+## Unidades y lectura
+
+- Los valores de los Excel vienen en **USD Thousand** y se convierten a USD.
+- El snapshot 2025 trae `Quantity` en toneladas (`Quantity Unit` = Tons); el
+  pipeline la normaliza a kilos. El volumen solo existe en 2025: en los demas
+  anos queda vacio, no en cero.
+- `reporterCd`/`partnerCd` son codigos M49; `partnerCd = 0` es el total "World".
+- La busqueda de archivos ignora cualquier carpeta `_cache`.
+
 ## Agregar nuevo producto
 
 Para agregar un producto sin tocar codigo:

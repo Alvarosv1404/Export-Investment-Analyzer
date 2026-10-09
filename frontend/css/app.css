@@ -35,10 +35,10 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
 
 /* --- control de participacion de mercado objetivo --- */
 #controls { max-width: 1080px; margin: 0 auto 1.5rem; }
-.share-form {
+.share-form, .controls-form {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.75rem 1rem;
   padding: 0.85rem 1rem;
   background: var(--card);
@@ -46,7 +46,9 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   border-radius: 8px;
   margin-bottom: 1rem;
 }
-.share-form label { font-size: 0.8rem; color: var(--ink-soft); }
+.share-form label, .controls-form label { font-size: 0.8rem; color: var(--ink-soft); }
+.control-block { display: flex; flex-direction: column; gap: 0.3rem; }
+.check { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--ink-soft); }
 .share-controls { display: flex; align-items: center; gap: 0.6rem; flex: 1; }
 .share-controls input {
   width: 7rem;

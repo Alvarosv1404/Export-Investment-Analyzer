@@ -174,8 +174,38 @@ export function tornado(canvas, sens) {
   })
 }
 
+/** Comparacion entre productos: exportaciones FOB por anio. */
+export function comparisonChart(canvas, data) {
+  if (!canvas || !data?.products?.length) return
+  const prods = data.products.filter((p) => p.available && p.series?.length)
+  if (!prods.length) return
+  const years = [...new Set(prods.flatMap((p) => p.series.map((r) => r.year)))].sort((a, b) => a - b)
+  const colors = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#f59e0b', '#0891b2', '#db2777', '#65a30d']
+  const datasets = prods.map((p, i) => ({
+    label: p.slug,
+    data: years.map((y) => {
+      const row = p.series.find((r) => r.year === y)
+      return row ? row.fob_usd : null
+    }),
+    borderColor: colors[i % colors.length],
+    tension: 0.25,
+    spanGaps: true,
+  }))
+  new Chart(canvas, {
+    type: 'line',
+    data: { labels: years, datasets },
+    options: {
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${money(c.parsed.y)}` } },
+      },
+      scales: { y: { ticks: { callback: compact }, title: { display: true, text: 'Exportaciones FOB (USD)' } } },
+    },
+  })
+}
+
 /** Dibuja todos los graficos del reporte. Idempotente por id de canvas. */
-export function renderAll(result) {
+export function renderAll(result, comparisonData) {
   if (!init() || !result) return
   const get = (id) => document.getElementById(id)
   series(get('chartSeries'), result.market)
@@ -184,4 +214,5 @@ export function renderAll(result) {
   headroom(get('chartLadder'), result.headroom)
   cashflows(get('chartCash'), result.investment)
   tornado(get('chartSens'), result.investment?.sensitivity)
+  comparisonChart(get('chartComparison'), comparisonData)
 }

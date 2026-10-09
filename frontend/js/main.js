@@ -10,9 +10,10 @@
  * En produccion, el mismo build lo sirve FastAPI desde el mismo origen.
  */
 
-import { getAnalysis, getProducts } from './api.js'
+import { getAnalysis, getComparison, getProducts } from './api.js'
 import { renderAll } from './charts.js'
 import {
+  comparison,
   competitors,
   destinations,
   headroom,
@@ -25,10 +26,14 @@ import {
 } from './components.js'
 import { escapeHTML } from './components.js'
 
+const urlParams = new URLSearchParams(location.search)
 const state = {
-  slug: new URLSearchParams(location.search).get('slug'),
-  targetShare: new URLSearchParams(location.search).get('target_share') || '',
+  slug: urlParams.get('slug'),
+  targetShare: urlParams.get('target_share') || '',
+  price: urlParams.get('price') || '',
+  compare: urlParams.get('compare') === '1',
   products: [],
+  comparisonData: null,
 }
 
 /** Actualiza la URL sin recargar, para que la vista sea compartible. */
@@ -36,6 +41,8 @@ function syncURL() {
   const params = new URLSearchParams()
   if (state.slug) params.set('slug', state.slug)
   if (state.targetShare) params.set('target_share', state.targetShare)
+  if (state.price) params.set('price', state.price)
+  if (state.compare) params.set('compare', '1')
   const qs = params.toString()
   history.replaceState(null, '', qs ? `?${qs}` : location.pathname)
 }
@@ -45,7 +52,7 @@ function showError(message) {
     <div class="alert error"><strong>Error:</strong> ${escapeHTML(message)}</div>`
 }
 
-/** Selector de producto y campo de participacion objetivo. */
+/** Selector de producto, participacion objetivo, precio y comparacion. */
 function renderControls() {
   const chips = state.products
     .map(
@@ -57,18 +64,32 @@ function renderControls() {
     )
     .join('')
 
-  const shareInput = `
-    <form class="share-form" id="shareForm">
-      <label for="shareInput">Participacion de mercado objetivo (opcional)</label>
-      <div class="share-controls">
-        <input type="number" id="shareInput" name="target_share" min="0" max="100" step="0.5"
-               placeholder="auto" value="${escapeHTML(shareInputValue())}" />
-        <span class="share-hint">% &mdash; vacio = share actual + 2 pp</span>
-        <button type="submit" class="btn">Aplicar</button>
+  const form = `
+    <form class="controls-form" id="controlsForm">
+      <div class="control-block">
+        <label for="shareInput">Participacion de mercado objetivo (opcional)</label>
+        <div class="share-controls">
+          <input type="number" id="shareInput" name="target_share" min="0" max="100" step="0.5"
+                 placeholder="auto" value="${escapeHTML(shareInputValue())}" />
+          <span class="share-hint">% &mdash; vacio = share actual + 2 pp</span>
+        </div>
       </div>
+      <div class="control-block">
+        <label for="priceInput">Precio FOB de venta (opcional)</label>
+        <div class="share-controls">
+          <input type="number" id="priceInput" name="price" min="0" step="0.001"
+                 placeholder="auto" value="${escapeHTML(state.price)}" />
+          <span class="share-hint">USD/kg &mdash; vacio = calculado de los historicos</span>
+        </div>
+      </div>
+      <label class="check">
+        <input type="checkbox" id="compareInput" ${state.compare ? 'checked' : ''} />
+        Comparar con los demas productos del catalogo
+      </label>
+      <button type="submit" class="btn">Aplicar</button>
     </form>`
 
-  return `<nav class="products">${chips}</nav>${shareInput}`
+  return `<nav class="products">${chips}</nav>${form}`
 }
 
 /**
@@ -87,18 +108,23 @@ function shareInputValue() {
 function productHref(slug) {
   const params = new URLSearchParams({ slug })
   if (state.targetShare) params.set('target_share', state.targetShare)
+  if (state.price) params.set('price', state.price)
+  if (state.compare) params.set('compare', '1')
   return `?${params.toString()}`
 }
 
-/** Inserta un control de participacion que dispara una recarga suave. */
-function bindShareForm(onChange) {
-  const form = document.getElementById('shareForm')
+/** Inserta los controles que disparan una recarga suave. */
+function bindControls(onChange) {
+  const form = document.getElementById('controlsForm')
   if (!form) return
   form.addEventListener('submit', (event) => {
     event.preventDefault()
-    const raw = document.getElementById('shareInput').value.trim()
+    const share = document.getElementById('shareInput').value.trim()
+    const price = document.getElementById('priceInput').value.trim()
     // El input esta en porcentaje (0-100); la API espera fraccion (0-1).
-    state.targetShare = raw === '' ? '' : (Number(raw) / 100).toFixed(4)
+    state.targetShare = share === '' ? '' : (Number(share) / 100).toFixed(4)
+    state.price = price === '' ? '' : String(Number(price))
+    state.compare = document.getElementById('compareInput').checked
     syncURL()
     onChange()
   })
@@ -133,10 +159,11 @@ function render(result) {
     tariffs(result),
     investment(result.investment),
     sensitivity(result.investment),
+    state.compare ? comparison(state.comparisonData) : '',
     sources(result),
   ].join('')
 
-  renderAll(result)
+  renderAll(result, state.comparisonData)
 }
 
 async function load() {
@@ -162,9 +189,17 @@ async function load() {
   }
 
   try {
-    const result = await getAnalysis(state.slug, state.targetShare)
+    const result = await getAnalysis(state.slug, state.targetShare, state.price)
+    state.comparisonData = null
+    if (state.compare) {
+      try {
+        state.comparisonData = await getComparison([])
+      } catch (err) {
+        state.comparisonData = { error: err.message }
+      }
+    }
     document.getElementById('controls').innerHTML = renderControls()
-    bindShareForm(load)
+    bindControls(load)
     render(result)
   } catch (err) {
     showError(err.message)

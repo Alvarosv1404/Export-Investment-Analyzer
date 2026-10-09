@@ -90,14 +90,23 @@ def list_products() -> dict:
 
 
 @app.get("/api/analysis/{slug}")
-def analysis(slug: str, target_share: float | None = Query(default=None, ge=0.0, le=1.0)) -> JSONResponse:
+def analysis(
+    slug: str,
+    target_share: float | None = Query(default=None, ge=0.0, le=1.0),
+    price_usd_per_kg: float | None = Query(default=None, gt=0.0),
+) -> JSONResponse:
     """Analisis completo de un producto.
 
     target_share: participacion de mercado objetivo. Opcional; si se omite se
     deriva como "share actual + 2 pp".
+
+    price_usd_per_kg: precio FOB de venta. Opcional; si se omite se calcula de
+    los historicos y, en ultimo caso, del unit value del Excel.
     """
     try:
-        result = analyze_product(slug, target_share=target_share)
+        result = analyze_product(
+            slug, target_share=target_share, price_usd_per_kg=price_usd_per_kg
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -107,7 +116,12 @@ def analysis(slug: str, target_share: float | None = Query(default=None, ge=0.0,
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, slug: str | None = None, target_share: float | None = None):
+def index(
+    request: Request,
+    slug: str | None = None,
+    target_share: float | None = None,
+    price_usd_per_kg: float | None = None,
+):
     """Sirve el frontend.
 
     Hay dos modos, y se eligen solos:
@@ -133,7 +147,9 @@ def index(request: Request, slug: str | None = None, target_share: float | None 
     error = None
     if selected_slug:
         try:
-            analysis_result = analyze_product(selected_slug, target_share=target_share)
+            analysis_result = analyze_product(
+                selected_slug, target_share=target_share, price_usd_per_kg=price_usd_per_kg
+            )
         except (KeyError, ValueError) as exc:
             error = str(exc)
             log.warning("No se pudo analizar %s: %s", selected_slug, exc)
@@ -148,6 +164,7 @@ def index(request: Request, slug: str | None = None, target_share: float | None 
             "result": _json_safe(analysis_result) if analysis_result else None,
             "error": error,
             "target_share": target_share,
+            "price_usd_per_kg": price_usd_per_kg,
         },
     )
 @app.get("/api/comparison")

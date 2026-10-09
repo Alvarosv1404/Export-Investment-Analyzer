@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import sys
-sys.path.insert(0, "src")
 
-import numpy as np
+sys.path.insert(0, "src")
 
 from exportanalysis.pipeline import excel_analysis
 
@@ -46,3 +45,30 @@ def test_world_exports_and_imports_readable():
     assert len(wi) > 0
     assert "year" in we.columns and "fob_usd" in we.columns
     assert "year" in wi.columns
+
+
+def test_peru_exports_trade_tiene_fila_world():
+    df = excel_analysis.peru_exports_trade("081040")
+    assert {"year", "partner_code", "partner_name", "is_world", "fob_usd", "net_weight_kg"} <= set(df.columns)
+    world = df[df["is_world"]]
+    assert len(world) > 0
+    # 2025 es el unico anio con volumen publicado (snapshot).
+    assert df[df["year"] == 2025]["net_weight_kg"].notna().any()
+
+
+def test_available_years_ordenados():
+    years = excel_analysis.available_years("081040")
+    assert years == sorted(years)
+    assert years[-1] >= 2025
+
+
+def test_todos_los_productos_leen_sus_cuatro_excel():
+    """Regresion: un nombre de archivo distinto rompia el producto en silencio."""
+    from exportanalysis.config import load_catalog
+
+    for product in load_catalog().products:
+        trade = excel_analysis.peru_exports_trade(product.hs6)
+        assert len(trade) > 0, f"sin serie peruana para {product.slug}"
+        assert len(excel_analysis.world_exports(product.hs6)) > 0, f"sin exportadores para {product.slug}"
+        assert len(excel_analysis.world_imports(product.hs6)) > 0, f"sin importadores para {product.slug}"
+        assert len(excel_analysis.peru_exports_indicators_2025(product.hs6)) > 0, f"sin snapshot 2025 para {product.slug}"

@@ -104,14 +104,14 @@ products:
 
   - slug: citricos
     name: Citricos
-    hs6: "080521"
-    nandina: "0805210000"
+    hs6: "080529"
+    nandina: "0805290000"
     unit: kg
     competitors: [724, 710, 792, 818, 156, 152]  # Espana, Sudafrica, Turquia, Egipto, China, Chile
     presentations:
+      - {hs6: "080529", label: "Otros citricos, frescos"}
       - {hs6: "080521", label: "Mandarina y tangerina, frescas"}
       - {hs6: "080550", label: "Limon y lima, frescos"}
-      - {hs6: "080529", label: "Otros citricos, frescos"}
 
   - slug: quinua
     name: Quinua

@@ -61,8 +61,8 @@ defaults:
 #   - opex_fixed_usd_year           -> planilla + alquiler + servicios
 #
 # El modulo model/unit_economics.py cruza estos costos contra el precio FOB real
-# que publica Comtrade y avisa si el margen por kilo es negativo. Corre eso
-# PRIMERO: si el margen es negativo, el VAN no dice nada.
+# que sale de los Excel de Trade Map y avisa si el margen por kilo es negativo.
+# Corre eso PRIMERO: si el margen es negativo, el VAN no dice nada.
 products:
   cafe_verde:
     capacity_kg_year: 500000

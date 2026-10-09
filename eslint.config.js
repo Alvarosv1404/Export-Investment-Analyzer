@@ -36,7 +36,18 @@ export default [
       globals: {
         process: 'readonly',
         console: 'readonly',
+        fetch: 'readonly',
         setTimeout: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
+  {
+    files: ['*.config.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
         URL: 'readonly',
       },
     },

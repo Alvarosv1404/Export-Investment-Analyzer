@@ -53,7 +53,7 @@ export function unitEconomics(u) {
         <span class="tag ${viable ? 'tag-ok' : 'tag-bad'}">${viable ? 'viable' : 'margen negativo'}</span>
       </h2>
       <div class="kpis">
-        ${kpi('Precio FOB de mercado', usd(u.fob_price_usd_per_kg), 'dato Comtrade')}
+        ${kpi('Precio FOB de mercado', usd(u.fob_price_usd_per_kg), 'Trade Map / input')}
         ${kpi('Costo variable total', usd(u.total_variable_cost_usd_per_kg), 'supuesto tuyo')}
         ${kpi('Margen bruto', usd(u.gross_margin_usd_per_kg), `${pct(u.gross_margin_pct)} por kilo`, viable ? '' : 'neg')}
         ${kpi('Precio de equilibrio', usd(u.breakeven_fob_price_usd_per_kg), 'minimo para no perder')}
@@ -259,6 +259,49 @@ export function sensitivity(inv) {
       <p class="note">Cada variable se mueve sola, una a la vez. El largo de la barra es cuanto mueve el VAN.</p>
       <div class="chart chart-tall"><canvas id="chartSens" height="200"></canvas></div>
       <p class="note">VAN base: <b>${fullUSD(inv.sensitivity.base_npv_usd)}</b>.</p>
+    </section>`
+}
+
+// --- Comparacion entre productos -------------------------------------------------
+export function comparison(data) {
+  if (!data) return ''
+  if (data.error) {
+    return `<section class="card"><div class="alert error">${escapeHTML(data.error)}</div></section>`
+  }
+  const products = (data.products || []).filter((p) => p.available)
+  if (!products.length) {
+    return `<section class="card"><div class="alert">Sin productos con datos para comparar.</div></section>`
+  }
+  const rows = products.map(
+    (p) => `
+      <tr>
+        <td>${escapeHTML(p.slug)} <span class="hs6">HS ${escapeHTML(p.hs6)}</span></td>
+        <td class="num">${p.latest_year ?? 'n/d'}</td>
+        <td class="num">${pct(p.cagr_value)}</td>
+        <td class="num">${pct(p.cagr_volume)}</td>
+        <td class="num">${pctSigned(p.cagr_unit_value)}</td>
+        <td class="num">${pct(p.volatility_value)}</td>
+        <td class="num">${pct(p.concentration_top5, 0)}</td>
+      </tr>`
+  )
+  return `
+    <section class="card">
+      <h2>9. Comparacion entre productos ${tagData}</h2>
+      <p class="note">${products.length} producto(s) con datos. La volatilidad es la desviacion estandar del
+        crecimiento anual: mas alta = mas riesgo. La concentracion top 5 es de las exportaciones peruanas.</p>
+      <div class="chart"><canvas id="chartComparison" height="90"></canvas></div>
+      ${table(
+        [
+          { label: 'Producto' },
+          { label: 'Ultimo ano', num: true },
+          { label: 'CAGR valor', num: true },
+          { label: 'CAGR volumen', num: true },
+          { label: 'CAGR precio', num: true },
+          { label: 'Volatilidad', num: true },
+          { label: 'Concentracion top 5', num: true },
+        ],
+        rows
+      )}
     </section>`
 }
 

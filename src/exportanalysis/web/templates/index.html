@@ -10,7 +10,7 @@
 <body>
 <header>
   <h1>Analisis de exportacion e inversion</h1>
-  <p class="sub">Mercado y competencia desde datos publicos (UN Comtrade). Decision de inversion con supuestos explicitos.</p>
+  <p class="sub">Mercado y competencia desde Trade Map en Excel local. Decision de inversion con supuestos explicitos.</p>
 </header>
 
 <nav class="products">
@@ -47,7 +47,7 @@
   <section class="card {% if not u.is_viable %}card-bad{% endif %}">
     <h2>1. Economia unitaria <span class="tag {% if u.is_viable %}tag-ok{% else %}tag-bad{% endif %}">{{ 'viable' if u.is_viable else 'margen negativo' }}</span></h2>
     <div class="kpis">
-      <div class="kpi"><span class="kpi-label">Precio FOB de mercado</span><span class="kpi-value">${{ '%.3f'|format(u.fob_price_usd_per_kg) }}</span><span class="kpi-note">dato Comtrade</span></div>
+      <div class="kpi"><span class="kpi-label">Precio FOB de mercado</span><span class="kpi-value">${{ '%.3f'|format(u.fob_price_usd_per_kg) }}</span><span class="kpi-note">dato Trade Map / input</span></div>
       <div class="kpi"><span class="kpi-label">Costo variable total</span><span class="kpi-value">${{ '%.3f'|format(u.total_variable_cost_usd_per_kg) }}</span><span class="kpi-note">supuesto tuyo</span></div>
       <div class="kpi"><span class="kpi-label">Margen bruto</span><span class="kpi-value {{ 'neg' if not u.is_viable }}">${{ '%.3f'|format(u.gross_margin_usd_per_kg) }}</span><span class="kpi-note">{{ '%.1f'|format(u.gross_margin_pct * 100) }}% por kilo</span></div>
       <div class="kpi"><span class="kpi-label">Precio de equilibrio</span><span class="kpi-value">${{ '%.3f'|format(u.breakeven_fob_price_usd_per_kg) }}</span><span class="kpi-note">minimo para no perder</span></div>
@@ -59,12 +59,12 @@
     <h2>2. Mercado <span class="tag tag-data">dato publicado</span></h2>
     <div class="kpis">
       <div class="kpi"><span class="kpi-label">Exportaciones FOB</span><span class="kpi-value">${{ '{:,.0f}'.format(m.latest_fob_usd) }}</span><span class="kpi-note">{{ m.latest_year }}</span></div>
-      <div class="kpi"><span class="kpi-label">Volumen</span><span class="kpi-value">{{ '{:,.0f}'.format(m.latest_volume_kg) }} kg</span><span class="kpi-note">peso neto</span></div>
-      <div class="kpi"><span class="kpi-label">Precio unitario</span><span class="kpi-value">${{ '%.3f'|format(m.latest_unit_value_usd) }}</span><span class="kpi-note">por kg, promedio ponderado</span></div>
-      <div class="kpi"><span class="kpi-label">CAGR valor</span><span class="kpi-value {{ 'neg' if m.cagr_value < 0 }}">{{ '%.1f'|format(m.cagr_value * 100) }}%</span><span class="kpi-note">ventana analizada</span></div>
-      <div class="kpi"><span class="kpi-label">CAGR volumen</span><span class="kpi-value {{ 'neg' if m.cagr_volume < 0 }}">{{ '%.1f'|format(m.cagr_volume * 100) }}%</span><span class="kpi-note">fisico</span></div>
-      <div class="kpi"><span class="kpi-label">CAGR precio</span><span class="kpi-value {{ 'neg' if m.cagr_unit_value < 0 }}">{{ '%+.1f'|format(m.cagr_unit_value * 100) }}%</span><span class="kpi-note">efecto precio vs volumen</span></div>
-      <div class="kpi"><span class="kpi-label">Concentracion top 5</span><span class="kpi-value">{{ '%.0f'|format(m.top5_concentration * 100) }}%</span><span class="kpi-note">en 5 destinos</span></div>
+      <div class="kpi"><span class="kpi-label">Volumen</span><span class="kpi-value">{{ '{:,.0f}'.format(m.latest_volume_kg) if m.latest_volume_kg is not none else 'n/d' }} kg</span><span class="kpi-note">peso neto</span></div>
+      <div class="kpi"><span class="kpi-label">Precio unitario</span><span class="kpi-value">{{ '$%.3f'|format(m.latest_unit_value_usd) if m.latest_unit_value_usd is not none else 'n/d' }}</span><span class="kpi-note">por kg, promedio ponderado</span></div>
+      <div class="kpi"><span class="kpi-label">CAGR valor</span><span class="kpi-value {{ 'neg' if m.cagr_value is not none and m.cagr_value < 0 }}">{{ '%.1f'|format(m.cagr_value * 100) if m.cagr_value is not none else 'n/d' }}%</span><span class="kpi-note">ventana analizada</span></div>
+      <div class="kpi"><span class="kpi-label">CAGR volumen</span><span class="kpi-value {{ 'neg' if m.cagr_volume is not none and m.cagr_volume < 0 }}">{{ '%.1f'|format(m.cagr_volume * 100) if m.cagr_volume is not none else 'n/d' }}%</span><span class="kpi-note">fisico</span></div>
+      <div class="kpi"><span class="kpi-label">CAGR precio</span><span class="kpi-value {{ 'neg' if m.cagr_unit_value is not none and m.cagr_unit_value < 0 }}">{{ '%+.1f'|format(m.cagr_unit_value * 100) if m.cagr_unit_value is not none else 'n/d' }}%</span><span class="kpi-note">efecto precio vs volumen</span></div>
+      <div class="kpi"><span class="kpi-label">Concentracion top 5</span><span class="kpi-value">{{ '%.0f'|format(m.top5_concentration * 100) if m.top5_concentration is not none else 'n/d' }}%</span><span class="kpi-note">en 5 destinos</span></div>
     </div>
     <div class="chart"><canvas id="chartSeries" height="90"></canvas></div>
   </section>
@@ -80,7 +80,7 @@
     {% if c.get('available') %}
       <div class="kpis">
         <div class="kpi"><span class="kpi-label">Puesto de Peru</span><span class="kpi-value">#{{ c.origin_rank }}</span><span class="kpi-note">de {{ c.origin_countries }} con data</span></div>
-        <div class="kpi"><span class="kpi-label">Participacion</span><span class="kpi-value">{{ '%.1f'|format(c.origin_share * 100) }}%</span><span class="kpi-note">{{ c.latest_year }}</span></div>
+        <div class="kpi"><span class="kpi-label">Participacion</span><span class="kpi-value">{{ '%.1f'|format(c.origin_share * 100) if c.origin_share is not none else 'n/d' }}%</span><span class="kpi-note">{{ c.latest_year }}</span></div>
         <div class="kpi"><span class="kpi-label">Tendencia</span><span class="kpi-value">{{ c.share_trend }}</span><span class="kpi-note">ganando o perdiendo share</span></div>
       </div>
       {% if c.coverage_warning %}<div class="alert warn">{{ c.coverage_warning }}</div>{% endif %}
@@ -91,8 +91,8 @@
           <tr class="{{ 'hl' if r.is_origin_country }}">
             <td>{{ r.rank }}</td><td>{{ r.country }}{% if r.is_origin_country %} <span class="tag tag-self">Peru</span>{% endif %}</td>
             <td class="num">{{ '{:,.0f}'.format(r.value_usd) }}</td>
-            <td class="num">{{ '{:,.0f}'.format(r.volume_kg) }}</td>
-            <td class="num">{{ '%.1f'|format(r.share * 100) }}%</td>
+            <td class="num">{{ '{:,.0f}'.format(r.volume_kg) if r.volume_kg else 'n/d' }}</td>
+            <td class="num">{{ '%.1f'|format(r.share * 100) if r.share is not none else 'n/d' }}%</td>
             <td class="num">{{ '%.2f'|format(r.unit_value_usd) if r.unit_value_usd else 'n/d' }}</td>
           </tr>
           {% endfor %}
@@ -213,7 +213,7 @@
 {% endif %}
 
 <footer>
-  <p>Analisis de exportacion e inversion. Datos de comercio: UN Comtrade (ONU). El arancel y los supuestos financieros no provienen de fuentes automaticas.</p>
+  <p>Analisis de exportacion e inversion. Datos de comercio: Trade Map (Excel local, 100% offline). El arancel y los supuestos financieros no provienen de fuentes automaticas.</p>
 </footer>
 
 <script>

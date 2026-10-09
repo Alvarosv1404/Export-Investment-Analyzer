@@ -15,12 +15,9 @@ limitacion que se pueda sortear con ingenieria:
     generar un link que llegue direto a la celda del arancel.
   - Los endpoints internos cambian sin aviso y no hay contrato que los proteja.
 
-Alternativa que si existe y conviene tener en el radar: UN Comtrade publica el
-endpoint `data/v1/getTariffline` (arancel line a line), que es la misma base de
-datos de la que Trade Map saca estos numeros. Verificado el 2026-09-30: sin
-`subscription-key` devuelve 404, porque cae dentro de las APIs que requieren
-cuenta. Si te registras en https://comtradeapi.un.org y pides una key gratuita,
-este mismo script puede pasar a descargar el arancel solo. Ver `--help`.
+Alternativa historica: UN Comtrade publica el endpoint `data/v1/getTariffline`
+(arancel line a line), pero requiere `subscription-key`. El proyecto corre
+offline, asi que no se usa: el arancel entra a mano por el CSV.
 
 QUE HACE
 ========
@@ -54,8 +51,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from exportanalysis.config import country_name, get_product, load_catalog  # noqa: E402
-from exportanalysis.pipeline import market  # noqa: E402
-from exportanalysis.sources import comtrade  # noqa: E402
+from exportanalysis.pipeline import excel_analysis, market  # noqa: E402
 from exportanalysis.sources.manual_tariffs import COLUMNS, TARIFF_FILE, tariff_for  # noqa: E402
 
 TRADEMAP_URL = "https://www.trademap.org/"
@@ -77,15 +73,15 @@ def _product(slug: str | None):
     return catalog.products[0]
 
 
-def _destinations(hs6: str, origin: int, years: list[int], configured: list[int]) -> tuple[list[int], str]:
+def _destinations(hs6: str, origin: int, configured: list[int]) -> tuple[list[int], str]:
     """Destinos reales del ultimo anio con data; si no hay data, los del config."""
     try:
-        trade = comtrade.fetch_trade(hs6=hs6, reporter=origin, years=years)
+        trade = excel_analysis.peru_exports_trade(hs6)
         frame = market.destination_breakdown(trade)
         if not frame.empty:
-            return frame["partner_code"].head(6).tolist(), "destinos reales (Comtrade)"
-    except Exception as exc:  # noqa: BLE001 - aca una falla de red no debe tumbar la ayuda
-        print(f"  aviso: no se pudo consultar Comtrade ({exc}); uso los competidores del config.", file=sys.stderr)
+            return frame["partner_code"].head(6).tolist(), "destinos reales (Trade Map Excel)"
+    except Exception as exc:  # noqa: BLE001 - aca un archivo faltante no debe tumbar la ayuda
+        print(f"  aviso: no se pudo leer el Excel de Trade Map ({exc}); uso los competidores del config.", file=sys.stderr)
     return list(configured), "competidores del config (sin data de destinos)"
 
 
@@ -209,9 +205,7 @@ def main() -> int:
     catalog = load_catalog()
     origin = catalog.defaults.reporter
     year = args.year or (pd.Timestamp.now().year - 1)
-    destinations, source = _destinations(
-        product.hs6, origin, comtrade.year_window(catalog.defaults.years), product.competitors
-    )
+    destinations, source = _destinations(product.hs6, origin, product.competitors)
 
     if not destinations:
         print("  No hay destinos: el producto no tiene data de comercio ni competidores en el config.")

@@ -10,8 +10,8 @@ un producto, cuanto dinero puedo hacer y con que evidencia.**
 Combina dos cosas que normalmente viven separadas:
 
 1. **Datos publicados de comercio** (volumen, valor FOB, precio unitario,
-   principales destinos y competidores) que salen de la API publica de
-   UN Comtrade.
+   principales destinos y competidores) que salen de los **Excel de Trade Map
+   locales**. El proyecto corre 100% offline: sin API, sin claves, sin internet.
 2. **Un modelo de inversion** (CAPEX, OPEX, capital de trabajo, VAN, TIR,
    payback, sensibilidad) con los supuestos que defines tu.
 
@@ -136,10 +136,12 @@ puerto esta ocupado, en vez de un `Errno 10048` de uvicorn.
 
 | Ruta | Que hace |
 |---|---|
-| `GET /` | Reporte con los 8 bloques y graficos |
+| `GET /` | Reporte completo con los bloques del analisis y graficos |
 | `GET /api/products` | Catalogo de productos configurados |
 | `GET /api/analysis/{slug}` | Analisis completo en JSON |
 | `GET /api/analysis/{slug}?target_share=0.12` | Con participacion de mercado objetivo explicita |
+| `GET /api/analysis/{slug}?price_usd_per_kg=6.5` | Con precio FOB de venta explicito |
+| `GET /api/comparison?slugs=cafe_verde,uva_fresca` | Comparacion entre productos |
 | `GET /health` | Sonda de salud |
 | `GET /docs` | Swagger UI interactivo |
 
@@ -201,36 +203,33 @@ automaticamente.
 
 ## De donde salen los datos
 
-### Mercado y competencia: UN Comtrade (verificado)
+### Mercado y competencia: Excel de Trade Map (100% offline)
 
-Endpoint publico, sin clave de API:
+El proyecto no consulta ninguna API. Cada producto es una carpeta
+`data/<hs6> <nombre>/` con cuatro Excel exportados de ITC Trade Map:
 
-```
-https://comtradeapi.un.org/public/v1/preview/C/A/HS
-```
+| Archivo | Que trae | Unidad |
+|---|---|---|
+| `exporting-economies_<hs6>.xlsx` | Exportaciones de cada pais exportador (partner = World), serie por ano | USD Thousand |
+| `importing-economies_<hs6>.xlsx` | Importaciones de cada pais importador (partner = World), serie por ano | USD Thousand |
+| `perus-exports-to-world-by-importer_<hs6>.xlsx` | Exportaciones peruanas por destino, serie por ano | USD Thousand |
+| `perus-exports-to-world-in-2025-by-importer_<hs6>.xlsx` | Snapshot 2025 por destino, con cantidad y precio unitario | kUSD, Tons, USD/Tons |
 
-Resultados reales para cafe verde peruano (`090111`, Peru, M49 `604`):
+Como se leen:
 
-| Indicador | Valor |
-|---|---|
-| Exportaciones FOB 2024 | USD 1,100,414,274 |
-| Volumen 2024 | 238,261,639 kg |
-| Precio unitario 2024 | USD 4.619/kg |
-| CAGR valor (2021-2024) | 13.3% |
-| CAGR volumen | 7.5% |
-| CAGR precio | 5.4% |
-| Puesto de Peru | 3 de 6 exportadores comparados, 6.6% de share |
+- `reporterCd` / `partnerCd` son codigos **M49** (`config/countries.yaml`);
+  `604` es Peru y `partnerCd = 0` es la fila de total "World".
+- El valor se convierte a USD (los archivos vienen en miles) y la cantidad a
+  kilos cuando Trade Map la publica en toneladas. El volumen solo existe en el
+  snapshot 2025; en los demas anos queda `null`, que es un hueco real de la
+  fuente, no un cero.
+- El precio de venta del modelo sale del valor FOB ponderado por kilo de 2025.
+  Se puede sobrescribir con `price_usd_per_kg` y el reporte dice de donde
+  salio (`calculado de históricos`, `ajustado por el usuario` o `unit value del
+  Excel`).
 
-Limitaciones que conviene tener presentes:
-
-- El endpoint `preview` entrega datos agregados, no el detalle de cada
-  operacion. Es lo que hay sin registro.
-- Hay que consultar **ano por ano**: mandar la lista de anos en `period`
-  devuelve `400`.
-- Limite de 500 registros por respuesta y rate limiting (`429`). Por eso hay
-  una capa de cache en `data/raw/_cache/` con reintentos y pausa.
-- Peru no reporto cafe para 2025, asi que la ventana de 5 anos se cierra en
-  2024. El reporte indica cuantos anos hay realmente.
+Para agregar o reemplazar data, copia los cuatro Excel en la carpeta del
+producto con exactamente esos nombres. Ver `data/README.md`.
 
 ### Aranceles: carga manual, y por que
 
@@ -241,7 +240,7 @@ estas opciones:
 | Fuente | Resultado |
 |---|---|
 | **SUNAT** (Aduanet, acumulado por subpartida/pais) | Responde 200 pero devuelve "No se encontraron registros" para todo, incluidas importaciones que si existen. Backend vacio. No usable. |
-| **WITS / World Bank** | El endpoint documentado responde 400/403/405 segun la variante de URL. Queda como adaptador sin verificar. |
+| **WITS / World Bank** | El endpoint documentado responde 400/403/405 segun la variante de URL. El adaptador se retiro: el modelo corre offline. |
 | **WTO API** | Requiere registro y subscription key. Gratis, pero con signup. |
 | **UNCTAD TRAINS** | Es la fuente real de WITS. No es gratuita. |
 | **ITC Market Access Map** | Gratis e incluye el arancel junto con la data de comercio. Peru tiene acceso completo. Sin API publica, pero exporta a Excel. |
@@ -290,12 +289,9 @@ siempre es un acuerdo comercial, no una linea nacional.
 > specific circumstances". No hay contrato que proteja esos endpoints, asi que un
 > scraper se rompe sin avisar.
 >
-> **La alternativa que si existe:** UN Comtrade publica el endpoint
-> `data/v1/getTariffline`, con arancel linea a linea, que es la misma base de
-> datos de la que Trade Map saca estos numeros. Verificado el 2026-09-30: sin
-> `subscription-key` devuelve 404, porque cae entre las APIs que piden cuenta.
-> Si te registras en `comtradeapi.un.org` y pides una key, este mismo script
-> puede pasar a descargar el arancel solo.
+> El endpoint de aranceles de UN Comtrade (`data/v1/getTariffline`) requiere
+> `subscription-key`. Como el proyecto corre offline, no se usa: el arancel entra
+> a mano por este CSV.
 
 El archivo queda en `data/raw/tariffs/tariffs.csv`:
 
@@ -351,8 +347,8 @@ frontend/          interfaz web (Vite, JavaScript modular, sin framework)
     format.js      formato de moneda, porcentaje y volumen
 
 src/exportanalysis/
-  sources/         comtrade.py, manual_tariffs.py, wits.py, sunat.py
-  pipeline/        market.py, competitors.py, landed_cost.py, analyze.py
+  sources/         trademap_excel.py, manual_tariffs.py, sunat.py (offline)
+  pipeline/        market.py, competitors.py, excel_analysis.py, analyze.py
   model/           financials.py, valuation.py, unit_economics.py
   api/main.py      FastAPI; sirve dist/ si existe, si no cae a Jinja
   web/templates/   render en servidor (fallback sin Node)
@@ -371,10 +367,10 @@ tests/             test_financials.py, test_landed_cost.py, test_api.py
 El circuito que cierra el modelo:
 
 ```
-Comtrade ─> mercado (volumen, FOB, precio, destinos)
-         ─> competidores (share, ranking, headroom)
-         ─> volumen implicito ─> curva de ocupacion de la planta
-         ─> P&L, flujo de caja, VAN, TIR, payback, sensibilidad
+Trade Map (Excel local) ─> mercado (volumen, FOB, precio, destinos)
+                         ─> competidores (share, ranking, headroom)
+                         ─> volumen implicito ─> curva de ocupacion de la planta
+                         ─> P&L, flujo de caja, VAN, TIR, payback, sensibilidad
 ```
 
 La curva de ocupacion sale del **headroom real de mercado**, no de un supuesto
@@ -440,8 +436,8 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
 | `ModuleNotFoundError: exportanalysis` | Falta `pip install -e .` o falta `PYTHONPATH=src`. `npm run setup` lo resuelve. |
 | El grafico no aparece | Chart.js se carga por CDN: sin conexion a internet el `<script>` falla. Ver la nota de Chart.js arriba. |
 | La pagina sale sin estilos | Falta `npm install`, o estas viendo `/` sin haber corrido `npm run build` y sin el fallback. Revisa que `frontend/css/app.css` exista. |
-| El backend tarda en el primer request | Normal la primera vez: descarga y cachea las respuestas de Comtrade. Las siguientes salen de `data/raw/_cache/`. |
-| `Sin datos de comercio para este producto` | Ese HS-6 no tiene registros para Peru en la ventana de anos. Puede ser un codigo equivocado en `config/products.yaml`. |
+| El backend tarda en el primer request | Normal la primera vez: lee y normaliza los Excel de Trade Map. Despues el sistema operativo los tiene en cache. |
+| `Sin datos de comercio para este producto` | Falta el Excel del producto o el HS-6 no coincide con la carpeta. Verifica los nombres en `data/<hs6> <nombre>/`. |
 
 ---
 
@@ -457,8 +453,9 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
   Si tienes volumen historico, reescribir esa funcion vale la pena: es una de
   las palancas mas fuertes del modelo.
 - El precio FOB que entra al modelo es el unit value promedio ponderado del
-  ultimo ano con data. Es un promedio de todo lo exportado, no el precio de tu
-  calidad ni de tu cliente.
+  ultimo ano con cantidad disponible (2025). Es un promedio de todo lo
+  exportado, no el precio de tu calidad ni de tu cliente. Se puede sobrescribir
+  con el parametro `price_usd_per_kg`.
 - La aplicacion no predice. Traduce supuestos a flujos de caja y te dice que
   valor tienen. Si el resultado es negativo, no dice "no inviertas": dice "con
   estos supuestos no se justifica". Cambiar supuestos y volver a correr es el

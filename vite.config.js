@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
 // El puerto del backend se lee de dev.config.json, la misma fuente que usa

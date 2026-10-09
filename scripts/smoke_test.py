@@ -19,7 +19,11 @@ from exportanalysis.pipeline.analyze import analyze_product  # noqa: E402
 
 
 def money(value: float) -> str:
-    return f"{value:,.0f}"
+    return "n/d" if value is None else f"{value:,.0f}"
+
+
+def pct(value: float, fmt: str = ".1f") -> str:
+    return "n/d" if value is None else f"{value * 100:{fmt}}%"
 
 
 def run(slug: str = "cafe_verde") -> None:
@@ -35,21 +39,22 @@ def run(slug: str = "cafe_verde") -> None:
         print(f"  SIN DATA: {market.get('message')}")
         return
 
-    print("\n[1] MERCADO  (fuente: UN Comtrade, dato publicado)")
+    print("\n[1] MERCADO  (fuente: Trade Map Excel local, dato publicado)")
     print(f"  Ultimo anio con data : {market['latest_year']}")
     print(f"  Exportaciones FOB   : USD {money(market['latest_fob_usd'])}")
     print(f"  Volumen             : {money(market['latest_volume_kg'])} kg")
-    print(f"  Precio unitario     : USD {market['latest_unit_value_usd']:.3f}/kg")
-    print(f"  CAGR valor 5 anos   : {market['cagr_value'] * 100:.1f}%")
-    print(f"  CAGR volumen        : {market['cagr_volume'] * 100:.1f}%")
-    print(f"  CAGR precio         : {market['cagr_unit_value'] * 100:+.1f}%")
-    print(f"  Concentracion top 5 : {market['top5_concentration'] * 100:.1f}% de las exportaciones")
+    unit_value = market["latest_unit_value_usd"]
+    print(f"  Precio unitario     : USD {unit_value:.3f}/kg" if unit_value is not None else "  Precio unitario     : n/d")
+    print(f"  CAGR valor 5 anos   : {pct(market['cagr_value'])}")
+    print(f"  CAGR volumen        : {pct(market['cagr_volume'])}")
+    print(f"  CAGR precio         : {pct(market['cagr_unit_value'], '+.1f')}")
+    print(f"  Concentracion top 5 : {pct(market['top5_concentration'])} de las exportaciones")
     print("  Principales destinos :")
     for row in market["top_destinations"][:5]:
         print(f"     {row['partner_name']:<18} USD {money(row['fob_usd']):>14}")
 
     comp = result["competitors"]
-    print("\n[2] COMPETENCIA  (fuente: UN Comtrade, dato publicado)")
+    print("\n[2] COMPETENCIA  (fuente: Trade Map Excel local, dato publicado)")
     if comp.get("available"):
         share = comp["origin_share"]
         print(
@@ -102,7 +107,7 @@ def run(slug: str = "cafe_verde") -> None:
 
     unit = result["unit_economics"]
     print("\n[5] ECONOMIA UNITARIA  (data de mercado vs tus costos)")
-    print(f"  Precio FOB de mercado  : USD {unit['fob_price_usd_per_kg']:.3f}/kg   <- dato Comtrade")
+    print(f"  Precio FOB de mercado  : USD {unit['fob_price_usd_per_kg']:.3f}/kg   <- Trade Map / input")
     print(f"  Costo de compra        : USD {unit['purchase_cost_usd_per_kg']:.3f}/kg   <- supuesto tuyo")
     print(f"  Costo de procesamiento : USD {unit['processing_cost_usd_per_kg']:.3f}/kg   <- supuesto tuyo")
     print(f"  Comision + cumplimiento: USD {unit['commission_usd_per_kg'] + unit['compliance_usd_per_kg']:.3f}/kg   <- supuesto tuyo")
