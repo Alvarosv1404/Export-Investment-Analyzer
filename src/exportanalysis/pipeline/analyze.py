@@ -17,6 +17,7 @@ from ..model.unit_economics import analyze_unit_economics
 from ..model.valuation import breakeven, run_sensitivity, summarize
 from ..pipeline import competitors, market
 from ..sources import comtrade, manual_tariffs
+from . import pricing
 from .landed_cost import landed_cost, price_positioning
 
 log = logging.getLogger(__name__)
@@ -129,6 +130,8 @@ def analyze_product(slug: str, *, target_share: float | None = None) -> dict[str
     # Precio de referencia: el unit value del ultimo anio con data.
     price = market_summary.get("latest_unit_value_usd")
     fob_price = price if price else 0.0
+    price_calc = pricing.estimated_fob_price_usd_per_kg(product.hs6)
+    fob_price_calc = price_calc.get("price_usd_per_kg") if price_calc.get("price_usd_per_kg") is not None else fob_price
     capex_inputs = load_assumptions().for_product(slug)
     capacity = capex_inputs["capacity_kg_year"]
 
@@ -216,6 +219,7 @@ def analyze_product(slug: str, *, target_share: float | None = None) -> dict[str
         "tariffs": _records(tariffs),
         "landed_cost": landed,
         "price_positioning": positioning,
+        "pricing": price_calc,
         "investment": {
             "inputs": assumed.__dict__,
             "ramp_source": ramp_source,
