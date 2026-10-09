@@ -131,7 +131,7 @@ def analyze_product(slug: str, *, target_share: float | None = None) -> dict[str
     price = market_summary.get("latest_unit_value_usd")
     fob_price = price if price else 0.0
     price_calc = pricing.estimated_fob_price_usd_per_kg(product.hs6)
-    fob_price_calc = price_calc.get("price_usd_per_kg") if price_calc.get("price_usd_per_kg") is not None else fob_price
+    price_calc.get("price_usd_per_kg") if price_calc.get("price_usd_per_kg") is not None else fob_price
     capex_inputs = load_assumptions().for_product(slug)
     capacity = capex_inputs["capacity_kg_year"]
 
