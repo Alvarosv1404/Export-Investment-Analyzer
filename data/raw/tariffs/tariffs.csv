@@ -1,0 +1,4 @@
+hs6,destination,origin,duty_type,duty_pct,year,source,notes
+090111,842,604,PREF,0.0,2025,Market Access Map (revisar: USA aplica TLC con Peru?),Ejemplo de plantilla. Verificar antes de usar en el modelo.
+090111,276,604,PREF,0.0,2025,Acuerdo UE-Peru,
+090111,392,604,MFN,,2025,Market Access Map,Dejar vacio si no se conoce: el modelo lo tratara como supuesto.

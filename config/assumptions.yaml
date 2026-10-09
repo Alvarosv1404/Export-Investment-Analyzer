@@ -1,0 +1,105 @@
+# Supuestos del modelo de inversion.
+#
+# SEPARACION IMPORTANTE:
+#   - La data de mercado (volumen, FOB, precio, arancel) viene de APIs publicas.
+#   - Los supuestos de aqui (CAPEX, OPEX, precio de compra, WACC) son TUYOS.
+#     No se pueden obtener de ninguna API. Empieza con rangos Orders of Magnitude
+#     y calibra con tu cotizacion real. El reporte siempre marca cuales valores
+#     vienen de la data y cuales son supuestos, para no confundir ambos.
+#
+# Unidades: USD, excepto `fx` que es PEN/USD.
+
+defaults:
+  project_years: 5          # horizonte de proyeccion
+  discount_rate: 0.12       # WACC / costo de capital. Alternativa: 0.14 si es mas riesgoso
+  tax_rate: 0.30            # impuesto a la renta (Peru, 30%)
+
+  # Curva de aprendizaje: el costo por kg baja conforme crece el volumen.
+  learning_rate: 0.03       # 3% de reduccion de costo unitario por cada duplicacion de volumen
+
+  # Comision de agente comercial / corretaje, sobre el valor FOB.
+  sales_commission: 0.05
+
+  # Flete internacional como % del FOB. Depende mucho del modo (maritimo/aereo)
+  # y del destino. Enmaritimo OCDE-Asia suele estar 3-6%.
+  freight_pct_fob: 0.05
+
+  # Otros costos de acceso a mercado, como % del FOB
+  # (certificaciones, etiquetado, muestras, agente de aduana en destino).
+  compliance_pct_fob: 0.02
+
+  # Working capital: dias de inventario + dias de cuentas por cobrar - dias por pagar
+  wc_inventory_days: 60
+  wc_receivable_days: 45
+  wc_payable_days: 30
+
+  # Depreciacion en linea recta, anios
+  depreciation_years: 10
+
+  # Calendario de inversion. La posicion 0 es el ano 0 (la inversion inicial);
+  # las posiciones siguientes son los anos de operacion. Debe sumar 1.0.
+  #   [1.0]         = todo el CAPEX antes de arrancar
+  #   [0.4, 0.3, 0.3] = 40% al inicio, 30% en el ano 1, 30% en el ano 2
+  # Lo que no escribas NO se gasta: no se estira el ultimo valor.
+  capex_schedule: [1.0]
+
+  # Curva de ocupacion de planta, un valor por ano de operacion.
+  # 0.30 = arrancamos al 30% de la capacidad instalada.
+  # OJO: si el analisis de mercado puede derivar el volumen, esta curva se
+  # SOBRESCRIBE con la que salga del headroom real y el reporte indica cual se
+  # uso. Este valor queda como respaldo cuando no hay data de mercado.
+  utilization_ramp: [0.30, 0.55, 0.75, 0.90, 0.95]
+
+# Overrides por producto. Se aplican encima de `defaults`.
+# Asi's un solo producto puede tener su propio CAPEX sin tocar el resto.
+#
+# ESTOS NUMEROS SON EJEMPLOS, NO COTIZACIONES. Sirven para que el pipeline
+# corra de punta a punta. Antes de mirar el VAN, reemplaza al menos:
+#   - purchase_cost_usd_per_kg      -> tu precio de compra real
+#   - variable_cost_usd_per_kg      -> tu costo de procesamiento real (por kg)
+#   - capex_usd                     -> cotizacion de la planta
+#   - opex_fixed_usd_year           -> planilla + alquiler + servicios
+#
+# El modulo model/unit_economics.py cruza estos costos contra el precio FOB real
+# que publica Comtrade y avisa si el margen por kilo es negativo. Corre eso
+# PRIMERO: si el margen es negativo, el VAN no dice nada.
+products:
+  cafe_verde:
+    capacity_kg_year: 500000
+    capex_usd: 4200000
+    # Verde: compra del pergamino ~2.20, proceso (secado, descascarado, clasificado)
+    # ~0.45. FOB de mercado 2024 fue 4.62/kg.
+    variable_cost_usd_per_kg: 0.45
+    purchase_cost_usd_per_kg: 2.20
+    opex_fixed_usd_year: 185000        # planilla, alquiler, servicios
+    working_capital_usd: 350000
+
+  cacao_en_grano:
+    capacity_kg_year: 300000
+    capex_usd: 2800000
+    variable_cost_usd_per_kg: 0.90
+    purchase_cost_usd_per_kg: 3.10
+    opex_fixed_usd_year: 140000
+    working_capital_usd: 220000
+
+  arandano:
+    capacity_kg_year: 120000
+    capex_usd: 5200000
+    variable_cost_usd_per_kg: 2.80
+    purchase_cost_usd_per_kg: 4.20
+    opex_fixed_usd_year: 260000
+    working_capital_usd: 410000
+
+# Escenarios de sensibilidad que corren automaticamente sobre cada producto.
+# El reporte genera un tornado: cuanto se mueve el VAN ante la variacion de
+# cada variable, manteniendo las demas constantes.
+sensitivity:
+  discount_rate:   [0.10, 0.12, 0.14, 0.16]
+  volume_shift:    [-0.30, -0.15, 0.0, 0.15, 0.30]   # desviacion sobre la participacion de mercado capturable
+  fob_price_shift: [-0.20, -0.10, 0.0, 0.10, 0.20]
+  fx_shift:        [-0.10, -0.05, 0.0, 0.05, 0.10]    # PEN/USD
+  capex_shift:     [-0.20, -0.10, 0.0, 0.10, 0.30]
+
+# Tipo de cambio referencial (informativo, no se usa en el calculo en USD).
+fx:
+  pen_per_usd: 3.75

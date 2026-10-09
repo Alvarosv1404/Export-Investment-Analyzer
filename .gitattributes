@@ -1,0 +1,10 @@
+# Normaliza finales de linea: en el repo siempre LF, en el disco lo que pida
+# el sistema (evita el ruido de "todo el archivo cambio" en Windows).
+* text=auto eol=lf
+
+# Binarios: Git no debe intentar convertirlos ni mostrarlos como diff.
+*.xlsx binary
+*.xls binary
+*.png binary
+*.jpg binary
+*.pdf binary

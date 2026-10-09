@@ -1,0 +1,187 @@
+/**
+ * Graficos del reporte.
+ *
+ * Chart.js se carga desde CDN en index.html, no como dependencia de npm. Es
+ * una libreria de 200 KB que no se versiona con el proyecto y cuya API es
+ * estable; meterla al bundle anade un paso de build y un lockfile por un
+ * beneficio que no se necesita en un reporte interno.
+ *
+ * Si el reporte se va a usar sin conexion, lo correcto es copiarla a
+ * frontend/vendor/chart.umd.min.js y cambiar el <script> por una ruta local.
+ */
+
+import { compactUSD, fullUSD } from './format.js'
+
+const money = fullUSD
+const compact = compactUSD
+
+function init() {
+  if (typeof Chart === 'undefined') {
+    console.warn('[charts] Chart.js no cargo; los graficos quedan vacios.')
+    return false
+  }
+  Chart.defaults.font.family = 'system-ui, sans-serif'
+  Chart.defaults.color = '#555'
+  return true
+}
+
+/** Serie anual: valor FOB en el eje izquierdo, volumen en el derecho. */
+export function series(canvas, m) {
+  if (!canvas || !m?.series?.length) return
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: m.series.map((r) => r.year),
+      datasets: [
+        {
+          label: 'Valor FOB',
+          data: m.series.map((r) => r.fob_usd),
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37,99,235,.08)',
+          fill: true,
+          tension: 0.25,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Volumen (kg)',
+          data: m.series.map((r) => r.volume_kg),
+          borderColor: '#059669',
+          tension: 0.25,
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y.toLocaleString('es-PE')}` } },
+      },
+      scales: {
+        y: { position: 'left', ticks: { callback: compact }, title: { display: true, text: 'Valor FOB (USD)' } },
+        y1: {
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: { callback: (v) => `${(v / 1e6).toFixed(0)}M kg` },
+          title: { display: true, text: 'Volumen' },
+        },
+      },
+    },
+  })
+}
+
+/** Destinos: barra horizontal, los 12 mas grandes. */
+export function destinations(canvas, rows) {
+  if (!canvas || !rows?.length) return
+  const top = rows.slice(0, 12)
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: top.map((d) => d.partner_name),
+      datasets: [{ label: 'Exportaciones FOB', data: top.map((d) => d.fob_usd), backgroundColor: '#7c3aed' }],
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => money(c.parsed.x) } } },
+      scales: { x: { ticks: { callback: compact } } },
+    },
+  })
+}
+
+/** Competencia: share por pais, Peru resaltado. */
+export function competitors(canvas, c) {
+  if (!canvas || !c?.available) return
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: c.rankings.map((r) => r.country),
+      datasets: [
+        {
+          label: 'Share de mercado',
+          data: c.rankings.map((r) => r.share * 100),
+          backgroundColor: c.rankings.map((r) => (r.is_origin_country ? '#dc2626' : '#94a3b8')),
+        },
+      ],
+    },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (x) => `${x.parsed.y.toFixed(1)}%` } } },
+      scales: { y: { ticks: { callback: (v) => `${v}%` } } },
+    },
+  })
+}
+
+/** Escalera de headroom: facturacion adicional por share objetivo. */
+export function headroom(canvas, h) {
+  if (!canvas || !h?.available) return
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: h.ladder.map((r) => `${(r.target_share * 100).toFixed(1)}%`),
+      datasets: [
+        { label: 'Facturacion adicional', data: h.ladder.map((r) => r.headroom_usd), backgroundColor: '#0891b2' },
+      ],
+    },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => money(c.parsed.y) } } },
+      scales: { y: { ticks: { callback: compact } } },
+    },
+  })
+}
+
+/** Flujo de caja libre por anio, verde positivo / rojo negativo. */
+export function cashflows(canvas, inv) {
+  if (!canvas || !inv?.cashflows) return
+  const flows = inv.cashflows
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: flows.map((_, i) => (i === 0 ? 'Inversion' : `Ano ${i}`)),
+      datasets: [
+        {
+          label: 'Flujo de caja libre',
+          data: flows,
+          backgroundColor: flows.map((v) => (v >= 0 ? '#059669' : '#dc2626')),
+        },
+      ],
+    },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => money(c.parsed.y) } } },
+      scales: { y: { ticks: { callback: compact } } },
+    },
+  })
+}
+
+/** Tornado: que variable mueve mas el VAN. */
+export function tornado(canvas, sens) {
+  if (!canvas || !sens?.tornado) return
+  const t = sens.tornado
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: t.map((x) => x.variable),
+      datasets: [
+        {
+          label: 'Impacto en VAN',
+          data: t.map((x) => x.swing_usd),
+          backgroundColor: t.map((x) => (x.swing_usd > 0 ? '#f59e0b' : '#64748b')),
+        },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `swing ${money(c.parsed.x)}` } } },
+      scales: { x: { ticks: { callback: compact } } },
+    },
+  })
+}
+
+/** Dibuja todos los graficos del reporte. Idempotente por id de canvas. */
+export function renderAll(result) {
+  if (!init() || !result) return
+  const get = (id) => document.getElementById(id)
+  series(get('chartSeries'), result.market)
+  destinations(get('chartDest'), result.destinations)
+  competitors(get('chartComp'), result.competitors)
+  headroom(get('chartLadder'), result.headroom)
+  cashflows(get('chartCash'), result.investment)
+  tornado(get('chartSens'), result.investment?.sensitivity)
+}

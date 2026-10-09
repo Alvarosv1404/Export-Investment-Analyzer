@@ -1,0 +1,58 @@
+# Codigos de pais M49 (ONU) + ISO3. Formato: M49: {nombre, iso3}.
+# M49 es lo que usan UN Comtrade y WITS como `partnerCode` / `reporterCode`.
+# Fuente: https://unstats.un.org/unsd/methodology/m49/
+
+PERU: {code: 604, iso3: PER, name: Peru}
+
+# Exportadores regionales y globales usados como competidores
+COLOMBIA: {code: 170, iso3: COL, name: Colombia}
+BRASIL: {code: 76, iso3: BRA, name: Brasil}
+ECUADOR: {code: 218, iso3: ECU, name: Ecuador}
+COSTA_RICA: {code: 188, iso3: CRI, name: Costa Rica}
+GUATEMALA: {code: 320, iso3: GTM, name: Guatemala}
+HONDURAS: {code: 340, iso3: HND, name: Honduras}
+MEXICO: {code: 484, iso3: MEX, name: Mexico}
+NICARAGUA: {code: 558, iso3: NIC, name: Nicaragua}
+EL_SALVADOR: {code: 222, iso3: SLV, name: El Salvador}
+VENEZUELA: {code: 862, iso3: VEN, name: Venezuela}
+COTE_DIVOIRE: {code: 384, iso3: CIV, name: Costa de Marfil}
+GHANA: {code: 288, iso3: GHA, name: Ghana}
+INDIA: {code: 699, iso3: IND, name: India}
+VIETNAM: {code: 704, iso3: VNM, name: Vietnam}
+INDONESIA: {code: 360, iso3: IDN, name: Indonesia}
+TANZANIA: {code: 834, iso3: TZA, name: Tanzania}
+KENYA: {code: 404, iso3: KEN, name: Kenya}
+
+# Principales mercados importadores
+USA: {code: 842, iso3: USA, name: Estados Unidos}
+ALEMANIA: {code: 276, iso3: DEU, name: Alemania}
+ITALIA: {code: 380, iso3: ITA, name: Italia}
+ESPANA: {code: 724, iso3: ESP, name: Espana}
+FRANCIA: {code: 250, iso3: FRA, name: Francia}
+PAISES_BAJOS: {code: 528, iso3: NLD, name: Paises Bajos}
+REINO_UNIDO: {code: 826, iso3: GBR, name: Reino Unido}
+JAPON: {code: 392, iso3: JPN, name: Japon}
+CHINA: {code: 156, iso3: CHN, name: China}
+CANADA: {code: 124, iso3: CAN, name: Canada}
+BELGICA: {code: 56, iso3: BEL, name: Bélgica}
+SUECIA: {code: 752, iso3: SWE, name: Suecia}
+RUSIA: {code: 643, iso3: RUS, name: Rusia}
+CHILE: {code: 152, iso3: CHL, name: Chile}
+ARGENTINA: {code: 32, iso3: ARG, name: Argentina}
+AUSTRALIA: {code: 36, iso3: AUS, name: Australia}
+UAE: {code: 784, iso3: ARE, name: Emiratos Arabes Unidos}
+ARABIA_SAUDITA: {code: 682, iso3: SAU, name: Arabia Saudita}
+SINGAPUR: {code: 702, iso3: SGP, name: Singapur}
+
+# Competidores adicionales del portafolio agro
+BOLIVIA: {code: 68, iso3: BOL, name: Bolivia}
+CAMERUN: {code: 120, iso3: CMR, name: Camerun}
+MARRUECOS: {code: 504, iso3: MAR, name: Marruecos}
+SUDAFRICA: {code: 710, iso3: ZAF, name: Sudafrica}
+ISRAEL: {code: 376, iso3: ISR, name: Israel}
+TAILANDIA: {code: 764, iso3: THA, name: Tailandia}
+GRECIA: {code: 300, iso3: GRC, name: Grecia}
+PAKISTAN: {code: 586, iso3: PAK, name: Pakistan}
+TURQUIA: {code: 792, iso3: TUR, name: Turquia}
+EGIPTO: {code: 818, iso3: EGY, name: Egipto}
+MALASIA: {code: 458, iso3: MYS, name: Malasia}

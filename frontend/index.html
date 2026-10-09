@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Analisis de exportacion e inversion</title>
+    <link rel="stylesheet" href="./css/app.css" />
+    <!-- Chart.js desde CDN. Ver el comentario en js/charts.js: si el reporte
+         se usa sin conexion, copiarlo a frontend/vendor/ y usar ruta local. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Analisis de exportacion e inversion</h1>
+      <p class="sub">Mercado y competencia desde datos publicos (UN Comtrade). Decision de inversion con supuestos explicitos.</p>
+    </header>
+
+    <div id="controls"></div>
+    <main id="app">
+      <div class="alert">Cargando...</div>
+    </main>
+
+    <footer>
+      <p>Analisis de exportacion e inversion. Datos de comercio: UN Comtrade (ONU). El arancel y los supuestos financieros no provienen de fuentes automaticas.</p>
+    </footer>
+
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

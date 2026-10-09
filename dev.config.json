@@ -1,0 +1,8 @@
+{
+  "_comment": "Puertos de desarrollo en una sola fuente de verdad. package.json, vite.config.js y scripts lo leen de aqui. Si cambias uno, cambias todos.",
+  "api": 8010,
+  "web": 5180,
+  "host": "127.0.0.1",
+  "_web_host_comment": "Direccion en la que Vite escucha, para abrirlo desde otro equipo. 'host' sigue siendo 127.0.0.1 a proposito: es el loopback que usa el proxy hacia la API, y por eso /api y /health funcionan sin CORS. Con la IP de Tailscale el dev server se ve desde la PC sin exponerlo a la LAN. Si la IP de Tailscale cambia, se actualiza con 'tailscale ip -4'. Para trabajar solo en esta maquina, deja '127.0.0.1'.",
+  "web_host": "100.105.54.80"
+}

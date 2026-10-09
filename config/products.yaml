@@ -1,0 +1,193 @@
+# Catalogo de productos a analizar.
+#
+# PARA AGREGAR UN PRODUCTO NUEVO: copia un bloque de `products:` y cambia
+# slug / name / hs6 / presentations / competitors. Nada mas. El pipeline, la API
+# y el frontend lo recogen solo.
+#
+#   hs6  -> presentacion PRINCIPAL, a 6 digitos. Debe coincidir con
+#           presentations[0].hs6. Es la que usa el pipeline como cabecera.
+#
+#   presentations -> lista de presentaciones comerciales del mismo producto.
+#           Ejemplo: el cacao es grano (180100), pasta (180310) o manteca
+#           (180400). La primera DEBE ser la misma que `hs6`. Si omites la
+#           lista, el producto queda con una sola presentacion (su `hs6`).
+#
+#   nandina -> partida SUNAT de 10 digitos de la presentacion principal.
+#           Opcional. Sirve para cruzar con los Excel de SUNAT; los primeros 6
+#           digitos son el HS6 (ver exportanalysis.sources.sunat).
+#
+# Fuentes: Trade Map (demanda mundial y competidores) y SUNAT (exportaciones
+# peruanas). Ambas se muestran en campos separados porque NO siempre coinciden:
+# la discrepancia es parte del analisis, no un error a esconder.
+#
+# Los FOB 2024 citados son el ranking agroexportador de MIDAGRI para contexto.
+
+defaults:
+  years: 5            # ventana de analisis hacia atras desde el ultimo ano completo
+  reporter: 604       # 604 = Peru (codigo M49, ver countries.yaml)
+  flow: X             # X = exportaciones, M = importaciones
+
+products:
+  - slug: cafe_verde
+    name: Cafe
+    hs6: "090111"
+    nandina: "0901119000"
+    unit: kg
+    competitors: [76, 704, 170, 360, 340, 320]   # Brasil, Vietnam, Colombia, Indonesia, Honduras, Guatemala
+    presentations:
+      - {hs6: "090111", label: "Verde, sin tostar, sin descafeinar"}
+      - {hs6: "090121", label: "Tostado, sin descafeinar"}
+
+  - slug: cacao_en_grano
+    name: Cacao
+    hs6: "180100"
+    nandina: "1801001900"
+    unit: kg
+    competitors: [384, 288, 218, 120, 566, 360]  # Costa de Marfil, Ghana, Ecuador, Camerun, Nigeria, Indonesia
+    presentations:
+      - {hs6: "180100", label: "Grano entero o partido, crudo"}
+      - {hs6: "180310", label: "Pasta de cacao, sin desgrasar"}
+      - {hs6: "180400", label: "Manteca de cacao"}
+      - {hs6: "180500", label: "Polvo de cacao, sin azucar"}
+
+  - slug: arandano
+    name: Arandano
+    hs6: "081040"
+    nandina: "0810400000"
+    unit: kg
+    competitors: [152, 484, 504, 724, 842, 124]  # Chile, Mexico, Marruecos, Espana, USA, Canada
+    presentations:
+      - {hs6: "081040", label: "Fresco"}
+      - {hs6: "081190", label: "Congelado"}
+      - {hs6: "200989", label: "Jugo"}
+
+  - slug: uva_fresca
+    name: Uva
+    hs6: "080610"
+    nandina: "0806100000"
+    unit: kg
+    competitors: [152, 842, 380, 156, 710, 699]  # Chile, USA, Italia, China, Sudafrica, India
+    presentations:
+      - {hs6: "080610", label: "Fresca"}
+      - {hs6: "080620", label: "Pasa (seca)"}
+
+  - slug: palta_fresca
+    name: Palta
+    hs6: "080440"
+    nandina: "0804400000"
+    unit: kg
+    competitors: [484, 152, 170, 404, 724, 376]  # Mexico, Chile, Colombia, Kenia, Espana, Israel
+    presentations:
+      - {hs6: "080440", label: "Fresca o seca"}
+
+  - slug: esparrago_fresco
+    name: Esparrago
+    hs6: "070920"
+    nandina: "0709200000"
+    unit: kg
+    competitors: [484, 156, 724, 764, 300, 152]  # Mexico, China, Espana, Tailandia, Grecia, Chile
+    presentations:
+      - {hs6: "070920", label: "Fresco o refrigerado"}
+      - {hs6: "071080", label: "Congelado"}
+      - {hs6: "200560", label: "Conserva"}
+
+  - slug: mango_fresco
+    name: Mango
+    hs6: "080450"
+    nandina: "0804502000"
+    unit: kg
+    competitors: [484, 699, 764, 76, 218, 586]  # Mexico, India, Tailandia, Brasil, Ecuador, Pakistan
+    presentations:
+      - {hs6: "080450", label: "Fresco o seco"}
+      - {hs6: "081190", label: "Congelado"}
+      - {hs6: "200989", label: "Jugo"}
+
+  - slug: citricos
+    name: Citricos
+    hs6: "080521"
+    nandina: "0805210000"
+    unit: kg
+    competitors: [724, 710, 792, 818, 156, 152]  # Espana, Sudafrica, Turquia, Egipto, China, Chile
+    presentations:
+      - {hs6: "080521", label: "Mandarina y tangerina, frescas"}
+      - {hs6: "080550", label: "Limon y lima, frescos"}
+      - {hs6: "080529", label: "Otros citricos, frescos"}
+
+  - slug: quinua
+    name: Quinua
+    hs6: "100850"
+    nandina: "1008509000"
+    unit: kg
+    competitors: [68, 218, 842, 32, 124, 699]  # Bolivia, Ecuador, USA, Argentina, Canada, India
+    presentations:
+      - {hs6: "100850", label: "Grano (los demas)"}
+
+  - slug: aji_paprika
+    name: Aji y paprika
+    hs6: "090421"
+    nandina: "0904211000"
+    unit: kg
+    competitors: [156, 699, 724, 484, 764, 792]  # China, India, Espana, Mexico, Tailandia, Turquia
+    presentations:
+      - {hs6: "090421", label: "Seco, sin triturar ni pulverizar"}
+      - {hs6: "090422", label: "Triturado o pulverizado"}
+
+  - slug: jengibre
+    name: Jengibre
+    hs6: "091011"
+    nandina: "0910110000"
+    unit: kg
+    competitors: [156, 699, 764, 360, 76, 566]  # China, India, Tailandia, Indonesia, Brasil, Nigeria
+    presentations:
+      - {hs6: "091011", label: "Sin triturar ni pulverizar"}
+      - {hs6: "091012", label: "Triturado o pulverizado"}
+
+  - slug: aceite_palma
+    name: Aceite de palma
+    hs6: "151110"
+    nandina: "1511100000"
+    unit: kg
+    competitors: [360, 458, 764, 566, 170, 320]  # Indonesia, Malasia, Tailandia, Nigeria, Colombia, Guatemala
+    presentations:
+      - {hs6: "151110", label: "Crudo"}
+      - {hs6: "151190", label: "Refinado"}
+
+  - slug: cochinilla_carmin
+    name: Cochinilla y carmin
+    hs6: "320300"
+    nandina: "3203001900"
+    unit: kg
+    competitors: [152, 484, 76, 724, 170]  # Chile, Mexico, Brasil, Espana, Colombia
+    presentations:
+      - {hs6: "320300", label: "Materias colorantes de origen animal o vegetal"}
+
+  - slug: pota_calamar
+    name: Pota y calamar
+    hs6: "030743"
+    nandina: "0307430000"
+    unit: kg
+    competitors: [156, 724, 32, 152, 699, 504]  # China, Espana, Argentina, Chile, India, Marruecos
+    presentations:
+      - {hs6: "030743", label: "Congelado"}
+      - {hs6: "160554", label: "Preparado o en conserva"}
+
+  - slug: conservas_pescado
+    name: Conservas de pescado
+    hs6: "160414"
+    nandina: "1604141000"
+    unit: kg
+    competitors: [764, 724, 504, 218, 156, 704]  # Tailandia, Espana, Marruecos, Ecuador, China, Vietnam
+    presentations:
+      - {hs6: "160414", label: "Atun, bonito y listado"}
+      - {hs6: "160415", label: "Caballa"}
+      - {hs6: "160413", label: "Sardina, anchoveta y similares"}
+
+  # --- Plantilla para el siguiente producto ---
+  # - slug: nombre_sin_espacios
+  #   name: Descripcion legible del producto
+  #   hs6: "000000"
+  #   nandina: "0000000000"
+  #   unit: kg
+  #   competitors: [170, 76]
+  #   presentations:
+  #     - {hs6: "000000", label: "Presentacion principal (= hs6)"}
