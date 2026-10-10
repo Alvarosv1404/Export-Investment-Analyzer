@@ -57,6 +57,46 @@ function showError(message) {
     <div class="alert error"><strong>Error:</strong> ${escapeHTML(message)}</div>`
 }
 
+/** Mensaje de la vista de comparacion cuando aun no hay productos marcados. */
+function showEmptyComparison() {
+  destroyCharts()
+  document.getElementById('app').innerHTML = `
+    <div class="alert">
+      Aun no hay productos seleccionados. Marca uno o varios en el panel de arriba
+      para ver el crecimiento interanual y el CAGR desde la base (2016, o el primer
+      anio en que el producto exporto).
+    </div>`
+}
+
+/**
+ * Relee la comparacion al cambiar la seleccion sin volver a pintar los controles.
+ * Asi el buscador conserva el texto y el foco, y solo se refresca la data. El
+ * guard con `load.reqId` descarta respuestas que llegan fuera de orden.
+ */
+async function refreshComparison() {
+  const form = document.getElementById('comparisonForm')
+  if (!form) return
+
+  state.compareSlugs = Array.from(
+    form.querySelectorAll('input[name="compareSlugs"]:checked')
+  ).map((input) => input.value)
+  syncURL()
+
+  const reqId = ++load.reqId
+  if (!state.compareSlugs.length) {
+    showEmptyComparison()
+    return
+  }
+  try {
+    const data = await getComparison(state.compareSlugs)
+    if (reqId !== load.reqId) return
+    state.comparisonData = data
+    renderComparisonView()
+  } catch (err) {
+    showError(err.message)
+  }
+}
+
 /** Controles para analisis individual o comparacion de productos. */
 function renderControls() {
   const tabs = `
@@ -73,7 +113,7 @@ function renderControls() {
       <form class="controls-form comparison-controls" id="comparisonForm">
         <fieldset class="compare-picker">
           <legend>Elige los productos que quieres comparar</legend>
-          <p class="compare-picker-hint">Marca uno o varios. Puedes empezar con el producto actual y añadir otros.</p>
+          <p class="compare-picker-hint">Marca uno o varios. La comparacion se actualiza sola; puedes empezar con el producto actual y añadir otros.</p>
           <label class="compare-search-label" for="compareSearch">Buscar por nombre o código HS</label>
           <input type="search" id="compareSearch" class="compare-search" placeholder="Ej.: café o 090111" />
           <div class="compare-options">
@@ -172,20 +212,27 @@ function bindControls(onChange) {
       comparisonForm.querySelector('.compare-selection-count').textContent =
         `${selectedCount} producto${selectedCount === 1 ? '' : 's'} seleccionado${selectedCount === 1 ? '' : 's'}`
     }
-    checkboxes.forEach((input) => input.addEventListener('change', updateSelectionCount))
+    // Agrupa cambios seguidos (marcar varios) en una sola peticion a la API.
+    let reloadTimer = null
+    const scheduleReload = () => {
+      updateSelectionCount()
+      window.clearTimeout(reloadTimer)
+      reloadTimer = window.setTimeout(refreshComparison, 300)
+    }
+    checkboxes.forEach((input) => input.addEventListener('change', scheduleReload))
     document.getElementById('selectAllProducts').addEventListener('click', () => {
       checkboxes.forEach((input) => {
         const option = input.closest('.compare-option')
         if (option && option.hidden) return
         input.checked = true
       })
-      updateSelectionCount()
+      scheduleReload()
     })
     document.getElementById('clearProducts').addEventListener('click', () => {
       checkboxes.forEach((input) => {
         input.checked = false
       })
-      updateSelectionCount()
+      scheduleReload()
     })
     document.getElementById('compareSearch').addEventListener('input', (event) => {
       const query = event.target.value.trim().toLowerCase()
@@ -197,16 +244,8 @@ function bindControls(onChange) {
 
     comparisonForm.addEventListener('submit', (event) => {
       event.preventDefault()
-      state.compareSlugs = Array.from(
-        comparisonForm.querySelectorAll('input[name="compareSlugs"]:checked')
-      ).map((input) => input.value)
-      if (!state.compareSlugs.length) {
-        document.getElementById('app').innerHTML =
-          '<div class="alert warn">Selecciona al menos un producto para mostrar la comparacion.</div>'
-        return
-      }
-      syncURL()
-      onChange()
+      window.clearTimeout(reloadTimer)
+      refreshComparison()
     })
     return
   }
@@ -302,12 +341,7 @@ async function load() {
 
   if (state.view === 'compare') {
     if (!state.compareSlugs.length) {
-      document.getElementById('app').innerHTML = `
-        <div class="alert">
-          Aun no hay productos seleccionados. Marca uno o varios en el panel de arriba
-          y pulsa <b>Ver comparacion</b> para ver el crecimiento interanual y el CAGR
-          desde la base (2016, o el primer anio en que el producto exporto).
-        </div>`
+      showEmptyComparison()
       return
     }
     try {
@@ -330,3 +364,4 @@ async function load() {
 }
 
 load.reqId = 0
+load()
