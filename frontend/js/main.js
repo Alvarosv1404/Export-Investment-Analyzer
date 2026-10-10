@@ -45,7 +45,7 @@ function syncURL() {
   if (state.price) params.set('price', state.price)
   if (state.view === 'compare') {
     params.set('view', 'compare')
-    params.set('compare_slugs', state.compareSlugs.join(','))
+    if (state.compareSlugs.length) params.set('compare_slugs', state.compareSlugs.join(','))
   }
   const qs = params.toString()
   history.replaceState(null, '', qs ? `?${qs}` : location.pathname)
@@ -158,9 +158,6 @@ function bindControls(onChange) {
   document.querySelectorAll('.view-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       state.view = tab.dataset.view
-      if (state.view === 'compare' && !state.compareSlugs.length) {
-        state.compareSlugs = state.slug ? [state.slug] : []
-      }
       syncURL()
       onChange()
     })
@@ -296,15 +293,20 @@ async function load() {
     state.slug = state.products[0].slug
     syncURL()
   }
-  if (state.view === 'compare' && !state.compareSlugs.length && state.slug) {
-    state.compareSlugs = [state.slug]
-    syncURL()
-  }
 
   document.getElementById('controls').innerHTML = renderControls()
   bindControls(load)
 
   if (state.view === 'compare') {
+    if (!state.compareSlugs.length) {
+      document.getElementById('app').innerHTML = `
+        <div class="alert">
+          Aun no hay productos seleccionados. Marca uno o varios en el panel de arriba
+          y pulsa <b>Ver comparacion</b> para ver el crecimiento interanual y el CAGR
+          desde la base (2016, o el primer anio en que el producto exporto).
+        </div>`
+      return
+    }
     try {
       state.comparisonData = await getComparison(state.compareSlugs)
       renderComparisonView()

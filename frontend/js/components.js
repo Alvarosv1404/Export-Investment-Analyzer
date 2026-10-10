@@ -287,10 +287,25 @@ export function comparison(data) {
       ${years.map((year) => `<td class="num">${pctSigned(seriesByYear.get(year)?.value_yoy)}</td>`).join('')}
     </tr>`
   })
+  const cagrFromBaseRows = products.map((p) => {
+    const seriesByYear = new Map((p.series || []).map((row) => [row.year, row]))
+    return `<tr>
+      <th scope="row">${escapeHTML(p.name || p.slug)} <span class="hs6">HS ${escapeHTML(p.hs6)}</span></th>
+      ${years
+        .map((year) => {
+          if (year === p.cagr_base_year) return '<td class="num muted">base</td>'
+          if (year < (p.cagr_base_year ?? 2016)) return '<td class="num muted">&mdash;</td>'
+          const cagr = seriesByYear.get(year)?.cagr_from_base
+          return `<td class="num">${pct(cagr)}</td>`
+        })
+        .join('')}
+    </tr>`
+  })
   const cagrRows = products.map(
     (p) => `<tr>
       <th scope="row">${escapeHTML(p.name || p.slug)} <span class="hs6">HS ${escapeHTML(p.hs6)}</span></th>
-      <td class="num">${p.latest_year ?? 'n/d'}</td>
+      <td class="num">${p.cagr_base_year ?? 'n/d'}</td>
+      <td class="num">${p.cagr_end_year ?? p.latest_year ?? 'n/d'}</td>
       <td class="num">${pct(p.cagr_value)}</td>
     </tr>`
   )
@@ -299,7 +314,8 @@ export function comparison(data) {
       <section class="card comparison-intro">
         <h1>Comparacion de productos</h1>
         <p class="note">${products.length} producto(s) seleccionados. Compara la evolucion anual del valor FOB
-          exportado por Peru, su crecimiento interanual y el CAGR para el periodo 2016-2025.</p>
+          exportado por Peru, su crecimiento interanual y el CAGR acumulado desde la base (2016, o el primer
+          anio en que cada producto exporto) hasta 2025.</p>
         <p class="note">Fuente: series de exportacion peruana de Trade Map. La grafica de barras compara el ultimo
           ano con datos de cada producto; los vacios en las tablas indican que no hay un valor reportado.</p>
         <span>${tagData}</span>
@@ -320,6 +336,11 @@ export function comparison(data) {
           <p class="note">Variacion anual del valor exportado (%)</p>
           <div class="chart"><canvas id="chartComparisonGrowth"></canvas></div>
         </article>
+        <article class="card comparison-chart-card">
+          <h2>CAGR acumulado desde la base</h2>
+          <p class="note">El punto de partida es 2016, o el primer anio en que el producto exporto.</p>
+          <div class="chart"><canvas id="chartComparisonCagr"></canvas></div>
+        </article>
       </section>
       <section class="card comparison-table-card">
         <h2>Valor exportado anual (USD FOB)</h2>
@@ -339,16 +360,29 @@ export function comparison(data) {
         <p class="note">El primer ano no tiene crecimiento interanual porque no hay un ano previo en el periodo.</p>
       </section>
       <section class="card comparison-table-card">
-        <h2>CAGR 2016-2025</h2>
+        <h2>CAGR desde la base, anio por anio (%)</h2>
+        ${table(
+          [{ label: 'Producto' }, ...years.map((year) => ({ label: String(year), num: true }))],
+          cagrFromBaseRows,
+          'comparison-matrix'
+        )}
+        <p class="note">La base es 2016 para los productos que ya exportaban ese anio. Si el producto aun no
+          exportaba en 2016 (su valor es 0, como la pota), la base se corre al primer anio con exportaciones
+          registradas. Cada columna es el CAGR acumulado desde esa base hasta el anio de la columna.</p>
+      </section>
+      <section class="card comparison-table-card">
+        <h2>CAGR total del valor FOB</h2>
         ${table(
           [
             { label: 'Producto' },
-            { label: 'Ultimo ano disponible', num: true },
-            { label: 'CAGR del valor FOB', num: true },
+            { label: 'Anio base' },
+            { label: 'Ultimo anio con data', num: true },
+            { label: 'CAGR FOB', num: true },
           ],
           cagrRows
         )}
-        <p class="note">El CAGR solo se calcula cuando hay valores positivos reportados en 2016 y 2025.</p>
+        <p class="note">CAGR del periodo completo: desde el anio base (primera exportacion) hasta el ultimo anio
+          con data, como referencia al rango 2016-2025 cuando existe el dato.</p>
       </section>
     </section>`
 }

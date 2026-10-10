@@ -281,11 +281,49 @@ function comparisonGrowthChart(canvas, data) {
   })
 }
 
+/** Lineas: CAGR acumulado de cada producto desde su anio base. */
+function comparisonCagrChart(canvas, data) {
+  if (!canvas || !data?.products?.length) return
+  const products = data.products.filter((product) => product.available && product.series?.length)
+  if (!products.length) return
+  const years = Array.from({ length: 10 }, (_, i) => 2016 + i)
+  const colors = ['#2563eb', '#f97316', '#64748b', '#059669', '#7c3aed', '#eab308', '#0891b2', '#db2777']
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: products.map((product, index) => ({
+        label: product.name || product.slug,
+        data: years.map((year) => {
+          if (year <= product.cagr_base_year) return null
+          return product.series.find((row) => row.year === year)?.cagr_from_base ?? null
+        }),
+        borderColor: colors[index % colors.length],
+        backgroundColor: colors[index % colors.length],
+        pointRadius: 3,
+        tension: 0.2,
+        spanGaps: false,
+      })),
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${(context.parsed.y * 100).toFixed(1)}%` } },
+      },
+      scales: {
+        y: { ticks: { callback: (value) => `${(value * 100).toFixed(0)}%` }, title: { display: true, text: 'CAGR desde la base' } },
+      },
+    },
+  })
+}
+
 export function renderComparisonCharts(data) {
   if (!init()) return
   comparisonLatestChart(document.getElementById('chartComparisonLatest'), data)
   comparisonChart(document.getElementById('chartComparison'), data)
   comparisonGrowthChart(document.getElementById('chartComparisonGrowth'), data)
+  comparisonCagrChart(document.getElementById('chartComparisonCagr'), data)
 }
 
 /** Dibuja todos los graficos del reporte. Idempotente por id de canvas. */

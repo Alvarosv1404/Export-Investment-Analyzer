@@ -31,15 +31,19 @@ def _cagr(series: pd.Series) -> float | None:
         return None
 
 
-def _period_cagr(frame: pd.DataFrame, start_year: int, end_year: int) -> float | None:
-    values = frame.set_index("year")["fob_usd"]
-    if start_year not in values.index or end_year not in values.index:
-        return None
-    first = values.loc[start_year]
-    last = values.loc[end_year]
-    if pd.isna(first) or pd.isna(last) or first <= 0 or last < 0:
-        return None
-    return float((last / first) ** (1.0 / (end_year - start_year)) - 1.0)
+def _first_positive_year(g: pd.DataFrame) -> int | None:
+    """Primer anio con exportaciones positivas en la serie anual.
+
+    Si un producto no exportaba en la base (2016) y su valor es 0, la base se
+    corre hacia adelante: el CAGR no puede arrancar desde un valor inexistente.
+    """
+    pos = g.loc[g["fob_usd"].notna() & (g["fob_usd"] > 0), "year"]
+    return int(pos.min()) if not pos.empty else None
+
+
+def _last_positive_year(g: pd.DataFrame) -> int | None:
+    pos = g.loc[g["fob_usd"].notna() & (g["fob_usd"] > 0), "year"]
+    return int(pos.max()) if not pos.empty else None
 
 
 def _volatility(series: pd.Series) -> float | None:
@@ -96,15 +100,24 @@ def _series_product(slug: str) -> dict[str, Any]:
         .rename_axis("year")
         .reset_index()
     )
-    base_value = g.loc[g["year"] == BASE_YEAR, "fob_usd"].iloc[0]
+    base_year = _first_positive_year(g)
+    end_year = _last_positive_year(g)
+    base_value = (
+        float(g.loc[g["year"] == base_year, "fob_usd"].iloc[0])
+        if base_year is not None
+        else None
+    )
     g["value_yoy"] = g["fob_usd"].pct_change(fill_method=None)
-    g["cagr_from_2016"] = [
-        float((value / base_value) ** (1.0 / (year - BASE_YEAR)) - 1.0)
-        if year > BASE_YEAR
-        and pd.notna(base_value)
-        and base_value > 0
-        and pd.notna(value)
-        and value >= 0
+    g["cagr_from_base"] = [
+        float((float(value) / base_value) ** (1.0 / (year - base_year)) - 1.0)
+        if (
+            base_year is not None
+            and base_value is not None
+            and base_value > 0
+            and year > base_year
+            and pd.notna(value)
+            and float(value) >= 0
+        )
         else None
         for year, value in zip(g["year"], g["fob_usd"], strict=False)
     ]
@@ -131,14 +144,22 @@ def _series_product(slug: str) -> dict[str, Any]:
             }
         )
 
+    cagr_value = None
+    if base_year is not None and end_year is not None and end_year > base_year:
+        last_value = float(g.loc[g["year"] == end_year, "fob_usd"].iloc[0])
+        if last_value >= 0:
+            cagr_value = float((last_value / base_value) ** (1.0 / (end_year - base_year)) - 1.0)
+
     return {
         "slug": slug,
         "name": name,
         "hs6": hs6,
         "available": True,
+        "cagr_base_year": base_year,
+        "cagr_end_year": end_year,
         "years": list(range(BASE_YEAR, END_YEAR + 1)),
         "series": series,
-        "cagr_value": _period_cagr(g, BASE_YEAR, END_YEAR),
+        "cagr_value": cagr_value,
         "cagr_volume": _cagr(g["quantity"]),
         "cagr_unit_value": _cagr(g["unit_value_usd"]),
         "volatility_value": _volatility(g["fob_usd"]),
