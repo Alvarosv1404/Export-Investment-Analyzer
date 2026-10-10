@@ -123,6 +123,8 @@ def _sunat_block(nandina: str | None) -> dict:
         ),
         "cagr_price": market.cagr(summary["price_usd_per_kg"]),
     }
+
+
 def analyze_product(
     slug: str,
     *,
@@ -191,16 +193,82 @@ def analyze_product(
 
     sunat_block = _sunat_block(product.nandina)
 
-    capex_inputs = load_assumptions().for_product(slug)
+    # Aranceles y costo puesto en destino: no dependen de los supuestos, asi que
+    # se calculan una vez y sirven tanto al analisis completo como al parcial.
+    destinations = _top_destinations(trade)
+    tariffs = (
+        manual_tariffs.tariff_table(product.hs6, destinations) if destinations else pd.DataFrame()
+    )
+    real_tariff = _real_tariff(product.hs6, destinations)
+    landed = (
+        landed_cost(fob_price, freight_pct_fob=model_defaults.freight_pct_fob, duty_pct=real_tariff)
+        if fob_price
+        else {}
+    )
+    positioning = (
+        price_positioning(
+            fob_price, freight_pct_fob=model_defaults.freight_pct_fob, duty_pct=real_tariff
+        )
+        if fob_price
+        else {}
+    )
+
+    room = competitors.headroom_ladder(
+        product.hs6, reporter, product.competitors, unit_value_usd_per_kg=fob_price or None
+    )
+
+    # Sin supuestos no hay modelo de inversion, pero el analisis de mercado si es
+    # real: se entrega completo y se marca explicitamente lo que falta, en vez de
+    # fallar. Es el caso normal de un producto recien agregado por su carpeta.
+    assumptions = load_assumptions()
+    missing = assumptions.missing_for(slug)
+    if missing:
+        return {
+            "slug": slug,
+            "product": product.model_dump(),
+            "years": years,
+            "market": market_summary,
+            "sunat": sunat_block,
+            "destinations": _records(market.destination_breakdown(trade)),
+            "competitors": comp,
+            "headroom": room,
+            "implied_volume": {
+                "available": False,
+                "message": "Faltan supuestos de capacidad para traducir el espacio de mercado a volumen.",
+            },
+            "unit_economics": None,
+            "tariffs": _records(tariffs),
+            "landed_cost": landed,
+            "price_positioning": positioning,
+            "pricing": price_calc,
+            "investment": None,
+            "assumptions_missing": missing,
+            "data_quality": {
+                "market_data_source": "Trade Map (Excel local)",
+                "price_source": price_origin,
+                "sunat_source": (
+                    f"Excel SUNAT {product.nandina} (FOB y peso neto por año)"
+                    if sunat_block.get("available")
+                    else "no disponible para este producto"
+                ),
+                "years_with_data": years,
+                "tariff_source": "data/raw/tariffs/tariffs.csv (carga manual)",
+                "assumptions_source": "config/assumptions.yaml (supuestos, no data)",
+                "warning": (
+                    "Faltan supuestos de inversion para este producto. El análisis de "
+                    f"mercado de arriba es real; completa products.{slug} en "
+                    "config/assumptions.yaml para habilitar el modelo."
+                ),
+            },
+        }
+
+    capex_inputs = assumptions.for_product(slug)
     capacity = capex_inputs["capacity_kg_year"]
 
     # --- Cerrar el circuito: cuanto permite el mercado, no un ramp inventado ---
     if target_share is None:
         target_share = competitors.default_target_share(product.hs6, reporter, product.competitors)
 
-    room = competitors.headroom_ladder(
-        product.hs6, reporter, product.competitors, unit_value_usd_per_kg=fob_price or None
-    )
     implied = competitors.implied_capacity_usd(
         product.hs6, reporter, product.competitors, target_share, capacity,
         fob_price or None,
@@ -244,25 +312,6 @@ def analyze_product(
         sales_commission=model_defaults.sales_commission,
         compliance_pct_fob=model_defaults.compliance_pct_fob,
         freight_pct_fob=model_defaults.freight_pct_fob,
-    )
-
-    # Aranceles de los mercados destino realmente relevantes para este producto.
-    destinations = _top_destinations(trade)
-    tariffs = (
-        manual_tariffs.tariff_table(product.hs6, destinations) if destinations else pd.DataFrame()
-    )
-    real_tariff = _real_tariff(product.hs6, destinations)
-    landed = (
-        landed_cost(fob_price, freight_pct_fob=model_defaults.freight_pct_fob, duty_pct=real_tariff)
-        if fob_price
-        else {}
-    )
-    positioning = (
-        price_positioning(
-            fob_price, freight_pct_fob=model_defaults.freight_pct_fob, duty_pct=real_tariff
-        )
-        if fob_price
-        else {}
     )
 
     return {

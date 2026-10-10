@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ..config import load_catalog
-from ..pipeline import comparison
+from ..pipeline import comparison, screener
 from ..pipeline.analyze import analyze_product
 
 log = logging.getLogger(__name__)
@@ -82,6 +82,7 @@ def list_products() -> dict:
                 "name": p.name,
                 "hs6": p.hs6,
                 "nandina": p.nandina,
+                "industry": p.industry,
                 "presentations": [pres.model_dump() for pres in p.presentations],
             }
             for p in catalog.products
@@ -177,6 +178,18 @@ def compare_products(slugs: str = Query(default="", description="slugs separados
         return JSONResponse(content=_json_safe(res))
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@app.get("/api/ranking")
+def ranking(slugs: str = Query(default="", description="slugs separados por coma; vacio = catalogo completo")) -> JSONResponse:
+    """Screener: ranking de productos por puntaje ponderado (config/scoring.yaml)."""
+    try:
+        items = [x.strip() for x in slugs.split(",") if x.strip()] or None
+        return JSONResponse(content=_json_safe(screener.screen_products(items)))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
 
 @app.get("/simple", response_class=HTMLResponse)
 def simple(request: Request, hs6: str = "081040", year: int = 2024):

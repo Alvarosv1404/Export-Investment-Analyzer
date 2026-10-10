@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import functools
 import os
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,40 @@ def project_root() -> Path:
 
 CONFIG_DIR = project_root() / "config"
 DATA_DIR = project_root() / "data"
+
+# Supuestos numericos sin los cuales el modelo de inversion no puede correr.
+REQUIRED_ASSUMPTIONS = (
+    "capacity_kg_year",
+    "capex_usd",
+    "variable_cost_usd_per_kg",
+    "purchase_cost_usd_per_kg",
+    "opex_fixed_usd_year",
+    "working_capital_usd",
+)
+
+# Carpetas de data que NO son productos (agregados, cache y crudos).
+RESERVED_DATA_DIRS = {"raw", "interim", "processed"}
+
+# Sectores sugeridos para `Product.industry`. NO es una lista cerrada: agregar
+# uno nuevo es tan simple como escribir el sector que corresponda en
+# products.yaml. Vive aqui, y no en el yaml, para que el siguiente programador
+# vea de un vistazo que taxonomia se usa y pueda extenderla o agrupar/filtrar
+# por industria sin adivinar los valores existentes.
+INDUSTRIES = (
+    "Agricola",  # productos del agro sin transformar: frescos, secos, en grano
+    "Agroindustria",  # derivados del agro: aceites, conservas, extractos
+    "Pesquero",  # pesca y acuicultura
+    "Minero",  # minerales en bruto y concentrados
+    "Metales",  # metales refinados y manufacturas
+    "Textil",  # fibras, hilados y confecciones
+    "Quimico",  # quimicos, farmacos, colorantes
+    "Hidrocarburos",  # petroleo, gas y derivados
+    "Servicios",  # exportaciones de servicios
+)
+
+# Mapa para normalizar el nombre de una carpeta de industria a su forma canonica
+# ("agricola" -> "Agricola"). Las industrias fuera de la lista se respetan tal cual.
+_INDUSTRY_BY_FOLD = {name.lower(): name for name in INDUSTRIES}
 
 
 class Presentation(BaseModel):
@@ -49,6 +85,10 @@ class Product(BaseModel):
     hs6: str = Field(pattern=r"^\d{6}$")
     nandina: str | None = Field(default=None, pattern=r"^\d{10}$")
     unit: str = "kg"
+    # Sector del producto (ver INDUSTRIES). Opcional: un producto descubierto en
+    # data/ no lo trae hasta que se cura en products.yaml. Sirve para agrupar y
+    # ensenar de que sector es cada producto, no para validar.
+    industry: str | None = None
     competitors: list[int] = Field(default_factory=list)
     # Presentaciones opcionales. Si se omite, el producto tiene una sola (su hs6).
     presentations: list[Presentation] = Field(default_factory=list)
@@ -100,6 +140,10 @@ class InvestmentAssumptions(BaseModel):
     purchase_cost_usd_per_kg: float | None = None
     opex_fixed_usd_year: float | None = None
     working_capital_usd: float | None = None
+    # Los supuestos del catalogo arrancan como ejemplos (False). Marcarlos True
+    # solo cuando los reemplazaste por cotizaciones reales: el screener usa esa
+    # bandera para no presentar un ranking de ejemplo como una recomendacion.
+    verified: bool = False
 
 
 class ModelDefaults(BaseModel):
@@ -124,35 +168,54 @@ class Assumptions(BaseModel):
     sensitivity: dict[str, list[float]] = Field(default_factory=dict)
     fx: dict[str, float] = Field(default_factory=lambda: {"pen_per_usd": 3.75})
 
+    def effective(self, slug: str) -> dict[str, Any]:
+        """Supuestos efectivos: defaults + override del producto (sin validar)."""
+        base = self.defaults.model_dump()
+        override = self.products.get(slug)
+        if override:
+            base.update({k: v for k, v in override.model_dump().items() if v is not None})
+        return base
+
+    def missing_for(self, slug: str) -> list[str]:
+        """Supuestos numericos clave que le faltan a un producto (vacio = completo).
+
+        Se expone para que el pipeline pueda degradar con un aviso en vez de
+        reventar: un producto recien descubierto por su carpeta de data todavia
+        no tiene supuestos, y eso no deberia impedir ver su analisis de mercado.
+        """
+        base = self.effective(slug)
+        return [k for k in REQUIRED_ASSUMPTIONS if base.get(k) is None]
+
     def for_product(self, slug: str) -> dict[str, Any]:
         """Supuestos efectivos de un producto: defaults + override del producto.
 
         Falla explicito si al producto le falta un supuesto numerico clave,
         en vez de propagar None y romper mas abajo con un error confuso.
         """
-        base = self.defaults.model_dump()
-        override = self.products.get(slug)
-        if override:
-            base.update({k: v for k, v in override.model_dump().items() if v is not None})
-
-        missing = [
-            k
-            for k in (
-                "capacity_kg_year",
-                "capex_usd",
-                "variable_cost_usd_per_kg",
-                "purchase_cost_usd_per_kg",
-                "opex_fixed_usd_year",
-                "working_capital_usd",
-            )
-            if base.get(k) is None
-        ]
+        base = self.effective(slug)
+        missing = self.missing_for(slug)
         if missing:
             raise ValueError(
                 f"Faltan supuestos para '{slug}': {', '.join(missing)}. "
                 f"Agrégalos en config/assumptions.yaml bajo products.{slug}."
             )
         return base
+
+
+class ScoringMetric(BaseModel):
+    """Una dimension del ranking de productos, con su peso y su base."""
+
+    label: str
+    weight: float = 1.0
+    lower_is_better: bool = False
+    basis: str = "dato publicado"
+    description: str = ""
+
+
+class Scoring(BaseModel):
+    """Configuracion del screener: que se mide y cuanto pesa cada cosa."""
+
+    metrics: dict[str, ScoringMetric] = Field(default_factory=dict)
 
 
 def _read_yaml(name: str) -> dict[str, Any]:
@@ -163,9 +226,165 @@ def _read_yaml(name: str) -> dict[str, Any]:
         return yaml.safe_load(fh) or {}
 
 
+def _slugify(text: str) -> str:
+    """Nombre legible -> slug ASCII: 'Naranja fresca' -> 'naranja_fresca'."""
+    folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", folded.strip().lower()).strip("_")
+    return slug or "producto"
+
+
+_HS6_RE = re.compile(r"(\d{6})")
+_NANDINA_FILE_RE = re.compile(r"^(\d{10})\.xlsx$", re.IGNORECASE)
+
+
+def _folder_hs6(folder: Path) -> str | None:
+    """HS6 de una carpeta de data: primero el prefijo del nombre, luego los archivos."""
+    match = _HS6_RE.match(folder.name.strip())
+    if match:
+        return match.group(1)
+    counts: dict[str, int] = {}
+    for file in folder.glob("*.xlsx"):
+        for token in _HS6_RE.findall(file.stem):
+            counts[token] = counts.get(token, 0) + 1
+    if not counts:
+        return None
+    return max(counts, key=lambda key: counts[key])
+
+
+def _folder_name(folder: Path, hs6: str) -> str:
+    """Nombre del producto: el nombre de la carpeta sin el prefijo HS6."""
+    name = re.sub(rf"^{hs6}[^0-9a-zA-Z]*", "", folder.name.strip()).strip(" -_")
+    name = name or f"Producto {hs6}"
+    return name[:1].upper() + name[1:] if name.islower() else name
+
+
+def _folder_nandina(folder: Path, hs6: str) -> str | None:
+    """Partida SUNAT (10 digitos) si hay un Excel con ese nombre en la carpeta."""
+    candidates = [
+        match.group(1)
+        for file in folder.glob("*.xlsx")
+        if (match := _NANDINA_FILE_RE.match(file.name))
+    ]
+    if not candidates:
+        return None
+    exact = [code for code in candidates if code.startswith(hs6)]
+    return (exact or candidates)[0]
+
+
+def _is_ignored(folder: Path) -> bool:
+    """Carpetas que nunca son productos: reservadas (raw, interim, processed) u ocultas."""
+    return folder.name.startswith((".", "_")) or folder.name in RESERVED_DATA_DIRS
+
+
+def _canonical_industry(name: str) -> str:
+    """Nombre de carpeta -> industria canonica de INDUSTRIES, o tal cual.
+
+    Asi `data/agricola/` y `data/Agricola/` agrupan igual, y una carpeta de un
+    rubro nuevo ('Bebidas') se respeta sin tocar codigo.
+    """
+    cleaned = name.strip()
+    return _INDUSTRY_BY_FOLD.get(cleaned.lower(), cleaned)
+
+
+def _product_from_folder(folder: Path, industry: str | None) -> Product | None:
+    """Producto a partir de una carpeta de data; None si no parece serlo."""
+    if not any(folder.glob("*.xlsx")):
+        return None
+    hs6 = _folder_hs6(folder)
+    if not hs6:
+        return None
+    name = _folder_name(folder, hs6)
+    return Product(
+        slug=_slugify(name),
+        name=name,
+        hs6=hs6,
+        nandina=_folder_nandina(folder, hs6),
+        industry=industry,
+    )
+
+
+def _product_folders(root: Path):
+    """Recorre data/ y emite (carpeta, industria) por cada producto.
+
+    Estructura soportada:
+
+      data/<hs6> <nombre>/               -> producto, sin industria declarada
+      data/<industria>/<hs6> <nombre>/   -> producto de esa industria
+
+    La regla es simple para quien solo deja data: una carpeta con Excel es un
+    producto; una carpeta sin Excel es una carpeta de industria y se bajan sus
+    subcarpetas. Las carpetas reservadas (raw, interim, processed) y las ocultas
+    se ignoran en todos los niveles.
+    """
+    for entry in sorted(root.iterdir()):
+        if not entry.is_dir() or _is_ignored(entry):
+            continue
+        if any(entry.glob("*.xlsx")):
+            yield entry, None
+            continue
+        industry = _canonical_industry(entry.name)
+        for sub in sorted(entry.iterdir()):
+            if sub.is_dir() and not _is_ignored(sub):
+                yield sub, industry
+
+
+def _unique_slug(slug: str, seen: set[str]) -> str:
+    """Slug unico dentro del catalogo: agrega sufijo _2, _3... si se repite."""
+    if slug not in seen:
+        seen.add(slug)
+        return slug
+    suffix = 2
+    while f"{slug}_{suffix}" in seen:
+        suffix += 1
+    unique = f"{slug}_{suffix}"
+    seen.add(unique)
+    return unique
+
+
+def _discover_products(base: Path | None = None) -> list[Product]:
+    """Productos inferidos de las carpetas de data/.
+
+    Cada carpeta con al menos un Excel es un producto: el HS6 sale del nombre o
+    de los archivos, la partida SUNAT del Excel de 10 digitos y la industria del
+    nombre de la carpeta que la contiene. Es lo que permite sumar un producto
+    nuevo sin tocar products.yaml: basta con dejar su data en su carpeta.
+    """
+    root = base or DATA_DIR
+    if not root.exists():
+        return []
+
+    products: list[Product] = []
+    seen_slugs: set[str] = set()
+    for folder, industry in _product_folders(root):
+        product = _product_from_folder(folder, industry)
+        if product is None:
+            continue
+        slug = _unique_slug(product.slug, seen_slugs)
+        if slug != product.slug:
+            product = product.model_copy(update={"slug": slug})
+        products.append(product)
+    return products
+
+
 @functools.lru_cache(maxsize=1)
 def load_catalog() -> Catalog:
-    return Catalog(**_read_yaml("products.yaml"))
+    """Catalogo efectivo: products.yaml + productos descubiertos en data/.
+
+    products.yaml sigue mandando: si un HS6 ya esta declarado ahi, se conserva
+    su metadata curada (nombre, competidores, presentaciones). Lo que aparece
+    en data/ y no esta en el yaml se agrega solo, con lo minimo.
+    """
+    catalog = Catalog(**_read_yaml("products.yaml"))
+    known_hs6 = {product.hs6 for product in catalog.products}
+    known_slugs = {product.slug for product in catalog.products}
+
+    for product in _discover_products():
+        if product.hs6 in known_hs6 or product.slug in known_slugs:
+            continue
+        catalog.products.append(product)
+        known_hs6.add(product.hs6)
+        known_slugs.add(product.slug)
+    return catalog
 
 
 @functools.lru_cache(maxsize=1)
@@ -179,12 +398,23 @@ def load_countries() -> dict[str, Country]:
     return {name: Country(**data) for name, data in raw.items()}
 
 
+@functools.lru_cache(maxsize=1)
+def load_scoring() -> Scoring:
+    """Pesos del screener. Si falta config/scoring.yaml, corre sin ponderar."""
+    path = CONFIG_DIR / "scoring.yaml"
+    if not path.exists():
+        return Scoring()
+    return Scoring(**_read_yaml("scoring.yaml"))
+
+
 def get_product(slug: str) -> Product:
     for product in load_catalog().products:
         if product.slug == slug:
             return product
     available = ", ".join(p.slug for p in load_catalog().products)
-    raise KeyError(f"Producto '{slug}' no esta en products.yaml. Disponibles: {available}")
+    raise KeyError(
+        f"Producto '{slug}' no esta en el catalogo (products.yaml o data/). Disponibles: {available}"
+    )
 
 
 def country_name(code: int) -> str:

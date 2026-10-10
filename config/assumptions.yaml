@@ -125,14 +125,6 @@ products:
     opex_fixed_usd_year: 180000
     working_capital_usd: 250000
 
-  citricos:
-    capacity_kg_year: 500000
-    capex_usd: 1400000
-    purchase_cost_usd_per_kg: 0.40
-    variable_cost_usd_per_kg: 0.25
-    opex_fixed_usd_year: 170000
-    working_capital_usd: 230000
-
   quinua:
     capacity_kg_year: 250000
     capex_usd: 1000000

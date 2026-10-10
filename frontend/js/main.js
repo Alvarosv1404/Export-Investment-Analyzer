@@ -10,8 +10,8 @@
  * En produccion, el mismo build lo sirve FastAPI desde el mismo origen.
  */
 
-import { getAnalysis, getComparison, getProducts } from './api.js'
-import { destroyCharts, renderAll, renderComparisonCharts } from './charts.js'
+import { getAnalysis, getComparison, getProducts, getRanking } from './api.js'
+import { destroyCharts, renderAll, renderComparisonCharts, renderRankingChart } from './charts.js'
 import {
   comparison,
   competitors,
@@ -19,6 +19,8 @@ import {
   headroom,
   investment,
   market,
+  missingAssumptions,
+  ranking,
   sensitivity,
   sources,
   sunatPrice,
@@ -36,6 +38,7 @@ const state = {
   compareSlugs: (urlParams.get('compare_slugs') || '').split(',').filter(Boolean),
   products: [],
   comparisonData: null,
+  rankingData: null,
 }
 
 /** Actualiza la URL sin recargar, para que la vista sea compartible. */
@@ -58,15 +61,12 @@ function showError(message) {
 }
 
 /** Mensaje de la vista de comparación cuando aún no hay productos marcados. */
-function showEmptyComparison() {
-  destroyCharts()
-  document.getElementById('app').innerHTML = `
-    <div class="alert">
-      Aún no hay productos seleccionados. Marca uno o varios en el panel de arriba
-      para ver el crecimiento interanual y el CAGR desde la base (2016, o el primer
-      año en que el producto exportó).
-    </div>`
-}
+const EMPTY_COMPARISON = `
+  <div class="alert">
+    Aún no hay productos seleccionados. Marca uno o varios en el panel de arriba
+    para ver su ranking ("¿por cuál empezar?") y comparar su crecimiento
+    interanual y CAGR desde la base (2016, o el primer año en que exportaron).
+  </div>`
 
 /**
  * Relee la comparacion al cambiar la seleccion sin volver a pintar los controles.
@@ -84,13 +84,19 @@ async function refreshComparison() {
 
   const reqId = ++load.reqId
   if (!state.compareSlugs.length) {
-    showEmptyComparison()
+    state.comparisonData = null
+    state.rankingData = null
+    renderComparisonView()
     return
   }
   try {
-    const data = await getComparison(state.compareSlugs)
+    const [data, rank] = await Promise.all([
+      getComparison(state.compareSlugs),
+      getRanking(state.compareSlugs),
+    ])
     if (reqId !== load.reqId) return
     state.comparisonData = data
+    state.rankingData = rank
     renderComparisonView()
   } catch (err) {
     showError(err.message)
@@ -120,12 +126,13 @@ function renderControls() {
             ${state.products
               .map(
                 (p) => `
-                  <label class="compare-option" data-product-name="${escapeHTML(`${p.name} ${p.hs6}`.toLowerCase())}">
+                  <label class="compare-option" data-product-name="${escapeHTML(`${p.name} ${p.hs6} ${p.industry || ''}`.toLowerCase())}">
                     <input type="checkbox" name="compareSlugs" value="${escapeHTML(p.slug)}"
                            ${state.compareSlugs.includes(p.slug) ? 'checked' : ''} />
                     <span class="compare-option-copy">
                       <span class="compare-option-name">${escapeHTML(p.name)}</span>
                       <span class="hs6">HS ${escapeHTML(p.hs6)}</span>
+                      ${p.industry ? `<span class="chip chip-industry">${escapeHTML(p.industry)}</span>` : ''}
                     </span>
                   </label>`
               )
@@ -287,12 +294,14 @@ function render(result) {
       <div class="meta">
         <span>HS-6 <b>${escapeHTML(product.hs6 || '')}</b></span>
         ${product.nandina ? `<span>Partida SUNAT <b>${escapeHTML(product.nandina)}</b></span>` : ''}
+        ${product.industry ? `<span>Industria <b>${escapeHTML(product.industry)}</b></span>` : ''}
         <span>Último año con data <b>${result.market.latest_year}</b></span>
       </div>
     </section>`
 
   app.innerHTML = [
     meta,
+    missingAssumptions(result),
     unitEconomics(result.unit_economics),
     market(result.market),
     sunatPrice(result),
@@ -311,8 +320,10 @@ function render(result) {
 function renderComparisonView() {
   destroyCharts()
   const app = document.getElementById('app')
-  app.innerHTML = comparison(state.comparisonData)
-  renderComparisonCharts(state.comparisonData)
+  const detail = state.comparisonData ? comparison(state.comparisonData) : EMPTY_COMPARISON
+  app.innerHTML = `<section class="comparison-page">${ranking(state.rankingData)}${detail}</section>`
+  renderRankingChart(state.rankingData)
+  if (state.comparisonData) renderComparisonCharts(state.comparisonData)
 }
 
 async function load() {
@@ -342,13 +353,23 @@ async function load() {
   bindControls(load)
 
   if (state.view === 'compare') {
+    // El ranking y la comparacion van juntos y sobre la MISMA seleccion: marcar
+    // productos es la pregunta "de estos, por cual empezar" y la comparacion es
+    // el detalle. Por eso el ranking ya no abarca el catalogo completo.
     if (!state.compareSlugs.length) {
-      showEmptyComparison()
+      state.comparisonData = null
+      state.rankingData = null
+      renderComparisonView()
       return
     }
     try {
-      state.comparisonData = await getComparison(state.compareSlugs)
+      const [data, rank] = await Promise.all([
+        getComparison(state.compareSlugs),
+        getRanking(state.compareSlugs),
+      ])
       if (reqId !== load.reqId) return
+      state.comparisonData = data
+      state.rankingData = rank
       renderComparisonView()
     } catch (err) {
       showError(err.message)

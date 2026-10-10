@@ -62,6 +62,24 @@ export function unitEconomics(u) {
     </section>`
 }
 
+// --- Aviso: producto sin supuestos de inversion ---------------------------------
+export function missingAssumptions(result) {
+  const missing = result?.assumptions_missing
+  if (!missing || !missing.length) return ''
+  return `
+    <section class="card">
+      <h2>Modelo de inversión <span class="tag tag-assumed">faltan supuestos</span></h2>
+      <div class="alert warn">
+        Este producto tiene datos de mercado, pero todavía no tiene supuestos de inversión
+        (capacidad, CAPEX, costos). Complétalos en <code>config/assumptions.yaml</code> bajo
+        <code>products.${escapeHTML(result.slug)}</code> para habilitar los bloques 1, 7 y 8.
+        Falta: ${missing.map((key) => `<code>${escapeHTML(key)}</code>`).join(', ')}.
+      </div>
+      <p class="note">El análisis de mercado de arriba (Trade Map / SUNAT) sí es real y no depende
+        de estos valores. La separación es la del resto del proyecto: datos vs. tus supuestos.</p>
+    </section>`
+}
+
 // --- Bloque 2: mercado -----------------------------------------------------------
 export function market(m) {
   if (!m || !m.available) {
@@ -354,7 +372,6 @@ export function comparison(data) {
     </tr>`
   )
   return `
-    <section class="comparison-page">
       <section class="card comparison-intro">
         <h1>Comparación de productos</h1>
         <p class="note">${products.length} producto(s) seleccionados. Compara la evolución anual del valor FOB
@@ -437,8 +454,123 @@ export function comparison(data) {
         )}
         <p class="note">CAGR del periodo completo: desde el año base (primera exportación) hasta el último año
           con data, como referencia al rango 2016-2025 cuando existe el dato.</p>
+      </section>`
+}
+
+// --- Ranking: por cual producto empezar -----------------------------------------
+function scoreCell(score) {
+  if (score === null || score === undefined) return '<span class="muted">n/d</span>'
+  const width = Math.max(0, Math.min(100, score))
+  return `<span class="score-cell">
+      <span class="score-num">${score.toFixed(1)}</span>
+      <span class="score-bar"><span class="score-fill" style="width:${width}%"></span></span>
+    </span>`
+}
+
+const metricFormatters = {
+  market_size: (v) => fullUSD(v),
+  growth: (v) => pctSigned(v),
+  concentration: (v) => pct(v, 0),
+  headroom: (v) => `${v.toFixed(1)}x`,
+  margin: (v) => pct(v),
+  capital_intensity: (v) => `${v.toFixed(2)}x`,
+  returns: (v) => fullUSD(v),
+}
+
+function metricValue(key, value) {
+  if (value === null || value === undefined) return '<span class="muted">n/d</span>'
+  return metricFormatters[key] ? metricFormatters[key](value) : escapeHTML(value)
+}
+
+function readinessChips(r) {
+  const tm = `<span class="chip ${r.trademap_count === r.trademap_expected ? 'chip-ok' : 'chip-warn'}">Trade Map ${r.trademap_count}/${r.trademap_expected}</span>`
+  const sunat = r.sunat ? '<span class="chip chip-ok">SUNAT</span>' : '<span class="chip chip-off">sin SUNAT</span>'
+  const tariff = r.tariffs_known
+    ? `<span class="chip chip-ok">arancel ${r.tariffs_known}/${r.tariffs_total}</span>`
+    : '<span class="chip chip-off">sin arancel</span>'
+  const assumed = r.assumptions_verified
+    ? '<span class="chip chip-ok">supuestos verificados</span>'
+    : '<span class="chip chip-warn">supuestos de ejemplo</span>'
+  return `<span class="chips">${tm}${sunat}${tariff}${assumed}</span>`
+}
+
+export function ranking(data) {
+  if (!data) return ''
+  const products = data.products || []
+  if (!products.length) {
+    return `<section class="card"><div class="alert">Sin productos para rankear.</div></section>`
+  }
+  const metrics = data.metrics || []
+  const ranked = products.filter((p) => p.score !== null)
+
+  const headerCells = ['#', 'Producto', 'Puntaje', 'Confianza', ...metrics.map((m) => m.label), 'Datos']
+    .map((label, index) => {
+      const num = index >= 2 && index <= 3 + metrics.length
+      const head = metrics[index - 4]
+      const title = head ? `${head.description} (peso ${head.weight})` : ''
+      return `<th class="${num ? 'num' : ''}" ${title ? `title="${escapeHTML(title)}"` : ''}>${escapeHTML(label)}</th>`
+    })
+    .join('')
+
+  const rows = products.map((product) => {
+    const rank = product.rank !== null ? `#${product.rank}` : '&mdash;'
+    const cells = metrics
+      .map((metric) => `<td class="num">${metricValue(metric.key, product.values?.[metric.key])}</td>`)
+      .join('')
+    const note = product.available
+      ? readinessChips(product.readiness)
+      : `<span class="chip chip-bad">${escapeHTML(product.error || 'sin datos')}</span>`
+    return `<tr class="${product.rank && product.rank <= 3 ? 'hl' : ''}">
+        <td class="num">${rank}</td>
+        <td>${escapeHTML(product.name || product.slug)} <span class="hs6">HS ${escapeHTML(product.hs6)}</span></td>
+        <td class="num">${scoreCell(product.score)}</td>
+        <td class="num">${pct(product.score_confidence / 100, 0)}</td>
+        ${cells}
+        <td>${note}</td>
+      </tr>`
+  })
+
+  const metricRows = metrics.map(
+    (metric) => `<tr>
+        <td>${escapeHTML(metric.label)}</td>
+        <td class="num">${metric.weight}</td>
+        <td>${escapeHTML(metric.basis)}</td>
+        <td>${escapeHTML(metric.description)}</td>
+      </tr>`
+  )
+
+  return `
+      <section class="card comparison-intro">
+        <h1>¿Por cuál de estos empezar?</h1>
+        <p class="note">${ranked.length} de ${products.length} producto(s) seleccionado(s) con datos suficientes, ordenados por
+          puntaje ponderado. El puntaje es el promedio de cada dimensión (normalizada 0-100 entre los productos comparados),
+          pesada por su importancia. <b>No es una recomendación de inversión</b>: ordena la conversación.</p>
+        <p class="note">La columna <b>Confianza</b> dice qué fracción del peso total pudo evaluarse con datos del
+          producto. Un puntaje alto con confianza baja significa que faltan datos, no que el producto sea seguro.
+          La columna <b>Datos</b> muestra qué evidencia existe y si los supuestos siguen siendo de ejemplo.</p>
+        <span>${tagAssumed}</span>
       </section>
-    </section>`
+      <section class="card">
+        <h2>Puntaje por producto</h2>
+        <p class="note">Barra azul: los tres primeros. Escala fija 0-100.</p>
+        <div class="chart chart-tall"><canvas id="chartRanking" height="320"></canvas></div>
+      </section>
+      <section class="card comparison-table-card">
+        <h2>Tabla de decisión</h2>
+        <table class="ranking-table">
+          <thead><tr>${headerCells}</tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
+        <p class="note">Las métricas sin dato aparecen como n/d y no cuentan para el puntaje del producto.</p>
+      </section>
+      <section class="card comparison-table-card">
+        <h2>Qué mide cada dimensión</h2>
+        ${table(
+          [{ label: 'Dimensión' }, { label: 'Peso', num: true }, { label: 'Base' }, { label: 'Descripción' }],
+          metricRows
+        )}
+        <p class="note">Los pesos viven en <code>config/scoring.yaml</code>. Ajustarlos cambia el orden, no los datos.</p>
+      </section>`
 }
 
 // --- Procedencia ----------------------------------------------------------------

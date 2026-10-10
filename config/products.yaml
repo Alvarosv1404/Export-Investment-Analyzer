@@ -4,6 +4,22 @@
 # slug / name / hs6 / presentations / competitors. Nada mas. El pipeline, la API
 # y el frontend lo recogen solo.
 #
+# AUN MAS SIMPLE: este archivo es opcional. Si dejas la data de un producto en
+# `data/<hs6> <nombre>/` (con sus Excel de Trade Map), el producto se agrega al
+# catalogo solo: el HS6 sale del nombre de la carpeta o de los archivos, y la
+# partida SUNAT del Excel de 10 digitos. Declarar el producto aqui solo sirve
+# para enriquecerlo (competidores, presentaciones, un nombre cuidado). Si un HS6
+# ya esta declarado aqui, esta declaracion manda sobre lo detectado en data/.
+#
+# ORDENA LA DATA POR INDUSTRIA: si agrupas las carpetas por rubro, la industria
+# tambien se infiere sola del nombre de la carpeta que las contiene:
+#
+#   data/<hs6> <nombre>/               -> producto, sin industria
+#   data/<industria>/<hs6> <nombre>/   -> producto con esa industria
+#
+#   data/Agricola/080510 naranja fresca/
+#   data/Pesquero/030743 pota calamar congelado/
+#
 #   hs6  -> presentacion PRINCIPAL, a 6 digitos. Debe coincidir con
 #           presentations[0].hs6. Es la que usa el pipeline como cabecera.
 #
@@ -15,6 +31,15 @@
 #   nandina -> partida SUNAT de 10 digitos de la presentacion principal.
 #           Opcional. Sirve para cruzar con los Excel de SUNAT; los primeros 6
 #           digitos son el HS6 (ver exportanalysis.sources.sunat).
+#
+#   industry -> sector del producto. Opcional pero recomendado: es lo que
+#           permite agrupar y entender de que rubro es cada producto. Los
+#           valores sugeridos viven en `INDUSTRIES` (config.py): Agricola,
+#           Agroindustria, Pesquero, Minero, Metales, Textil, Quimico,
+#           Hidrocarburos, Servicios. La lista NO es cerrada: si tu producto es
+#           de otro rubro, escribe el que corresponda. Si omites `industry`, se
+#           toma el nombre de la carpeta de industria que contiene la data (y si
+#           el producto esta suelto en data/, queda sin industria).
 #
 # Fuentes: Trade Map (demanda mundial y competidores) y SUNAT (exportaciones
 # peruanas). Ambas se muestran en campos separados porque NO siempre coinciden:
@@ -33,6 +58,7 @@ products:
     hs6: "090111"
     nandina: "0901119000"
     unit: kg
+    industry: Agricola
     competitors: [76, 704, 170, 360, 340, 320]   # Brasil, Vietnam, Colombia, Indonesia, Honduras, Guatemala
     presentations:
       - {hs6: "090111", label: "Verde, sin tostar, sin descafeinar"}
@@ -43,6 +69,7 @@ products:
     hs6: "180100"
     nandina: "1801001900"
     unit: kg
+    industry: Agricola
     competitors: [384, 288, 218, 120, 566, 360]  # Costa de Marfil, Ghana, Ecuador, Camerun, Nigeria, Indonesia
     presentations:
       - {hs6: "180100", label: "Grano entero o partido, crudo"}
@@ -55,6 +82,7 @@ products:
     hs6: "081040"
     nandina: "0810400000"
     unit: kg
+    industry: Agricola
     competitors: [152, 484, 504, 724, 842, 124]  # Chile, Mexico, Marruecos, Espana, USA, Canada
     presentations:
       - {hs6: "081040", label: "Fresco"}
@@ -66,6 +94,7 @@ products:
     hs6: "080610"
     nandina: "0806100000"
     unit: kg
+    industry: Agricola
     competitors: [152, 842, 380, 156, 710, 699]  # Chile, USA, Italia, China, Sudafrica, India
     presentations:
       - {hs6: "080610", label: "Fresca"}
@@ -76,6 +105,7 @@ products:
     hs6: "080440"
     nandina: "0804400000"
     unit: kg
+    industry: Agricola
     competitors: [484, 152, 170, 404, 724, 376]  # Mexico, Chile, Colombia, Kenia, Espana, Israel
     presentations:
       - {hs6: "080440", label: "Fresca o seca"}
@@ -85,6 +115,7 @@ products:
     hs6: "070920"
     nandina: "0709200000"
     unit: kg
+    industry: Agricola
     competitors: [484, 156, 724, 764, 300, 152]  # Mexico, China, Espana, Tailandia, Grecia, Chile
     presentations:
       - {hs6: "070920", label: "Fresco o refrigerado"}
@@ -96,28 +127,19 @@ products:
     hs6: "080450"
     nandina: "0804502000"
     unit: kg
+    industry: Agricola
     competitors: [484, 699, 764, 76, 218, 586]  # Mexico, India, Tailandia, Brasil, Ecuador, Pakistan
     presentations:
       - {hs6: "080450", label: "Fresco o seco"}
       - {hs6: "081190", label: "Congelado"}
       - {hs6: "200989", label: "Jugo"}
 
-  - slug: citricos
-    name: Citricos
-    hs6: "080529"
-    nandina: "0805290000"
-    unit: kg
-    competitors: [724, 710, 792, 818, 156, 152]  # Espana, Sudafrica, Turquia, Egipto, China, Chile
-    presentations:
-      - {hs6: "080529", label: "Otros citricos, frescos"}
-      - {hs6: "080521", label: "Mandarina y tangerina, frescas"}
-      - {hs6: "080550", label: "Limon y lima, frescos"}
-
   - slug: quinua
     name: Quinua
     hs6: "100850"
     nandina: "1008509000"
     unit: kg
+    industry: Agricola
     competitors: [68, 218, 842, 32, 124, 699]  # Bolivia, Ecuador, USA, Argentina, Canada, India
     presentations:
       - {hs6: "100850", label: "Grano (los demas)"}
@@ -127,6 +149,7 @@ products:
     hs6: "090421"
     nandina: "0904211000"
     unit: kg
+    industry: Agricola
     competitors: [156, 699, 724, 484, 764, 792]  # China, India, Espana, Mexico, Tailandia, Turquia
     presentations:
       - {hs6: "090421", label: "Seco, sin triturar ni pulverizar"}
@@ -137,6 +160,7 @@ products:
     hs6: "091011"
     nandina: "0910110000"
     unit: kg
+    industry: Agricola
     competitors: [156, 699, 764, 360, 76, 566]  # China, India, Tailandia, Indonesia, Brasil, Nigeria
     presentations:
       - {hs6: "091011", label: "Sin triturar ni pulverizar"}
@@ -147,6 +171,7 @@ products:
     hs6: "151110"
     nandina: "1511100000"
     unit: kg
+    industry: Agroindustria
     competitors: [360, 458, 764, 566, 170, 320]  # Indonesia, Malasia, Tailandia, Nigeria, Colombia, Guatemala
     presentations:
       - {hs6: "151110", label: "Crudo"}
@@ -157,6 +182,7 @@ products:
     hs6: "320300"
     nandina: "3203001900"
     unit: kg
+    industry: Agroindustria
     competitors: [152, 484, 76, 724, 170]  # Chile, Mexico, Brasil, Espana, Colombia
     presentations:
       - {hs6: "320300", label: "Materias colorantes de origen animal o vegetal"}
@@ -166,6 +192,7 @@ products:
     hs6: "030743"
     nandina: "0307430000"
     unit: kg
+    industry: Pesquero
     competitors: [156, 724, 32, 152, 699, 504]  # China, Espana, Argentina, Chile, India, Marruecos
     presentations:
       - {hs6: "030743", label: "Congelado"}
@@ -176,6 +203,7 @@ products:
     hs6: "160414"
     nandina: "1604141000"
     unit: kg
+    industry: Pesquero
     competitors: [764, 724, 504, 218, 156, 704]  # Tailandia, Espana, Marruecos, Ecuador, China, Vietnam
     presentations:
       - {hs6: "160414", label: "Atun, bonito y listado"}
@@ -188,6 +216,7 @@ products:
   #   hs6: "000000"
   #   nandina: "0000000000"
   #   unit: kg
+  #   industry: Agricola
   #   competitors: [170, 76]
   #   presentations:
   #     - {hs6: "000000", label: "Presentacion principal (= hs6)"}

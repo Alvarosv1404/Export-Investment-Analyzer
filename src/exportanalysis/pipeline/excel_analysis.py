@@ -28,6 +28,46 @@ def _find(hs6: str, pattern: str) -> Path:
     raise FileNotFoundError(pattern.format(hs6=hs6))
 
 
+# Los cuatro Excel que Trade Map exporta por producto, con una etiqueta corta.
+TRADEMAP_FILES: dict[str, str] = {
+    "exportadores": "exporting-economies_{hs6}.xlsx",
+    "importadores": "importing-economies_{hs6}.xlsx",
+    "serie_peru": "perus-exports-to-world-by-importer_{hs6}.xlsx",
+    "snapshot_2025": "perus-exports-to-world-in-2025-by-importer_{hs6}.xlsx",
+}
+
+
+def data_files_status(hs6: str, nandina: str | None = None) -> dict:
+    """Que archivos de un producto estan realmente en data/.
+
+    Sirve para el semaforo de confianza del screener: un producto sin su
+    snapshot 2025 no tiene volumen ni precio por kilo, aunque la ficha corra.
+    No lanza: devuelve banderas.
+    """
+    present = {}
+    for key, pattern in TRADEMAP_FILES.items():
+        try:
+            _find(hs6, pattern)
+            present[key] = True
+        except FileNotFoundError:
+            present[key] = False
+
+    sunat = False
+    if nandina:
+        try:
+            _find_nandina_file(nandina)
+            sunat = True
+        except FileNotFoundError:
+            sunat = False
+
+    return {
+        "trademap": present,
+        "trademap_count": sum(present.values()),
+        "trademap_expected": len(TRADEMAP_FILES),
+        "sunat": sunat,
+    }
+
+
 def _year_columns(df: pd.DataFrame) -> list[str]:
     """Columnas de anio ("2024 (USD Thousand)") de un Excel de Trade Map."""
     return [c for c in df.columns if str(c).split(" ")[0].isdigit()]

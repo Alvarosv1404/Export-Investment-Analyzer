@@ -1,6 +1,47 @@
-﻿# Data organizada por producto
+﻿# Data organizada por producto e industria
 
-Cada carpeta corresponde a HS6 con nombre descriptivo: data/<HS6> <nombre>/
+El catalogo se arma solo a partir de estas carpetas: no hace falta tocar codigo
+para sumar un producto. Hay dos formas de dejar la data, y se pueden mezclar.
+
+## 1. Organizada por industria (recomendada)
+
+```
+data/
+  Agricola/
+    080510 naranja fresca/
+    081040 arandano fresco/
+    ...
+  Agroindustria/
+    151110 aceite palma crudo/
+    ...
+  Pesquero/
+    030743 pota calamar congelado/
+    ...
+```
+
+- La carpeta de industria es solo para agrupar y para que se entienda el rubro:
+  su nombre se usa como `industry` del producto (ver `INDUSTRIES` en
+  `src/exportanalysis/config.py`).
+- Una carpeta con Excel es un producto; una carpeta sin Excel es una carpeta de
+  industria y se revisan sus subcarpetas.
+- Las carpetas reservadas (`raw`, `interim`, `processed`) y las que empiezan
+  con `.` o `_` se ignoran.
+
+## 2. Producto suelto en la raiz
+
+Tambien puedes dejar la carpeta del producto directamente en `data/`:
+
+```
+data/080510 naranja fresca/
+```
+
+En ese caso el producto aparece igual, pero sin industria declarada.
+
+## Nombre de la carpeta del producto
+
+`data/<industria>/<HS6> <nombre>/` — el HS6 (6 digitos) al inicio del nombre
+fija la partida del producto. Si no esta en el nombre, se deduce del nombre de
+los archivos.
 
 ## Archivos requeridos (Trade Map)
 
@@ -27,10 +68,13 @@ Por producto se esperan 4 archivos Excel (nombres exactos):
 
 ## Agregar nuevo producto
 
-Para agregar un producto sin tocar codigo:
-1. Crear carpeta data/<hs6> <nombre>/
+Lo minimo (sin tocar codigo):
+1. Crear `data/<Industria>/<hs6> <nombre>/`
 2. Colocar los 4 archivos con nombres exactos
-3. Anadir bloque en config/products.yaml con slug, name, hs6, unit, competitors, presentations
-4. Opcional: anadir supuestos en config/assumptions.yaml (por slug)
 
-El pipeline detecta archivos automaticamente por hs6 (busqueda recursiva en data/).
+Opcional, para enriquecer el producto en `config/products.yaml` (nombre cuidado,
+competidores, presentaciones, `industry`) y en `config/assumptions.yaml`
+(supuestos de inversion por slug). Sin supuestos, el producto igual muestra su
+analisis de mercado, con un aviso de lo que falta.
+
+El pipeline detecta los productos automaticamente (busqueda recursiva en data/).

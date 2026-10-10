@@ -42,4 +42,8 @@ export const getComparison = (slugs = []) => {
   const q = slugs.length ? `?slugs=${encodeURIComponent(slugs.join(','))}` : ''
   return getJSON(`/api/comparison${q}`)
 }
+export const getRanking = (slugs = []) => {
+  const q = slugs.length ? `?slugs=${encodeURIComponent(slugs.join(','))}` : ''
+  return getJSON(`/api/ranking${q}`)
+}
 export const getHealth = () => getJSON('/health')

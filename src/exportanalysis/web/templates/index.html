@@ -39,11 +39,24 @@
     <div class="meta">
       <span>HS-6 <b>{{ result.product.hs6 }}</b></span>
       {% if result.product.nandina %}<span>Partida SUNAT <b>{{ result.product.nandina }}</b></span>{% endif %}
+      {% if result.product.industry %}<span>Industria <b>{{ result.product.industry }}</b></span>{% endif %}
       <span>Último año con data <b>{{ m.latest_year }}</b></span>
     </div>
   </section>
 
+  {% if result.get('assumptions_missing') %}
+  <section class="card">
+    <h2>Modelo de inversión <span class="tag tag-assumed">faltan supuestos</span></h2>
+    <div class="alert warn">
+      Este producto tiene datos de mercado, pero todavía no tiene supuestos de inversión.
+      Complétalos en <code>config/assumptions.yaml</code> bajo
+      <code>products.{{ result.slug }}</code>: {{ result.assumptions_missing|join(', ') }}.
+    </div>
+  </section>
+  {% endif %}
+
   {% set u = result.unit_economics %}
+  {% if u %}
   <section class="card {% if not u.is_viable %}card-bad{% endif %}">
     <h2>1. Economía unitaria <span class="tag {% if u.is_viable %}tag-ok{% else %}tag-bad{% endif %}">{{ 'viable' if u.is_viable else 'margen negativo' }}</span></h2>
     <div class="kpis">
@@ -54,6 +67,7 @@
     </div>
     {% for w in u.warnings %}<div class="alert warn">{{ w }}</div>{% endfor %}
   </section>
+  {% endif %}
 
   <section class="card">
     <h2>2. Mercado <span class="tag tag-data">dato publicado</span></h2>
@@ -153,6 +167,7 @@
   </section>
 
   {% set inv = result.investment %}
+  {% if inv %}
   {% set s = inv.summary %}
   <section class="card">
     <h2>7. Decisión de inversión <span class="tag tag-assumed">todos estos números son supuestos</span></h2>
@@ -198,6 +213,7 @@
     <div class="chart chart-tall"><canvas id="chartSens" height="200"></canvas></div>
     <p class="note">VAN base: <b>${{ '{:,.0f}'.format(inv.sensitivity.base_npv_usd) }}</b>.</p>
   </section>
+  {% endif %}
 
   <section class="card card-quiet">
     <h3>Procedencia de los datos</h3>
@@ -274,26 +290,28 @@ if (R && R.market && R.market.available) {
     });
   }
 
-  new Chart(document.getElementById('chartCash'), {
-    type: 'bar',
-    data: {
-      labels: R.investment.cashflows.map((_, i) => i === 0 ? 'Inversión' : 'Año ' + i),
-      datasets: [{label: 'Flujo de caja libre', data: R.investment.cashflows,
-        backgroundColor: R.investment.cashflows.map(v => v >= 0 ? '#059669' : '#dc2626')}]
-    },
-    options: {plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => money(c.parsed.y)}}}, scales:{y:{ticks:{callback:v=>compact(v)}}}}
-  });
+  if (R.investment) {
+    new Chart(document.getElementById('chartCash'), {
+      type: 'bar',
+      data: {
+        labels: R.investment.cashflows.map((_, i) => i === 0 ? 'Inversión' : 'Año ' + i),
+        datasets: [{label: 'Flujo de caja libre', data: R.investment.cashflows,
+          backgroundColor: R.investment.cashflows.map(v => v >= 0 ? '#059669' : '#dc2626')}]
+      },
+      options: {plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => money(c.parsed.y)}}}, scales:{y:{ticks:{callback:v=>compact(v)}}}}
+    });
 
-  const t = R.investment.sensitivity.tornado;
-  new Chart(document.getElementById('chartSens'), {
-    type: 'bar',
-    data: {
-      labels: t.map(x => x.variable),
-      datasets: [{label: 'Impacto en VAN', data: t.map(x => x.swing_usd),
-        backgroundColor: t.map(x => x.swing_usd > 0 ? '#f59e0b' : '#64748b')}]
-    },
-    options: {indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => 'swing ' + money(c.parsed.x)}}}, scales:{x:{ticks:{callback:v=>compact(v)}}}}
-  });
+    const t = R.investment.sensitivity.tornado;
+    new Chart(document.getElementById('chartSens'), {
+      type: 'bar',
+      data: {
+        labels: t.map(x => x.variable),
+        datasets: [{label: 'Impacto en VAN', data: t.map(x => x.swing_usd),
+          backgroundColor: t.map(x => x.swing_usd > 0 ? '#f59e0b' : '#64748b')}]
+      },
+      options: {indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => 'swing ' + money(c.parsed.x)}}}, scales:{x:{ticks:{callback:v=>compact(v)}}}}
+    });
+  }
 }
 </script>
 </body>

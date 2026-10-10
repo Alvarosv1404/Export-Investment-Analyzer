@@ -276,6 +276,28 @@ code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-si
 .sources { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; color: var(--ink-soft); }
 .sources li { margin-bottom: 0.3rem; }
 
+/* --- ranking: por cual producto empezar --- */
+.ranking-table { min-width: 1080px; }
+.ranking-table .hs6 { display: block; }
+.score-cell { display: inline-flex; align-items: center; gap: 0.5rem; justify-content: flex-end; }
+.score-num { font-weight: 650; font-variant-numeric: tabular-nums; min-width: 2.5rem; }
+.score-bar { display: inline-block; width: 4.5rem; height: 0.5rem; border-radius: 999px; background: var(--line); overflow: hidden; }
+.score-fill { display: block; height: 100%; background: var(--data); border-radius: 999px; }
+.chips { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; }
+.chip {
+  display: inline-block;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chip-ok { background: #d1fae5; color: var(--ok); }
+.chip-warn { background: #fef3c7; color: var(--warn); }
+.chip-off { background: #e2e8f0; color: var(--ink-soft); }
+.chip-bad { background: #fee2e2; color: var(--bad); }
+.chip-industry { background: #dbeafe; color: #1d4ed8; }
+
 footer { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
 footer p { font-size: 0.8rem; color: var(--ink-faint); }
 

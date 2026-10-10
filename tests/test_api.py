@@ -78,14 +78,27 @@ class TestProducts:
         assert "cafe_verde" in slugs
         for product in data["products"]:
             assert len(product["hs6"]) == 6
+        assert any(p.get("industry") for p in data["products"]) is True
 
     def test_sin_parametros_obligatorios(self, client):
         assert client.get("/api/products").status_code == 200
 
-    def test_todos_los_productos_tienen_supuestos_de_inversion(self):
+    def test_productos_sin_supuestos_se_analizan_parcialmente(self, client):
+        """Un producto descubierto en data/ puede no tener supuestos.
+
+        El catalogo ya no exige supuestos: si faltan, el analisis entrega el
+        mercado completo y marca lo que falta, en vez de fallar con 500.
+        """
         assumptions = load_assumptions()
         for product in load_catalog().products:
-            assumptions.for_product(product.slug)
+            response = client.get(f"/api/analysis/{product.slug}")
+            assert response.status_code == 200, product.slug
+            data = response.json()
+            if assumptions.missing_for(product.slug):
+                assert data["investment"] is None
+                assert data["assumptions_missing"]
+            else:
+                assert data["investment"] is not None
 
 
 class TestAnalysis:

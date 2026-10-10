@@ -327,6 +327,50 @@ export function renderComparisonCharts(data) {
   comparisonCagrChart(document.getElementById('chartComparisonCagr'), data)
 }
 
+/** Ranking: puntaje ponderado por producto, los mejor rankeados arriba. */
+function rankingChart(canvas, data) {
+  if (!canvas || !data?.products?.length) return
+  const products = data.products.filter((product) => product.score !== null)
+  if (!products.length) return
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: products.map((product) => `${product.name || product.slug} (HS ${product.hs6})`),
+      datasets: [
+        {
+          label: 'Puntaje',
+          data: products.map((product) => product.score),
+          backgroundColor: products.map((_, index) => (index < 3 ? '#2563eb' : '#94a3b8')),
+          borderRadius: 5,
+        },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const product = products[context.dataIndex]
+              return `puntaje ${product.score} / 100 (confianza ${product.score_confidence}%)`
+            },
+          },
+        },
+      },
+      scales: {
+        x: { beginAtZero: true, max: 100, title: { display: true, text: 'Puntaje ponderado (0-100)' } },
+      },
+    },
+  })
+}
+
+export function renderRankingChart(data) {
+  if (!init()) return
+  rankingChart(document.getElementById('chartRanking'), data)
+}
+
 /** Precio promedio por kilo SUNAT: FOB / peso neto, linea por anio. */
 function sunatPriceChart(canvas, s) {
   if (!canvas || !s?.available || !s.series?.length) return
