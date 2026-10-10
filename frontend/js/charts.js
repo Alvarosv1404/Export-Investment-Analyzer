@@ -326,11 +326,42 @@ export function renderComparisonCharts(data) {
   comparisonCagrChart(document.getElementById('chartComparisonCagr'), data)
 }
 
+/** Precio promedio por kilo SUNAT: FOB / peso neto, linea por anio. */
+function sunatPriceChart(canvas, s) {
+  if (!canvas || !s?.available || !s.series?.length) return
+  const rows = s.series.filter((r) => r.price_usd_per_kg !== null && r.price_usd_per_kg !== undefined)
+  if (!rows.length) return
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: rows.map((r) => r.year),
+      datasets: [
+        {
+          label: 'Precio promedio USD/kg',
+          data: rows.map((r) => r.price_usd_per_kg),
+          borderColor: '#0d9488',
+          backgroundColor: 'rgba(13,148,136,.12)',
+          fill: true,
+          tension: 0.25,
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `$${c.parsed.y.toFixed(3)}/kg` } },
+      },
+      scales: { y: { title: { display: true, text: 'USD/kg' } } },
+    },
+  })
+}
+
 /** Dibuja todos los graficos del reporte. Idempotente por id de canvas. */
 export function renderAll(result) {
   if (!init() || !result) return
   const get = (id) => document.getElementById(id)
   series(get('chartSeries'), result.market)
+  sunatPriceChart(get('chartSunatPrice'), result.sunat)
   destinations(get('chartDest'), result.destinations)
   competitors(get('chartComp'), result.competitors)
   headroom(get('chartLadder'), result.headroom)

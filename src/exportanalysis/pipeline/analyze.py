@@ -95,6 +95,34 @@ def _records(frame: pd.DataFrame) -> list[dict]:
     return frame.where(pd.notna(frame), None).to_dict("records")
 
 
+def _sunat_block(nandina: str | None) -> dict:
+    """Precio promedio por kilo desde el Excel SUNAT (FOB / peso neto), por anio.
+
+    Solo existe para los productos que tienen cargado su Excel de SUNAT con una
+    hoja por anio. Cuando esta, es la fuente de precio mas confiable: trae el
+    peso neto real de cada operacion y no depende de la unidad del snapshot.
+    """
+    if not nandina:
+        return {"available": False}
+    try:
+        summary = excel_analysis.sunat_annual_summary(nandina)
+    except (FileNotFoundError, KeyError, ValueError):
+        return {"available": False}
+    if summary.empty:
+        return {"available": False}
+
+    valid = summary.dropna(subset=["price_usd_per_kg"])
+    latest = valid.iloc[-1] if not valid.empty else None
+    return {
+        "available": True,
+        "nandina": nandina,
+        "series": _records(summary),
+        "latest_year": int(latest["year"]) if latest is not None else None,
+        "latest_price_usd_per_kg": (
+            float(latest["price_usd_per_kg"]) if latest is not None else None
+        ),
+        "cagr_price": market.cagr(summary["price_usd_per_kg"]),
+    }
 def analyze_product(
     slug: str,
     *,
@@ -136,12 +164,17 @@ def analyze_product(
 
     # Precio de venta: input editable. Orden de resolucion:
     #   1. lo que paso el usuario
-    #   2. estimado de los historicos (pricing)
-    #   3. unit value del Excel como ultimo respaldo
+    #   2. SUNAT (FOB / peso neto), si el producto tiene su Excel cargado
+    #   3. estimado de los historicos (pricing, snapshot Trade Map)
+    #   4. unit value del Excel como ultimo respaldo
     price_calc = pricing.estimated_fob_price_usd_per_kg(product.hs6)
+    sunat_calc = pricing.sunat_fob_price_usd_per_kg(product.nandina)
     if price_usd_per_kg is not None:
         fob_price = float(price_usd_per_kg)
         price_origin = pricing.PRICE_ORIGIN_USER
+    elif sunat_calc.get("price_usd_per_kg") is not None:
+        fob_price = float(sunat_calc["price_usd_per_kg"])
+        price_origin = pricing.PRICE_ORIGIN_SUNAT
     elif price_calc.get("price_usd_per_kg") is not None:
         fob_price = float(price_calc["price_usd_per_kg"])
         price_origin = pricing.PRICE_ORIGIN_CALCULATED
@@ -149,7 +182,14 @@ def analyze_product(
         excel_price = market_summary.get("latest_unit_value_usd")
         fob_price = float(excel_price) if excel_price else 0.0
         price_origin = pricing.PRICE_ORIGIN_EXCEL
-    price_calc = {**price_calc, "price_usd_per_kg": fob_price, "origin": price_origin}
+    price_calc = {
+        **price_calc,
+        "price_usd_per_kg": fob_price,
+        "origin": price_origin,
+        "sunat": sunat_calc,
+    }
+
+    sunat_block = _sunat_block(product.nandina)
 
     capex_inputs = load_assumptions().for_product(slug)
     capacity = capex_inputs["capacity_kg_year"]
@@ -230,6 +270,7 @@ def analyze_product(
         "product": product.model_dump(),
         "years": years,
         "market": market_summary,
+        "sunat": sunat_block,
         "destinations": _records(market.destination_breakdown(trade)),
         "competitors": comp,
         "headroom": room,
@@ -251,6 +292,11 @@ def analyze_product(
         "data_quality": {
             "market_data_source": "Trade Map (Excel local)",
             "price_source": price_origin,
+            "sunat_source": (
+                f"Excel SUNAT {product.nandina} (FOB y peso neto por anio)"
+                if sunat_block.get("available")
+                else "no disponible para este producto"
+            ),
             "years_with_data": years,
             "tariff_source": "data/raw/tariffs/tariffs.csv (carga manual)",
             "assumptions_source": "config/assumptions.yaml (supuestos, no data)",

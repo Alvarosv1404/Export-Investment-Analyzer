@@ -21,6 +21,7 @@ import {
   market,
   sensitivity,
   sources,
+  sunatPrice,
   tariffs,
   unitEconomics,
 } from './components.js'
@@ -253,6 +254,7 @@ function render(result) {
     meta,
     unitEconomics(result.unit_economics),
     market(result.market),
+    sunatPrice(result),
     destinations(result.destinations),
     competitors(result.competitors),
     headroom(result.headroom),

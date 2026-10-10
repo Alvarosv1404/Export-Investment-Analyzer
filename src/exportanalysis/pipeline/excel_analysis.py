@@ -181,3 +181,81 @@ def available_years(hs6: str) -> list[int]:
     """Anios con data en el Excel historico, ordenados y sin depender de la red."""
     df = peru_exports_ts(hs6)
     return sorted(df["year"].dropna().astype(int).unique().tolist())
+
+
+def _find_nandina_file(nandina: str) -> Path:
+    """Busca el Excel de SUNAT (hojas por anio) por partida NANDINA."""
+    for p in DATA_DIR.rglob(f"{nandina}.xlsx"):
+        if "_cache" not in str(p):
+            return p
+    raise FileNotFoundError(f"{nandina}.xlsx")
+
+
+def _column_by(cols: list, *needles: str, exclude: tuple[str, ...] = ()) -> str | None:
+    """Primera columna cuyo encabezado contiene todos los needles y ningun exclude."""
+    for col in cols:
+        text = str(col).lower()
+        if all(n in text for n in needles) and not any(e in text for e in exclude):
+            return col
+    return None
+
+
+def sunat_exports_by_nandina(nandina: str) -> pd.DataFrame:
+    """Exportaciones por destino desde el Excel de SUNAT (una hoja por anio).
+
+    Columnas: year, partner_label, fob_usd, net_weight_kg. Se toma el anio del
+    nombre de la hoja (p.ej. "2024"); cualquier hoja con otro nombre se ignora.
+    El encabezado real es: Pais de Destino, Valor FOB(dolares), Peso Neto(Kilos),
+    Peso Bruto(Kilos), Porcentaje FOB, pero se ubican las columnas por nombre para
+    no depender del orden ni del idioma exacto de los acentos.
+    """
+    path = _find_nandina_file(nandina)
+    xls = pd.ExcelFile(path)
+    frames = []
+    for sheet in xls.sheet_names:
+        label = str(sheet).strip()
+        if not (len(label) == 4 and label.isdigit()):
+            continue
+        raw = pd.read_excel(xls, sheet_name=sheet)
+        if raw.empty:
+            continue
+        partner_col = raw.columns[0]
+        fob_col = _column_by(list(raw.columns), "fob", exclude=("porcentaje", "%"))
+        net_col = _column_by(list(raw.columns), "neto")
+        if fob_col is None or net_col is None:
+            continue
+        frame = pd.DataFrame(
+            {
+                "year": int(label),
+                "partner_label": raw[partner_col].astype(str).str.strip(),
+                "fob_usd": pd.to_numeric(raw[fob_col], errors="coerce"),
+                "net_weight_kg": pd.to_numeric(raw[net_col], errors="coerce"),
+            }
+        )
+        frames.append(frame.dropna(subset=["fob_usd"]))
+    if not frames:
+        return pd.DataFrame(columns=["year", "partner_label", "fob_usd", "net_weight_kg"])
+    return pd.concat(frames, ignore_index=True)
+
+
+def sunat_annual_summary(nandina: str) -> pd.DataFrame:
+    """Serie anual de SUNAT: FOB, peso neto y precio promedio por kilo.
+
+    `price_usd_per_kg` es la division del FOB entre el peso neto en kilos,
+    ponderada por destino (suma de FOB / suma de peso neto). Es el precio real
+    por kilo, a diferencia del unit value del snapshot, que no siempre trae la
+    cantidad en kilos y puede dar un precio irreal.
+    """
+    df = sunat_exports_by_nandina(nandina)
+    if df.empty:
+        return pd.DataFrame(columns=["year", "fob_usd", "net_weight_kg", "price_usd_per_kg"])
+    summary = df.groupby("year", as_index=False).agg(
+        fob_usd=("fob_usd", "sum"),
+        net_weight_kg=("net_weight_kg", lambda s: s.sum(min_count=1)),
+    )
+    summary["price_usd_per_kg"] = np.where(
+        summary["net_weight_kg"].fillna(0) > 0,
+        summary["fob_usd"] / summary["net_weight_kg"],
+        np.nan,
+    )
+    return summary.sort_values("year").reset_index(drop=True)

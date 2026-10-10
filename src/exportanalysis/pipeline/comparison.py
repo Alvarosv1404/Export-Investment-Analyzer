@@ -58,9 +58,11 @@ def _series_product(slug: str) -> dict[str, Any]:
         product = get_product(slug)
         hs6 = product.hs6
         name = product.name
+        nandina = product.nandina
     except KeyError:
         hs6 = slug
         name = slug
+        nandina = None
 
     try:
         df = excel_analysis.peru_exports_ts(hs6)
@@ -100,6 +102,23 @@ def _series_product(slug: str) -> dict[str, Any]:
         .rename_axis("year")
         .reset_index()
     )
+
+    # Precio promedio por kilo (FOB / peso neto) desde el Excel SUNAT, si el
+    # producto lo tiene cargado. Es la forma mas confiable de precio por anio.
+    sunat_available = False
+    if nandina:
+        try:
+            ssum = excel_analysis.sunat_annual_summary(nandina)
+        except (FileNotFoundError, KeyError, ValueError):
+            ssum = pd.DataFrame()
+        if not ssum.empty:
+            g = g.merge(ssum[["year", "net_weight_kg", "price_usd_per_kg"]], on="year", how="left")
+            sunat_available = bool(g["price_usd_per_kg"].notna().any())
+    if "net_weight_kg" not in g.columns:
+        g["net_weight_kg"] = pd.NA
+    if "price_usd_per_kg" not in g.columns:
+        g["price_usd_per_kg"] = pd.NA
+
     base_year = _first_positive_year(g)
     end_year = _last_positive_year(g)
     base_value = (
@@ -160,6 +179,8 @@ def _series_product(slug: str) -> dict[str, Any]:
         "years": list(range(BASE_YEAR, END_YEAR + 1)),
         "series": series,
         "cagr_value": cagr_value,
+        "cagr_price": _cagr(g["price_usd_per_kg"]),
+        "sunat_available": sunat_available,
         "cagr_volume": _cagr(g["quantity"]),
         "cagr_unit_value": _cagr(g["unit_value_usd"]),
         "volatility_value": _volatility(g["fob_usd"]),

@@ -33,3 +33,18 @@ def test_estimated_price_handles_all_products():
     for slug in comparison.all_product_slugs()[:3]:
         info = pricing.estimated_fob_price_usd_per_kg(slug)
         assert "source" in info
+
+
+def test_sunat_price_usado_cuando_existe_el_excel():
+    """La pota tiene su Excel SUNAT: el precio debe ser FOB / peso neto (~USD/kg)."""
+    info = pricing.sunat_fob_price_usd_per_kg("0307430000")
+    assert info.get("price_usd_per_kg") is not None
+    assert 0.5 < info["price_usd_per_kg"] < 10
+    assert info["calculated_from"] == ["0307430000.xlsx"]
+    assert info["last_year"] == 2025
+
+
+def test_sunat_price_sin_nandina_devuelve_vacio():
+    info = pricing.sunat_fob_price_usd_per_kg(None)
+    assert info["price_usd_per_kg"] is None
+    assert info["calculated_from"] == []

@@ -15,6 +15,44 @@ from . import excel_analysis
 PRICE_ORIGIN_CALCULATED = "calculado de históricos"
 PRICE_ORIGIN_USER = "ajustado por el usuario"
 PRICE_ORIGIN_EXCEL = "unit value del Excel"
+PRICE_ORIGIN_SUNAT = "precio SUNAT (FOB / peso neto)"
+
+
+def sunat_fob_price_usd_per_kg(nandina: str | None) -> dict:
+    """Precio FOB por kilo desde el Excel SUNAT, si el producto lo tiene cargado.
+
+    Se estima como FOB / peso neto (kg) del ultimo anio con data, ponderado por
+    destino. Es mas confiable que el unit value del snapshot cuando este trae la
+    cantidad en una unidad distinta al kilo: ahi el precio sale irreal (en pota,
+    por ejemplo, el snapshot daba miles de dolares por kilo).
+    """
+    info = {
+        "nandina": nandina,
+        "source": "published",
+        "price_usd_per_kg": None,
+        "calculated_from": [],
+    }
+    if not nandina:
+        return info
+
+    try:
+        summary = excel_analysis.sunat_annual_summary(nandina)
+    except (FileNotFoundError, KeyError, ValueError):
+        return info
+
+    valid = summary.dropna(subset=["price_usd_per_kg"])
+    if valid.empty:
+        return info
+
+    last = valid.iloc[-1]
+    info.update(
+        {
+            "price_usd_per_kg": round(float(last["price_usd_per_kg"]), 4),
+            "last_year": int(last["year"]),
+            "calculated_from": [f"{nandina}.xlsx"],
+        }
+    )
+    return info
 
 
 def estimated_fob_price_usd_per_kg(hs6: str, method: str = "weighted_mean_2025") -> dict:

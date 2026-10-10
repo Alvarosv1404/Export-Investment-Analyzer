@@ -95,6 +95,23 @@ def test_compare_products_basic():
             assert "concentration_top5" in p
 
 
+def test_comparacion_pota_trae_precio_por_kilo_sunat():
+    """La pota tiene su Excel SUNAT: la serie incluye el precio FOB / peso neto por anio."""
+    import pytest
+
+    from exportanalysis.pipeline import excel_analysis
+
+    summary = excel_analysis.sunat_annual_summary("0307430000")
+    product = comparison._series_product("pota_calamar")
+    assert product["sunat_available"] is True
+    assert product["cagr_price"] is not None
+    by_year = {row["year"]: row for row in product["series"]}
+    p2025 = by_year[2025]["price_usd_per_kg"]
+    sunat_2025 = summary[summary["year"] == 2025].iloc[0]
+    assert p2025 == pytest.approx(sunat_2025["price_usd_per_kg"])
+    assert 0.5 < p2025 < 10
+
+
 def test_compare_products_handles_missing():
     res = comparison.compare_products(["no_existe", "arandano"])
     assert res["available_count"] >= 1

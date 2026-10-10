@@ -83,6 +83,42 @@ export function market(m) {
     </section>`
 }
 
+// --- Bloque 2b: precio promedio por kilo desde SUNAT -------------------------
+export function sunatPrice(result) {
+  const s = result?.sunat || {}
+  if (!s.available) return ''
+  const rows = (s.series || []).map(
+    (r) => `
+      <tr>
+        <td class="num">${escapeHTML(r.year)}</td>
+        <td class="num">${fullUSD(r.fob_usd)}</td>
+        <td class="num">${kg(r.net_weight_kg)}</td>
+        <td class="num">${r.price_usd_per_kg ? usd(r.price_usd_per_kg, 3) : 'n/d'}</td>
+      </tr>`
+  )
+  return `
+    <section class="card">
+      <h2>2b. Precio promedio por kilo (SUNAT) ${tagData}</h2>
+      <div class="kpis">
+        ${kpi('Precio promedio', usd(s.latest_price_usd_per_kg, 3), `ultimo anio: ${escapeHTML(s.latest_year ?? '')}`)}
+        ${kpi('CAGR del precio', pctSigned(s.cagr_price), 'efecto precio, no volumen', s.cagr_price < 0 ? 'neg' : '')}
+      </div>
+      <p class="note">Calculado como <b>FOB / peso neto (kg)</b> de la subpartida SUNAT
+        <b>${escapeHTML(s.nandina || '')}</b>, ponderado por destino. Mas confiable que el unit
+        value del snapshot cuando este trae la cantidad en otra unidad.</p>
+      <div class="chart"><canvas id="chartSunatPrice" height="90"></canvas></div>
+      ${table(
+        [
+          { label: 'Anio', num: true },
+          { label: 'FOB SUNAT', num: true },
+          { label: 'Peso neto', num: true },
+          { label: 'USD/kg', num: true },
+        ],
+        rows
+      )}
+    </section>`
+}
+
 // --- Bloque 3: destinos ----------------------------------------------------------
 export function destinations(rows) {
   if (!rows || rows.length === 0) return ''
@@ -287,6 +323,14 @@ export function comparison(data) {
       ${years.map((year) => `<td class="num">${pctSigned(seriesByYear.get(year)?.value_yoy)}</td>`).join('')}
     </tr>`
   })
+  const priceRows = products.map((p) => {
+    const seriesByYear = new Map((p.series || []).map((row) => [row.year, row]))
+    return `<tr>
+      <th scope="row">${escapeHTML(p.name || p.slug)} <span class="hs6">HS ${escapeHTML(p.hs6)}</span></th>
+      ${years.map((year) => `<td class="num">${seriesByYear.get(year)?.price_usd_per_kg ? usd(seriesByYear.get(year).price_usd_per_kg, 3) : 'n/d'}</td>`).join('')}
+      <td class="num">${pctSigned(p.cagr_price)}</td>
+    </tr>`
+  })
   const cagrFromBaseRows = products.map((p) => {
     const seriesByYear = new Map((p.series || []).map((row) => [row.year, row]))
     return `<tr>
@@ -358,6 +402,16 @@ export function comparison(data) {
           'comparison-matrix'
         )}
         <p class="note">El primer ano no tiene crecimiento interanual porque no hay un ano previo en el periodo.</p>
+      </section>
+      <section class="card comparison-table-card">
+        <h2>Precio promedio por kilo (USD/kg)</h2>
+        ${table(
+          [{ label: 'Producto' }, ...years.map((year) => ({ label: String(year), num: true })), { label: 'CAGR precio', num: true }],
+          priceRows,
+          'comparison-matrix'
+        )}
+        <p class="note">FOB / peso neto (kg) de SUNAT, ponderado por destino. Solo disponible para los
+          productos con su Excel SUNAT cargado por anio (hoy: pota).</p>
       </section>
       <section class="card comparison-table-card">
         <h2>CAGR desde la base, anio por anio (%)</h2>

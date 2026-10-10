@@ -72,3 +72,33 @@ def test_todos_los_productos_leen_sus_cuatro_excel():
         assert len(excel_analysis.world_exports(product.hs6)) > 0, f"sin exportadores para {product.slug}"
         assert len(excel_analysis.world_imports(product.hs6)) > 0, f"sin importadores para {product.slug}"
         assert len(excel_analysis.peru_exports_indicators_2025(product.hs6)) > 0, f"sin snapshot 2025 para {product.slug}"
+
+
+def test_sunat_excel_por_anio_calcula_precio_promedio():
+    """Si existe el Excel SUNAT por anio, el precio por kilo es FOB / peso neto."""
+    import pytest
+
+    try:
+        summary = excel_analysis.sunat_annual_summary("0307430000")
+    except FileNotFoundError:
+        pytest.skip("Excel SUNAT de pota no cargado en esta maquina")
+    assert not summary.empty
+    assert {"year", "fob_usd", "net_weight_kg", "price_usd_per_kg"} <= set(summary.columns)
+    valid = summary.dropna(subset=["price_usd_per_kg"])
+    assert not valid.empty
+    # Precio por kilo realista; si saliera >100 USD/kg es que se mezclaron unidades.
+    assert (valid["price_usd_per_kg"] > 0.1).all()
+    assert (valid["price_usd_per_kg"] < 100).all()
+    # 2016 no exportaba pota (0): el primer anio real es al menos 2017.
+    assert summary["year"].min() >= 2017
+    # Sanidad del precio: es exactamente FOB / peso neto.
+    probe = valid.iloc[0]
+    assert probe["price_usd_per_kg"] == pytest.approx(probe["fob_usd"] / probe["net_weight_kg"])
+
+
+def test_sunat_reader_sin_archivo_no_rompe():
+    """Si el producto no tiene Excel SUNAT, la lectura levanta FileNotFoundError."""
+    import pytest
+
+    with pytest.raises(FileNotFoundError):
+        excel_analysis.sunat_annual_summary("0000000000")
