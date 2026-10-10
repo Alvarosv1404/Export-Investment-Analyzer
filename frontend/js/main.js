@@ -218,10 +218,15 @@ function bindControls(onChange) {
     }
     checkboxes.forEach((input) => input.addEventListener('change', scheduleReload))
     document.getElementById('selectAllProducts').addEventListener('click', () => {
+      // Marca todos y limpia el buscador: el boton dice "Seleccionar todos", no
+      // "los filtrados". Si no, con una busqueda escrita solo se comparaban los
+      // visibles y parecia que faltaba informacion.
       checkboxes.forEach((input) => {
-        const option = input.closest('.compare-option')
-        if (option && option.hidden) return
         input.checked = true
+      })
+      document.getElementById('compareSearch').value = ''
+      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
+        option.hidden = false
       })
       scheduleReload()
     })
