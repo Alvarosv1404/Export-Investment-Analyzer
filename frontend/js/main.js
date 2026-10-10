@@ -275,6 +275,7 @@ function renderComparisonView() {
 }
 
 async function load() {
+  const reqId = ++load.reqId
   syncURL()
 
   // El catalogo se pide siempre, no solo cuando la URL no trae slug: si no,
@@ -311,6 +312,7 @@ async function load() {
     }
     try {
       state.comparisonData = await getComparison(state.compareSlugs)
+      if (reqId !== load.reqId) return
       renderComparisonView()
     } catch (err) {
       showError(err.message)
@@ -320,10 +322,11 @@ async function load() {
 
   try {
     const result = await getAnalysis(state.slug, state.targetShare, state.price)
+    if (reqId !== load.reqId) return
     render(result)
   } catch (err) {
     showError(err.message)
   }
 }
 
-document.addEventListener('DOMContentLoaded', load)
+load.reqId = 0

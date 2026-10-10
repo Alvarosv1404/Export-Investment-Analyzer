@@ -28,6 +28,7 @@ function init() {
 export function destroyCharts() {
   if (typeof Chart === 'undefined') return
   Object.values(Chart.instances).forEach((chart) => chart.destroy())
+  if (Chart.instances && typeof Chart.instances.clear === 'function') Chart.instances.clear()
 }
 
 /** Serie anual: valor FOB en el eje izquierdo, volumen en el derecho. */
