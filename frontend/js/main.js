@@ -139,9 +139,6 @@ function renderControls() {
             </div>
           </div>
         </fieldset>
-        <div class="comparison-submit">
-          <button type="submit" class="btn">Ver comparacion</button>
-        </div>
       </form>`
   }
 
