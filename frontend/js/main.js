@@ -103,6 +103,32 @@ async function refreshComparison() {
   }
 }
 
+/** Opciones de producto para el selector, agrupadas por industria (optgroup). */
+function productOptions() {
+  const groups = new Map()
+  for (const p of state.products) {
+    const key = p.industry || ''
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(p)
+  }
+  const option = (p) =>
+    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''}>` +
+    `${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</option>`
+
+  // Sin industrias declaradas no tiene sentido envolver todo en un optgroup.
+  if (groups.size <= 1 && groups.has('')) {
+    return state.products.map(option).join('')
+  }
+  const label = (key) => key || 'Sin industria'
+  return [...groups.entries()]
+    .sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))
+    .map(
+      ([key, items]) =>
+        `<optgroup label="${escapeHTML(label(key))}">${items.map(option).join('')}</optgroup>`
+    )
+    .join('')
+}
+
 /** Controles para analisis individual o comparacion de productos. */
 function renderControls() {
   const tabs = `
@@ -115,18 +141,34 @@ function renderControls() {
       </button>
     </nav>`
   if (state.view === 'compare') {
+    const industries = [...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort()
+    const industryFilter = industries.length
+      ? `
+          <div class="compare-filter">
+            <label class="compare-search-label" for="compareIndustry">Filtrar por industria</label>
+            <select id="compareIndustry" class="compare-industry">
+              <option value="">Todas las industrias</option>
+              ${industries.map((name) => `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join('')}
+            </select>
+          </div>`
+      : ''
     return `${tabs}
       <form class="controls-form comparison-controls" id="comparisonForm">
         <fieldset class="compare-picker">
           <legend>Elige los productos que quieres comparar</legend>
           <p class="compare-picker-hint">Marca uno o varios. La comparación se actualiza sola; puedes empezar con el producto actual y añadir otros.</p>
-          <label class="compare-search-label" for="compareSearch">Buscar por nombre o código HS</label>
-          <input type="search" id="compareSearch" class="compare-search" placeholder="Ej.: café o 090111" />
+          <div class="compare-filters">
+            <div class="compare-filter">
+              <label class="compare-search-label" for="compareSearch">Buscar por nombre o código HS</label>
+              <input type="search" id="compareSearch" class="compare-search" placeholder="Ej.: café o 090111" />
+            </div>
+            ${industryFilter}
+          </div>
           <div class="compare-options">
             ${state.products
               .map(
                 (p) => `
-                  <label class="compare-option" data-product-name="${escapeHTML(`${p.name} ${p.hs6} ${p.industry || ''}`.toLowerCase())}">
+                  <label class="compare-option" data-product-name="${escapeHTML(`${p.name} ${p.hs6} ${p.industry || ''}`.toLowerCase())}" data-product-industry="${escapeHTML(p.industry || '')}">
                     <input type="checkbox" name="compareSlugs" value="${escapeHTML(p.slug)}"
                            ${state.compareSlugs.includes(p.slug) ? 'checked' : ''} />
                     <span class="compare-option-copy">
@@ -154,14 +196,7 @@ function renderControls() {
       <div class="control-block">
         <label for="productSelect">Producto para analizar</label>
         <select id="productSelect" name="slug">
-          ${state.products
-            .map(
-              (p) => `
-                <option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''}>
-                  ${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})
-                </option>`
-            )
-            .join('')}
+          ${productOptions()}
         </select>
       </div>
       <div class="control-block">
@@ -224,17 +259,32 @@ function bindControls(onChange) {
       reloadTimer = window.setTimeout(refreshComparison, 300)
     }
     checkboxes.forEach((input) => input.addEventListener('change', scheduleReload))
+
+    const searchInput = document.getElementById('compareSearch')
+    const industrySelect = document.getElementById('compareIndustry')
+    // Filtra la lista por texto (nombre/HS/industria) y por industria elegida.
+    const applyProductFilter = () => {
+      const query = searchInput.value.trim().toLowerCase()
+      const industry = industrySelect ? industrySelect.value : ''
+      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
+        const matchesQuery = option.dataset.productName.includes(query)
+        const matchesIndustry = !industry || option.dataset.productIndustry === industry
+        option.hidden = !(matchesQuery && matchesIndustry)
+      })
+    }
+    searchInput.addEventListener('input', applyProductFilter)
+    if (industrySelect) industrySelect.addEventListener('change', applyProductFilter)
+
     document.getElementById('selectAllProducts').addEventListener('click', () => {
-      // Marca todos y limpia el buscador: el boton dice "Seleccionar todos", no
-      // "los filtrados". Si no, con una busqueda escrita solo se comparaban los
-      // visibles y parecia que faltaba informacion.
+      // Marca todos y limpia los filtros: el boton dice "Seleccionar todos", no
+      // "los filtrados". Si no, con una busqueda o industria puesta solo se
+      // comparaban los visibles y parecia que faltaba informacion.
       checkboxes.forEach((input) => {
         input.checked = true
       })
-      document.getElementById('compareSearch').value = ''
-      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
-        option.hidden = false
-      })
+      searchInput.value = ''
+      if (industrySelect) industrySelect.value = ''
+      applyProductFilter()
       scheduleReload()
     })
     document.getElementById('clearProducts').addEventListener('click', () => {
@@ -242,12 +292,6 @@ function bindControls(onChange) {
         input.checked = false
       })
       scheduleReload()
-    })
-    document.getElementById('compareSearch').addEventListener('input', (event) => {
-      const query = event.target.value.trim().toLowerCase()
-      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
-        option.hidden = !option.dataset.productName.includes(query)
-      })
     })
     updateSelectionCount()
 
