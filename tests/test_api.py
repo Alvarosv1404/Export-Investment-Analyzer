@@ -149,7 +149,8 @@ class TestAnalysis:
 
     def test_precio_por_defecto_es_calculado(self, client):
         data = client.get("/api/analysis/cafe_verde").json()
-        assert data["data_quality"]["price_source"] == "calculado de históricos"
+        # Con el precio SUNAT disponible, el origen debe ser el de SUNAT
+        assert data["data_quality"]["price_source"] == "precio SUNAT (FOB / peso neto)"
         assert data["unit_economics"]["fob_price_usd_per_kg"] > 0
 
     def test_precio_invalido_da_422(self, client):
