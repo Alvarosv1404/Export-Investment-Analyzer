@@ -42,7 +42,7 @@ def _resolve_ramp(
     years = 5
     fallback = {
         "source": "config",
-        "reason": "El analisis de mercado no pudo derivar un volumen, se uso utilization_ramp del config.",
+        "reason": "El análisis de mercado no pudo derivar un volumen, se usó utilization_ramp del config.",
     }
 
     if not implied.get("available") or not implied.get("implied_volume_kg"):
@@ -62,8 +62,8 @@ def _resolve_ramp(
     return ramp, {
         "source": "mercado",
         "reason": (
-            f"El headroom de mercado a la participacion objetivo implica "
-            f"{implied['implied_volume_kg']:,.0f} kg/ano, equivalente a {peak * 100:.0f}% "
+            f"El headroom de mercado a la participación objetivo implica "
+            f"{implied['implied_volume_kg']:,.0f} kg/año, equivalente a {peak * 100:.0f}% "
             f"de la capacidad instalada. Cuello de botella: {implied.get('binds')}."
         ),
         "implied_volume_kg": implied["implied_volume_kg"],
@@ -293,7 +293,7 @@ def analyze_product(
             "market_data_source": "Trade Map (Excel local)",
             "price_source": price_origin,
             "sunat_source": (
-                f"Excel SUNAT {product.nandina} (FOB y peso neto por anio)"
+                f"Excel SUNAT {product.nandina} (FOB y peso neto por año)"
                 if sunat_block.get("available")
                 else "no disponible para este producto"
             ),
@@ -301,7 +301,7 @@ def analyze_product(
             "tariff_source": "data/raw/tariffs/tariffs.csv (carga manual)",
             "assumptions_source": "config/assumptions.yaml (supuestos, no data)",
             "warning": (
-                "El arancel es un supuesto cargado a mano. Si duty_pct esta vacio, "
+                "El arancel es un supuesto cargado a mano. Si duty_pct está vacío, "
                 "el modelo usa 0% y eso subestima el costo en destino."
             ),
         },

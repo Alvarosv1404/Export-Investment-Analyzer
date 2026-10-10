@@ -51,11 +51,11 @@ export function usd(value, digits = 3) {
   return `$${value.toFixed(digits)}`
 }
 
-/** Anos a texto: 2.5 -> "2.5 anos", 3 -> "3 anos". */
+/** Años a texto: 2.5 -> "2.5 años", 3 -> "3 años". */
 export function years(value) {
   if (value === null || value === undefined || Number.isNaN(value)) return 'n/d'
   const rounded = Math.round(value * 100) / 100
-  return `${rounded} ${rounded === 1 ? 'ano' : 'anos'}`
+  return `${rounded} ${rounded === 1 ? 'año' : 'años'}`
 }
 
 /**

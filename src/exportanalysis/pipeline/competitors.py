@@ -59,7 +59,7 @@ def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:
     if origin.empty:
         return {
             "available": False,
-            "message": f"El pais de origen (M49 {reporter}) no reporta exportaciones de {hs6}.",
+            "message": f"El país de origen (M49 {reporter}) no reporta exportaciones de {hs6}.",
         }
 
     # El ano de referencia debe ser uno en el que el pais de origen reporte.
@@ -72,7 +72,7 @@ def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:
     elif all_years:
         latest_year = max(all_years)
     else:
-        return {"available": False, "message": "Sin anos con data."}
+        return {"available": False, "message": "Sin años con data."}
 
     latest = (
         frame[frame["year"] == latest_year]
@@ -110,8 +110,8 @@ def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:
             if coverage >= 0.99
             else (
                 f"Solo {reporting} de {total_countries} exportadores comparados reportan "
-                f"{latest_year}. El share esta calculado sobre ese subconjunto, no sobre "
-                "el mercado completo: interpretalo con cuidado."
+                f"{latest_year}. El share está calculado sobre ese subconjunto, no sobre "
+                "el mercado completo: interprétalo con cuidado."
             )
         ),
         "share_change": share_change,
@@ -176,9 +176,9 @@ def headroom_ladder(
         "unit_value_usd_per_kg": unit_value_usd_per_kg,
         "ladder": rows,
         "note": (
-            "Cota superior teorica: asume que el crecimiento se le quita a los "
-            "exportadores actuales. No modela demanda incremental, obstaculos de "
-            "entrada, ni reaccion de la competencia."
+            "Cota superior teórica: asume que el crecimiento se le quita a los "
+            "exportadores actuales. No modela demanda incremental, obstáculos de "
+            "entrada, ni reacción de la competencia."
         ),
     }
 
@@ -215,11 +215,11 @@ def implied_capacity_usd(
             "installed_capacity_kg": installed_capacity_kg,
             "binds": "market",
             "message": (
-                f"Peru ya tiene {ladder['current_share'] * 100:.1f}% del mercado, por encima "
+                f"Perú ya tiene {ladder['current_share'] * 100:.1f}% del mercado, por encima "
                 f"del objetivo de {target_share * 100:.1f}%. Este producto no tiene headroom "
-                "de crecimiento con estos parametros: el caso de inversion, si lo hay, tiene "
-                "que apoyarse en otro motivo (penetracion en un mercado especifico, "
-                "diferenciacion en precio, o una nueva region), no en ganar share global."
+                "de crecimiento con estos parámetros: el caso de inversión, si lo hay, tiene "
+                "que apoyarse en otro motivo (penetración en un mercado específico, "
+                "diferenciación en precio, o una nueva región), no en ganar share global."
             ),
         }
 
@@ -237,11 +237,11 @@ def implied_capacity_usd(
         "installed_capacity_kg": installed_capacity_kg,
         "binds": binding,
         "message": (
-            "El mercado permite mas que la capacidad instalada: el cuello de botella es la "
-            "planta, no la demanda. Evalua ampliar capacidad."
+            "El mercado permite más que la capacidad instalada: el cuello de botella es la "
+            "planta, no la demanda. Evalúa ampliar capacidad."
             if binding == "capacity"
             else "El mercado limita el volumen por debajo de la capacidad instalada: "
-            "construir mas de lo que el mercado sostiene deja capacidad ociosa."
+            "construir más de lo que el mercado sostiene deja capacidad ociosa."
         ),
     }
 

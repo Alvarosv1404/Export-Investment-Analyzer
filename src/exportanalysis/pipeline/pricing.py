@@ -111,7 +111,7 @@ def estimated_fob_price_usd_per_kg(hs6: str, method: str = "weighted_mean_2025")
         if len(ts) > 0:
             info["last_year"] = int(ts["year"].max())
             info["warning"] = (
-                "No se encontro cantidad en el snapshot 2025; precio unitario no derivado."
+                "No se encontró cantidad en el snapshot 2025; precio unitario no derivado."
             )
             info["calculated_from"] = ["perus-exports-to-world-by-importer_{hs6}.xlsx"]
             return info

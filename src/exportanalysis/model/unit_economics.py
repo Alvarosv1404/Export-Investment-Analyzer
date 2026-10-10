@@ -104,7 +104,7 @@ def analyze_unit_economics(
         )
     elif unit.gross_margin_pct < 0.10:
         warnings.append(
-            f"Margen ajustado ({unit.gross_margin_pct * 100:.1f}%): cualquier desviacion "
+            f"Margen ajustado ({unit.gross_margin_pct * 100:.1f}%): cualquier desviación "
             "de volumen o costo deja el proyecto sin utilidad. Exige mucho control de costos."
         )
 

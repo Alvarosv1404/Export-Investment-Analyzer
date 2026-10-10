@@ -163,7 +163,7 @@ def breakeven(inputs: ProjectInputs) -> dict:
     if base.npv <= 0:
         return {
             "available": False,
-            "reason": "El escenario base ya tiene VAN negativo: no hay un precio minimo que lo salve.",
+            "reason": "El escenario base ya tiene VAN negativo: no hay un precio mínimo que lo salve.",
         }
 
     def npv_at_price(price: float) -> float:

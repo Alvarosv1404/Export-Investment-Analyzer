@@ -61,7 +61,7 @@ def market_summary(trade: pd.DataFrame) -> dict:
     if totals.empty:
         return {
             "available": False,
-            "message": "Sin datos de comercio para este producto y ventana de anos.",
+            "message": "Sin datos de comercio para este producto y ventana de años.",
         }
 
     latest = totals.iloc[-1]

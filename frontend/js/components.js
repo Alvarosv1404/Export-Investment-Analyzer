@@ -49,14 +49,14 @@ export function unitEconomics(u) {
   const viable = u.is_viable
   return `
     <section class="card ${viable ? '' : 'card-bad'}">
-      <h2>1. Economia unitaria
+      <h2>1. Economía unitaria
         <span class="tag ${viable ? 'tag-ok' : 'tag-bad'}">${viable ? 'viable' : 'margen negativo'}</span>
       </h2>
       <div class="kpis">
         ${kpi('Precio FOB de mercado', usd(u.fob_price_usd_per_kg), 'Trade Map / input')}
         ${kpi('Costo variable total', usd(u.total_variable_cost_usd_per_kg), 'supuesto tuyo')}
         ${kpi('Margen bruto', usd(u.gross_margin_usd_per_kg), `${pct(u.gross_margin_pct)} por kilo`, viable ? '' : 'neg')}
-        ${kpi('Precio de equilibrio', usd(u.breakeven_fob_price_usd_per_kg), 'minimo para no perder')}
+        ${kpi('Precio de equilibrio', usd(u.breakeven_fob_price_usd_per_kg), 'mínimo para no perder')}
       </div>
       ${(u.warnings || []).map((w) => `<div class="alert warn">${escapeHTML(w)}</div>`).join('')}
     </section>`
@@ -75,9 +75,9 @@ export function market(m) {
         ${kpi('Volumen', kg(m.latest_volume_kg), 'peso neto')}
         ${kpi('Precio unitario', usd(m.latest_unit_value_usd), 'por kg, promedio ponderado')}
         ${kpi('CAGR valor', pct(m.cagr_value), 'ventana analizada', m.cagr_value < 0 ? 'neg' : '')}
-        ${kpi('CAGR volumen', pct(m.cagr_volume), 'fisico', m.cagr_volume < 0 ? 'neg' : '')}
+        ${kpi('CAGR volumen', pct(m.cagr_volume), 'físico', m.cagr_volume < 0 ? 'neg' : '')}
         ${kpi('CAGR precio', pctSigned(m.cagr_unit_value), 'efecto precio vs volumen', m.cagr_unit_value < 0 ? 'neg' : '')}
-        ${kpi('Concentracion top 5', pct(m.top5_concentration, 0), 'en 5 destinos')}
+        ${kpi('Concentración top 5', pct(m.top5_concentration, 0), 'en 5 destinos')}
       </div>
       <div class="chart"><canvas id="chartSeries" height="90"></canvas></div>
     </section>`
@@ -100,16 +100,16 @@ export function sunatPrice(result) {
     <section class="card">
       <h2>2b. Precio promedio por kilo (SUNAT) ${tagData}</h2>
       <div class="kpis">
-        ${kpi('Precio promedio', usd(s.latest_price_usd_per_kg, 3), `ultimo anio: ${escapeHTML(s.latest_year ?? '')}`)}
+        ${kpi('Precio promedio', usd(s.latest_price_usd_per_kg, 3), `último año: ${escapeHTML(s.latest_year ?? '')}`)}
         ${kpi('CAGR del precio', pctSigned(s.cagr_price), 'efecto precio, no volumen', s.cagr_price < 0 ? 'neg' : '')}
       </div>
       <p class="note">Calculado como <b>FOB / peso neto (kg)</b> de la subpartida SUNAT
-        <b>${escapeHTML(s.nandina || '')}</b>, ponderado por destino. Mas confiable que el unit
+        <b>${escapeHTML(s.nandina || '')}</b>, ponderado por destino. Más confiable que el unit
         value del snapshot cuando este trae la cantidad en otra unidad.</p>
       <div class="chart"><canvas id="chartSunatPrice" height="90"></canvas></div>
       ${table(
         [
-          { label: 'Anio', num: true },
+          { label: 'Año', num: true },
           { label: 'FOB SUNAT', num: true },
           { label: 'Peso neto', num: true },
           { label: 'USD/kg', num: true },
@@ -138,7 +138,7 @@ export function competitors(c) {
     (r) => `
       <tr class="${r.is_origin_country ? 'hl' : ''}">
         <td>${r.rank}</td>
-        <td>${escapeHTML(r.country)} ${r.is_origin_country ? '<span class="tag tag-self">Peru</span>' : ''}</td>
+        <td>${escapeHTML(r.country)} ${r.is_origin_country ? '<span class="tag tag-self">Perú</span>' : ''}</td>
         <td class="num">${fullUSD(r.value_usd)}</td>
         <td class="num">${kg(r.volume_kg)}</td>
         <td class="num">${pct(r.share)}</td>
@@ -149,15 +149,15 @@ export function competitors(c) {
     <section class="card">
       <h2>4. Competencia regional ${tagData}</h2>
       <div class="kpis">
-        ${kpi('Puesto de Peru', `#${c.origin_rank}`, `de ${c.origin_countries} con data`)}
-        ${kpi('Participacion', pct(c.origin_share), String(c.latest_year))}
+        ${kpi('Puesto de Perú', `#${c.origin_rank}`, `de ${c.origin_countries} con data`)}
+        ${kpi('Participación', pct(c.origin_share), String(c.latest_year))}
         ${kpi('Tendencia', escapeHTML(c.share_trend), 'ganando o perdiendo share')}
       </div>
       ${c.coverage_warning ? `<div class="alert warn">${escapeHTML(c.coverage_warning)}</div>` : ''}
       ${table(
         [
           { label: '#' },
-          { label: 'Pais' },
+          { label: 'País' },
           { label: 'Exportaciones FOB', num: true },
           { label: 'Volumen', num: true },
           { label: 'Share', num: true },
@@ -184,13 +184,13 @@ export function headroom(h) {
   return `
     <section class="card">
       <h2>5. Espacio de mercado ${tagData}</h2>
-      <p class="note">TAM del ano ${h.latest_year}: <b>${fullUSD(h.market_value_usd)}</b> entre los paises
-        comparados. Share actual de Peru: <b>${pct(h.current_share)}</b>.</p>
+      <p class="note">TAM del año ${h.latest_year}: <b>${fullUSD(h.market_value_usd)}</b> entre los países
+        comparados. Share actual de Perú: <b>${pct(h.current_share)}</b>.</p>
       ${table(
         [
           { label: 'Share objetivo', num: true },
           { label: 'Brecha', num: true },
-          { label: 'Facturacion adicional', num: true },
+          { label: 'Facturación adicional', num: true },
           { label: 'Volumen equivalente', num: true },
         ],
         rows
@@ -250,7 +250,7 @@ export function investment(inv) {
   const be = inv.breakeven || {}
   return `
     <section class="card">
-      <h2>7. Decision de inversion ${tagAssumed}</h2>
+      <h2>7. Decisión de inversión ${tagAssumed}</h2>
       <div class="${verdictClass(v.label)}">
         <span class="verdict-label">${escapeHTML(v.label)}</span>
         <p>${escapeHTML(v.detail)}</p>
@@ -259,21 +259,21 @@ export function investment(inv) {
         ${kpi('VAN', fullUSD(s.npv_usd), `al ${s.discount_rate_pct}%`, s.npv_usd < 0 ? 'neg' : '')}
         ${kpi('TIR', s.irr_pct !== null && s.irr_pct !== undefined ? `${s.irr_pct}%` : 'no existe')}
         ${kpi('Payback', s.payback_years !== null && s.payback_years !== undefined ? years(s.payback_years) : 'no se recupera')}
-        ${kpi('Inversion inicial', fullUSD(s.initial_outflow_usd))}
+        ${kpi('Inversión inicial', fullUSD(s.initial_outflow_usd))}
       </div>
-      <p class="note">Curva de ocupacion: <code>${escapeHTML(JSON.stringify(inv.inputs.utilization_ramp))}</code>
+      <p class="note">Curva de ocupación: <code>${escapeHTML(JSON.stringify(inv.inputs.utilization_ramp))}</code>
         &mdash; origen: <b>${escapeHTML(inv.ramp_source.source)}</b>. ${escapeHTML(inv.ramp_source.reason)}</p>
       ${
         be.available
-          ? `<p class="note">Punto de equilibrio: FOB minimo <b>${usd(be.fob_price_floor_usd_per_kg)}</b>/kg,
-             ocupacion minima <b>${pct(be.utilization_floor_pct / 100)}</b>.</p>`
+          ? `<p class="note">Punto de equilibrio: FOB mínimo <b>${usd(be.fob_price_floor_usd_per_kg)}</b>/kg,
+             ocupación mínima <b>${pct(be.utilization_floor_pct / 100)}</b>.</p>`
           : ''
       }
       <div class="chart"><canvas id="chartCash" height="90"></canvas></div>
-      <h3>Estado de resultados por ano</h3>
+      <h3>Estado de resultados por año</h3>
       ${table(
         [
-          { label: 'Ano', num: true },
+          { label: 'Año', num: true },
           { label: 'Volumen', num: true },
           { label: 'Ingresos', num: true },
           { label: 'Costos var.', num: true },
@@ -292,7 +292,7 @@ export function sensitivity(inv) {
   return `
     <section class="card">
       <h2>8. Sensibilidad ${tagAssumed}</h2>
-      <p class="note">Cada variable se mueve sola, una a la vez. El largo de la barra es cuanto mueve el VAN.</p>
+      <p class="note">Cada variable se mueve sola, una a la vez. El largo de la barra es cuánto mueve el VAN.</p>
       <div class="chart chart-tall"><canvas id="chartSens" height="200"></canvas></div>
       <p class="note">VAN base: <b>${fullUSD(inv.sensitivity.base_npv_usd)}</b>.</p>
     </section>`
@@ -356,33 +356,33 @@ export function comparison(data) {
   return `
     <section class="comparison-page">
       <section class="card comparison-intro">
-        <h1>Comparacion de productos</h1>
-        <p class="note">${products.length} producto(s) seleccionados. Compara la evolucion anual del valor FOB
-          exportado por Peru, su crecimiento interanual y el CAGR acumulado desde la base (2016, o el primer
-          anio en que cada producto exporto) hasta 2025.</p>
-        <p class="note">Fuente: series de exportacion peruana de Trade Map. La grafica de barras compara el ultimo
-          ano con datos de cada producto; los vacios en las tablas indican que no hay un valor reportado.</p>
+        <h1>Comparación de productos</h1>
+        <p class="note">${products.length} producto(s) seleccionados. Compara la evolución anual del valor FOB
+          exportado por Perú, su crecimiento interanual y el CAGR acumulado desde la base (2016, o el primer
+          año en que cada producto exportó) hasta 2025.</p>
+        <p class="note">Fuente: series de exportación peruana de Trade Map. La gráfica de barras compara el último
+          año con datos de cada producto; los vacíos en las tablas indican que no hay un valor reportado.</p>
         <span>${tagData}</span>
       </section>
       <section class="comparison-charts">
         <article class="card comparison-chart-card">
           <h2>Valor exportado por producto</h2>
-          <p class="note">Ultimo ano disponible (USD FOB)</p>
+          <p class="note">Último año disponible (USD FOB)</p>
           <div class="chart"><canvas id="chartComparisonLatest"></canvas></div>
         </article>
         <article class="card comparison-chart-card">
-          <h2>Evolucion de exportaciones</h2>
+          <h2>Evolución de exportaciones</h2>
           <p class="note">Valor FOB anual, 2016-2025 (USD)</p>
           <div class="chart"><canvas id="chartComparison"></canvas></div>
         </article>
         <article class="card comparison-chart-card">
-          <h2>Crecimiento respecto al ano anterior</h2>
-          <p class="note">Variacion anual del valor exportado (%)</p>
+          <h2>Crecimiento respecto al año anterior</h2>
+          <p class="note">Variación anual del valor exportado (%)</p>
           <div class="chart"><canvas id="chartComparisonGrowth"></canvas></div>
         </article>
         <article class="card comparison-chart-card">
           <h2>CAGR acumulado desde la base</h2>
-          <p class="note">El punto de partida es 2016, o el primer anio en que el producto exporto.</p>
+          <p class="note">El punto de partida es 2016, o el primer año en que el producto exportó.</p>
           <div class="chart"><canvas id="chartComparisonCagr"></canvas></div>
         </article>
       </section>
@@ -401,7 +401,7 @@ export function comparison(data) {
           annualGrowthRows,
           'comparison-matrix'
         )}
-        <p class="note">El primer ano no tiene crecimiento interanual porque no hay un ano previo en el periodo.</p>
+        <p class="note">El primer año no tiene crecimiento interanual porque no hay un año previo en el periodo.</p>
       </section>
       <section class="card comparison-table-card">
         <h2>Precio promedio por kilo (USD/kg)</h2>
@@ -411,31 +411,31 @@ export function comparison(data) {
           'comparison-matrix'
         )}
         <p class="note">FOB / peso neto (kg) de SUNAT, ponderado por destino. Solo disponible para los
-          productos con su Excel SUNAT cargado por anio (hoy: pota).</p>
+          productos con su Excel SUNAT cargado por año (hoy: pota).</p>
       </section>
       <section class="card comparison-table-card">
-        <h2>CAGR desde la base, anio por anio (%)</h2>
+        <h2>CAGR desde la base, año por año (%)</h2>
         ${table(
           [{ label: 'Producto' }, ...years.map((year) => ({ label: String(year), num: true }))],
           cagrFromBaseRows,
           'comparison-matrix'
         )}
-        <p class="note">La base es 2016 para los productos que ya exportaban ese anio. Si el producto aun no
-          exportaba en 2016 (su valor es 0, como la pota), la base se corre al primer anio con exportaciones
-          registradas. Cada columna es el CAGR acumulado desde esa base hasta el anio de la columna.</p>
+        <p class="note">La base es 2016 para los productos que ya exportaban ese año. Si el producto aún no
+          exportaba en 2016 (su valor es 0, como la pota), la base se corre al primer año con exportaciones
+          registradas. Cada columna es el CAGR acumulado desde esa base hasta el año de la columna.</p>
       </section>
       <section class="card comparison-table-card">
         <h2>CAGR total del valor FOB</h2>
         ${table(
           [
             { label: 'Producto' },
-            { label: 'Anio base' },
-            { label: 'Ultimo anio con data', num: true },
+            { label: 'Año base' },
+            { label: 'Último año con data', num: true },
             { label: 'CAGR FOB', num: true },
           ],
           cagrRows
         )}
-        <p class="note">CAGR del periodo completo: desde el anio base (primera exportacion) hasta el ultimo anio
+        <p class="note">CAGR del periodo completo: desde el año base (primera exportación) hasta el último año
           con data, como referencia al rango 2016-2025 cuando existe el dato.</p>
       </section>
     </section>`
@@ -448,11 +448,11 @@ export function sources(result) {
     <section class="card card-quiet">
       <h3>Procedencia de los datos</h3>
       <ul class="sources">
-        <li><b>Mercado y competencia:</b> ${escapeHTML(q.market_data_source)}. Anios con data: ${escapeHTML(JSON.stringify(q.years_with_data))}.</li>
+        <li><b>Mercado y competencia:</b> ${escapeHTML(q.market_data_source)}. Años con data: ${escapeHTML(JSON.stringify(q.years_with_data))}.</li>
         <li><b>Aranceles:</b> ${escapeHTML(q.tariff_source)}.</li>
         <li><b>Supuestos financieros:</b> ${escapeHTML(q.assumptions_source)}. No provienen de ninguna API.</li>
       </ul>
-      <p class="note">Lo marcado ${tagData} viene de una fuente oficial. Lo marcado ${tagAssumed} lo defines tu.
-        La distincion es deliberada: confundir ambos es el error mas comun en este tipo de analisis.</p>
+      <p class="note">Lo marcado ${tagData} viene de una fuente oficial. Lo marcado ${tagAssumed} lo defines tú.
+        La distinción es deliberada: confundir ambos es el error más común en este tipo de análisis.</p>
     </section>`
 }

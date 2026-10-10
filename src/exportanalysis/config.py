@@ -150,7 +150,7 @@ class Assumptions(BaseModel):
         if missing:
             raise ValueError(
                 f"Faltan supuestos para '{slug}': {', '.join(missing)}. "
-                f"Agregalos en config/assumptions.yaml bajo products.{slug}."
+                f"Agrégalos en config/assumptions.yaml bajo products.{slug}."
             )
         return base
 
@@ -158,7 +158,7 @@ class Assumptions(BaseModel):
 def _read_yaml(name: str) -> dict[str, Any]:
     path = CONFIG_DIR / name
     if not path.exists():
-        raise FileNotFoundError(f"No se encontro {path}")
+        raise FileNotFoundError(f"No se encontró {path}")
     with path.open(encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}
 

@@ -123,7 +123,7 @@ export function headroom(canvas, h) {
     data: {
       labels: h.ladder.map((r) => `${(r.target_share * 100).toFixed(1)}%`),
       datasets: [
-        { label: 'Facturacion adicional', data: h.ladder.map((r) => r.headroom_usd), backgroundColor: '#0891b2' },
+        { label: 'Facturación adicional', data: h.ladder.map((r) => r.headroom_usd), backgroundColor: '#0891b2' },
       ],
     },
     options: {
@@ -140,7 +140,7 @@ export function cashflows(canvas, inv) {
   new Chart(canvas, {
     type: 'bar',
     data: {
-      labels: flows.map((_, i) => (i === 0 ? 'Inversion' : `Ano ${i}`)),
+      labels: flows.map((_, i) => (i === 0 ? 'Inversión' : `Año ${i}`)),
       datasets: [
         {
           label: 'Flujo de caja libre',
@@ -276,7 +276,7 @@ function comparisonGrowthChart(canvas, data) {
         tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${(context.parsed.y * 100).toFixed(1)}%` } },
       },
       scales: {
-        y: { ticks: { callback: (value) => `${(value * 100).toFixed(0)}%` }, title: { display: true, text: 'Variacion anual' } },
+        y: { ticks: { callback: (value) => `${(value * 100).toFixed(0)}%` }, title: { display: true, text: 'Variación anual' } },
       },
     },
   })

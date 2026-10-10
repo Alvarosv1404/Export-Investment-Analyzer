@@ -57,14 +57,14 @@ function showError(message) {
     <div class="alert error"><strong>Error:</strong> ${escapeHTML(message)}</div>`
 }
 
-/** Mensaje de la vista de comparacion cuando aun no hay productos marcados. */
+/** Mensaje de la vista de comparación cuando aún no hay productos marcados. */
 function showEmptyComparison() {
   destroyCharts()
   document.getElementById('app').innerHTML = `
     <div class="alert">
-      Aun no hay productos seleccionados. Marca uno o varios en el panel de arriba
+      Aún no hay productos seleccionados. Marca uno o varios en el panel de arriba
       para ver el crecimiento interanual y el CAGR desde la base (2016, o el primer
-      anio en que el producto exporto).
+      año en que el producto exportó).
     </div>`
 }
 
@@ -100,12 +100,12 @@ async function refreshComparison() {
 /** Controles para analisis individual o comparacion de productos. */
 function renderControls() {
   const tabs = `
-    <nav class="view-tabs" aria-label="Tipo de analisis">
+    <nav class="view-tabs" aria-label="Tipo de análisis">
       <button type="button" class="view-tab ${state.view === 'analysis' ? 'active' : ''}" data-view="analysis">
-        Analisis por producto
+        Análisis por producto
       </button>
       <button type="button" class="view-tab ${state.view === 'compare' ? 'active' : ''}" data-view="compare">
-        Comparacion de productos
+        Comparación de productos
       </button>
     </nav>`
   if (state.view === 'compare') {
@@ -113,7 +113,7 @@ function renderControls() {
       <form class="controls-form comparison-controls" id="comparisonForm">
         <fieldset class="compare-picker">
           <legend>Elige los productos que quieres comparar</legend>
-          <p class="compare-picker-hint">Marca uno o varios. La comparacion se actualiza sola; puedes empezar con el producto actual y añadir otros.</p>
+          <p class="compare-picker-hint">Marca uno o varios. La comparación se actualiza sola; puedes empezar con el producto actual y añadir otros.</p>
           <label class="compare-search-label" for="compareSearch">Buscar por nombre o código HS</label>
           <input type="search" id="compareSearch" class="compare-search" placeholder="Ej.: café o 090111" />
           <div class="compare-options">
@@ -158,11 +158,11 @@ function renderControls() {
         </select>
       </div>
       <div class="control-block">
-        <label for="shareInput">Participacion de mercado objetivo (opcional)</label>
+        <label for="shareInput">Participación de mercado objetivo (opcional)</label>
         <div class="share-controls">
           <input type="number" id="shareInput" name="target_share" min="0" max="100" step="0.5"
                  placeholder="auto" value="${escapeHTML(shareInputValue())}" />
-          <span class="share-hint">% &mdash; vacio = share actual + 2 pp</span>
+          <span class="share-hint">% &mdash; vacío = share actual + 2 pp</span>
         </div>
       </div>
       <div class="control-block">
@@ -170,7 +170,7 @@ function renderControls() {
         <div class="share-controls">
           <input type="number" id="priceInput" name="price" min="0" step="0.001"
                  placeholder="auto" value="${escapeHTML(state.price)}" />
-          <span class="share-hint">USD/kg &mdash; vacio = calculado de los historicos</span>
+          <span class="share-hint">USD/kg &mdash; vacío = calculado de los históricos</span>
         </div>
       </div>
       <button type="submit" class="btn">Aplicar</button>
@@ -287,7 +287,7 @@ function render(result) {
       <div class="meta">
         <span>HS-6 <b>${escapeHTML(product.hs6 || '')}</b></span>
         ${product.nandina ? `<span>Partida SUNAT <b>${escapeHTML(product.nandina)}</b></span>` : ''}
-        <span>Ultimo anio con data <b>${result.market.latest_year}</b></span>
+        <span>Último año con data <b>${result.market.latest_year}</b></span>
       </div>
     </section>`
 
