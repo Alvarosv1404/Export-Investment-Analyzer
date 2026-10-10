@@ -35,9 +35,9 @@ function kpi(label, value, note = '', extraClass = '') {
     </div>`
 }
 
-function table(headers, rows) {
+function table(headers, rows, className = '') {
   return `
-    <table>
+    <table class="${escapeHTML(className)}">
       <thead><tr>${headers.map((h) => `<th class="${h.num ? 'num' : ''}">${escapeHTML(h.label)}</th>`).join('')}</tr></thead>
       <tbody>${rows.join('')}</tbody>
     </table>`
@@ -272,36 +272,84 @@ export function comparison(data) {
   if (!products.length) {
     return `<section class="card"><div class="alert">Sin productos con datos para comparar.</div></section>`
   }
-  const rows = products.map(
-    (p) => `
-      <tr>
-        <td>${escapeHTML(p.slug)} <span class="hs6">HS ${escapeHTML(p.hs6)}</span></td>
-        <td class="num">${p.latest_year ?? 'n/d'}</td>
-        <td class="num">${pct(p.cagr_value)}</td>
-        <td class="num">${pct(p.cagr_volume)}</td>
-        <td class="num">${pctSigned(p.cagr_unit_value)}</td>
-        <td class="num">${pct(p.volatility_value)}</td>
-        <td class="num">${pct(p.concentration_top5, 0)}</td>
-      </tr>`
+  const years = Array.from({ length: 10 }, (_, i) => 2016 + i)
+  const annualValueRows = products.map((p) => {
+    const seriesByYear = new Map((p.series || []).map((row) => [row.year, row]))
+    return `<tr>
+      <th scope="row">${escapeHTML(p.name || p.slug)}</th>
+      ${years.map((year) => `<td class="num">${fullUSD(seriesByYear.get(year)?.fob_usd)}</td>`).join('')}
+    </tr>`
+  })
+  const annualGrowthRows = products.map((p) => {
+    const seriesByYear = new Map((p.series || []).map((row) => [row.year, row]))
+    return `<tr>
+      <th scope="row">${escapeHTML(p.name || p.slug)}</th>
+      ${years.map((year) => `<td class="num">${pctSigned(seriesByYear.get(year)?.value_yoy)}</td>`).join('')}
+    </tr>`
+  })
+  const cagrRows = products.map(
+    (p) => `<tr>
+      <th scope="row">${escapeHTML(p.name || p.slug)} <span class="hs6">HS ${escapeHTML(p.hs6)}</span></th>
+      <td class="num">${p.latest_year ?? 'n/d'}</td>
+      <td class="num">${pct(p.cagr_value)}</td>
+    </tr>`
   )
   return `
-    <section class="card">
-      <h2>9. Comparacion entre productos ${tagData}</h2>
-      <p class="note">${products.length} producto(s) con datos. La volatilidad es la desviacion estandar del
-        crecimiento anual: mas alta = mas riesgo. La concentracion top 5 es de las exportaciones peruanas.</p>
-      <div class="chart"><canvas id="chartComparison" height="90"></canvas></div>
-      ${table(
-        [
-          { label: 'Producto' },
-          { label: 'Ultimo ano', num: true },
-          { label: 'CAGR valor', num: true },
-          { label: 'CAGR volumen', num: true },
-          { label: 'CAGR precio', num: true },
-          { label: 'Volatilidad', num: true },
-          { label: 'Concentracion top 5', num: true },
-        ],
-        rows
-      )}
+    <section class="comparison-page">
+      <section class="card comparison-intro">
+        <h1>Comparacion de productos</h1>
+        <p class="note">${products.length} producto(s) seleccionados. Compara la evolucion anual del valor FOB
+          exportado por Peru, su crecimiento interanual y el CAGR para el periodo 2016-2025.</p>
+        <p class="note">Fuente: series de exportacion peruana de Trade Map. La grafica de barras compara el ultimo
+          ano con datos de cada producto; los vacios en las tablas indican que no hay un valor reportado.</p>
+        <span>${tagData}</span>
+      </section>
+      <section class="comparison-charts">
+        <article class="card comparison-chart-card">
+          <h2>Valor exportado por producto</h2>
+          <p class="note">Ultimo ano disponible (USD FOB)</p>
+          <div class="chart"><canvas id="chartComparisonLatest"></canvas></div>
+        </article>
+        <article class="card comparison-chart-card">
+          <h2>Evolucion de exportaciones</h2>
+          <p class="note">Valor FOB anual, 2016-2025 (USD)</p>
+          <div class="chart"><canvas id="chartComparison"></canvas></div>
+        </article>
+        <article class="card comparison-chart-card">
+          <h2>Crecimiento respecto al ano anterior</h2>
+          <p class="note">Variacion anual del valor exportado (%)</p>
+          <div class="chart"><canvas id="chartComparisonGrowth"></canvas></div>
+        </article>
+      </section>
+      <section class="card comparison-table-card">
+        <h2>Valor exportado anual (USD FOB)</h2>
+        ${table(
+          [{ label: 'Producto' }, ...years.map((year) => ({ label: String(year), num: true }))],
+          annualValueRows,
+          'comparison-matrix'
+        )}
+      </section>
+      <section class="card comparison-table-card">
+        <h2>Crecimiento interanual (%)</h2>
+        ${table(
+          [{ label: 'Producto' }, ...years.map((year) => ({ label: String(year), num: true }))],
+          annualGrowthRows,
+          'comparison-matrix'
+        )}
+        <p class="note">El primer ano no tiene crecimiento interanual porque no hay un ano previo en el periodo.</p>
+      </section>
+      <section class="card comparison-table-card">
+        <h2>CAGR 2016-2025</h2>
+        ${table(
+          [
+            { label: 'Producto' },
+            { label: 'Ultimo ano disponible', num: true },
+            { label: 'CAGR del valor FOB', num: true },
+          ],
+          cagrRows
+        )}
+        <p class="note">El CAGR solo se calcula cuando hay valores positivos reportados en 2016 y 2025.</p>
+      </section>
     </section>`
 }
 

@@ -51,7 +51,10 @@ defaults:
   utilization_ramp: [0.30, 0.55, 0.75, 0.90, 0.95]
 
 # Overrides por producto. Se aplican encima de `defaults`.
-# Asi's un solo producto puede tener su propio CAPEX sin tocar el resto.
+# Hay un escenario ilustrativo para cada producto del catalogo. Son cifras
+# hipoteticas de operaciones piloto y NO cotizaciones ni datos publicados.
+# Capacidad, precios de compra, proceso, CAPEX, OPEX y capital de trabajo deben
+# reemplazarse con cotizaciones y costos reales antes de decidir una inversion.
 #
 # ESTOS NUMEROS SON EJEMPLOS, NO COTIZACIONES. Sirven para que el pipeline
 # corra de punta a punta. Antes de mirar el VAN, reemplaza al menos:
@@ -89,6 +92,106 @@ products:
     purchase_cost_usd_per_kg: 4.20
     opex_fixed_usd_year: 260000
     working_capital_usd: 410000
+
+  uva_fresca:
+    capacity_kg_year: 500000
+    capex_usd: 1800000
+    purchase_cost_usd_per_kg: 1.20
+    variable_cost_usd_per_kg: 0.35
+    opex_fixed_usd_year: 200000
+    working_capital_usd: 300000
+
+  palta_fresca:
+    capacity_kg_year: 500000
+    capex_usd: 1500000
+    purchase_cost_usd_per_kg: 0.65
+    variable_cost_usd_per_kg: 0.30
+    opex_fixed_usd_year: 180000
+    working_capital_usd: 250000
+
+  esparrago_fresco:
+    capacity_kg_year: 300000
+    capex_usd: 1800000
+    purchase_cost_usd_per_kg: 1.80
+    variable_cost_usd_per_kg: 0.65
+    opex_fixed_usd_year: 220000
+    working_capital_usd: 300000
+
+  mango_fresco:
+    capacity_kg_year: 500000
+    capex_usd: 1500000
+    purchase_cost_usd_per_kg: 0.45
+    variable_cost_usd_per_kg: 0.25
+    opex_fixed_usd_year: 180000
+    working_capital_usd: 250000
+
+  citricos:
+    capacity_kg_year: 500000
+    capex_usd: 1400000
+    purchase_cost_usd_per_kg: 0.40
+    variable_cost_usd_per_kg: 0.25
+    opex_fixed_usd_year: 170000
+    working_capital_usd: 230000
+
+  quinua:
+    capacity_kg_year: 250000
+    capex_usd: 1000000
+    purchase_cost_usd_per_kg: 1.20
+    variable_cost_usd_per_kg: 0.35
+    opex_fixed_usd_year: 130000
+    working_capital_usd: 180000
+
+  aji_paprika:
+    capacity_kg_year: 200000
+    capex_usd: 1100000
+    purchase_cost_usd_per_kg: 1.30
+    variable_cost_usd_per_kg: 0.55
+    opex_fixed_usd_year: 140000
+    working_capital_usd: 180000
+
+  jengibre:
+    capacity_kg_year: 250000
+    capex_usd: 1200000
+    purchase_cost_usd_per_kg: 0.65
+    variable_cost_usd_per_kg: 0.35
+    opex_fixed_usd_year: 150000
+    working_capital_usd: 200000
+
+  aceite_palma:
+    capacity_kg_year: 500000
+    capex_usd: 2200000
+    purchase_cost_usd_per_kg: 0.45
+    variable_cost_usd_per_kg: 0.25
+    opex_fixed_usd_year: 200000
+    working_capital_usd: 300000
+
+  cochinilla_carmin:
+    capacity_kg_year: 10000
+    capex_usd: 900000
+    purchase_cost_usd_per_kg: 35.00
+    variable_cost_usd_per_kg: 5.00
+    opex_fixed_usd_year: 160000
+    working_capital_usd: 220000
+
+  pota_calamar:
+    # Escenario inicial ilustrativo, NO cotizaciones. Dimensionado para una
+    # planta piloto de 500 t/ano, frente al FOB de Trade Map 2025 (~USD 2.89/kg).
+    # La compra a USD 1.80/kg y el proceso a USD 0.45/kg son hipotesis editables.
+    # Reemplazar con precios de compra, capacidad y cotizaciones reales.
+    capacity_kg_year: 500000
+    capex_usd: 1500000
+    purchase_cost_usd_per_kg: 1.80
+    variable_cost_usd_per_kg: 0.45
+    opex_fixed_usd_year: 180000
+    working_capital_usd: 300000
+
+  conservas_pescado:
+    capacity_kg_year: 500000
+    capex_usd: 2500000
+    purchase_cost_usd_per_kg: 1.50
+    variable_cost_usd_per_kg: 1.10
+    opex_fixed_usd_year: 250000
+    working_capital_usd: 350000
 
 # Escenarios de sensibilidad que corren automaticamente sobre cada producto.
 # El reporte genera un tornado: cuanto se mueve el VAN ante la variacion de

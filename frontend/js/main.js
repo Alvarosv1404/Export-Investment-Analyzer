@@ -11,7 +11,7 @@
  */
 
 import { getAnalysis, getComparison, getProducts } from './api.js'
-import { renderAll } from './charts.js'
+import { destroyCharts, renderAll, renderComparisonCharts } from './charts.js'
 import {
   comparison,
   competitors,
@@ -31,7 +31,8 @@ const state = {
   slug: urlParams.get('slug'),
   targetShare: urlParams.get('target_share') || '',
   price: urlParams.get('price') || '',
-  compare: urlParams.get('compare') === '1',
+  view: urlParams.get('view') === 'compare' || urlParams.get('compare') === '1' ? 'compare' : 'analysis',
+  compareSlugs: (urlParams.get('compare_slugs') || '').split(',').filter(Boolean),
   products: [],
   comparisonData: null,
 }
@@ -42,7 +43,10 @@ function syncURL() {
   if (state.slug) params.set('slug', state.slug)
   if (state.targetShare) params.set('target_share', state.targetShare)
   if (state.price) params.set('price', state.price)
-  if (state.compare) params.set('compare', '1')
+  if (state.view === 'compare') {
+    params.set('view', 'compare')
+    params.set('compare_slugs', state.compareSlugs.join(','))
+  }
   const qs = params.toString()
   history.replaceState(null, '', qs ? `?${qs}` : location.pathname)
 }
@@ -52,20 +56,69 @@ function showError(message) {
     <div class="alert error"><strong>Error:</strong> ${escapeHTML(message)}</div>`
 }
 
-/** Selector de producto, participacion objetivo, precio y comparacion. */
+/** Controles para analisis individual o comparacion de productos. */
 function renderControls() {
-  const chips = state.products
-    .map(
-      (p) => `
-      <a class="chip ${p.slug === state.slug ? 'active' : ''}" href="${escapeHTML(productHref(p.slug))}"
-         data-slug="${escapeHTML(p.slug)}">
-        ${escapeHTML(p.name)} <span class="hs6">HS ${escapeHTML(p.hs6)}</span>
-      </a>`
-    )
-    .join('')
+  const tabs = `
+    <nav class="view-tabs" aria-label="Tipo de analisis">
+      <button type="button" class="view-tab ${state.view === 'analysis' ? 'active' : ''}" data-view="analysis">
+        Analisis por producto
+      </button>
+      <button type="button" class="view-tab ${state.view === 'compare' ? 'active' : ''}" data-view="compare">
+        Comparacion de productos
+      </button>
+    </nav>`
+  if (state.view === 'compare') {
+    return `${tabs}
+      <form class="controls-form comparison-controls" id="comparisonForm">
+        <fieldset class="compare-picker">
+          <legend>Elige los productos que quieres comparar</legend>
+          <p class="compare-picker-hint">Marca uno o varios. Puedes empezar con el producto actual y añadir otros.</p>
+          <label class="compare-search-label" for="compareSearch">Buscar por nombre o código HS</label>
+          <input type="search" id="compareSearch" class="compare-search" placeholder="Ej.: café o 090111" />
+          <div class="compare-options">
+            ${state.products
+              .map(
+                (p) => `
+                  <label class="compare-option" data-product-name="${escapeHTML(`${p.name} ${p.hs6}`.toLowerCase())}">
+                    <input type="checkbox" name="compareSlugs" value="${escapeHTML(p.slug)}"
+                           ${state.compareSlugs.includes(p.slug) ? 'checked' : ''} />
+                    <span class="compare-option-copy">
+                      <span class="compare-option-name">${escapeHTML(p.name)}</span>
+                      <span class="hs6">HS ${escapeHTML(p.hs6)}</span>
+                    </span>
+                  </label>`
+              )
+              .join('')}
+          </div>
+          <div class="compare-picker-footer">
+            <span class="compare-selection-count" aria-live="polite"></span>
+            <div class="compare-picker-actions">
+              <button type="button" class="text-btn" id="selectAllProducts">Seleccionar todos</button>
+              <button type="button" class="text-btn" id="clearProducts">Limpiar</button>
+            </div>
+          </div>
+        </fieldset>
+        <div class="comparison-submit">
+          <button type="submit" class="btn">Ver comparacion</button>
+        </div>
+      </form>`
+  }
 
   const form = `
     <form class="controls-form" id="controlsForm">
+      <div class="control-block">
+        <label for="productSelect">Producto para analizar</label>
+        <select id="productSelect" name="slug">
+          ${state.products
+            .map(
+              (p) => `
+                <option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''}>
+                  ${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})
+                </option>`
+            )
+            .join('')}
+        </select>
+      </div>
       <div class="control-block">
         <label for="shareInput">Participacion de mercado objetivo (opcional)</label>
         <div class="share-controls">
@@ -82,14 +135,10 @@ function renderControls() {
           <span class="share-hint">USD/kg &mdash; vacio = calculado de los historicos</span>
         </div>
       </div>
-      <label class="check">
-        <input type="checkbox" id="compareInput" ${state.compare ? 'checked' : ''} />
-        Comparar con los demas productos del catalogo
-      </label>
       <button type="submit" class="btn">Aplicar</button>
     </form>`
 
-  return `<nav class="products">${chips}</nav>${form}`
+  return `${tabs}${form}`
 }
 
 /**
@@ -104,19 +153,73 @@ function shareInputValue() {
   return String(Math.round(percent * 100) / 100)
 }
 
-/** Mantiene la participacion elegida al cambiar de producto. */
-function productHref(slug) {
-  const params = new URLSearchParams({ slug })
-  if (state.targetShare) params.set('target_share', state.targetShare)
-  if (state.price) params.set('price', state.price)
-  if (state.compare) params.set('compare', '1')
-  return `?${params.toString()}`
-}
-
 /** Inserta los controles que disparan una recarga suave. */
 function bindControls(onChange) {
+  document.querySelectorAll('.view-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      state.view = tab.dataset.view
+      if (state.view === 'compare' && !state.compareSlugs.length) {
+        state.compareSlugs = state.slug ? [state.slug] : []
+      }
+      syncURL()
+      onChange()
+    })
+  })
+
+  const comparisonForm = document.getElementById('comparisonForm')
+  if (comparisonForm) {
+    const checkboxes = Array.from(comparisonForm.querySelectorAll('input[name="compareSlugs"]'))
+    const updateSelectionCount = () => {
+      const selectedCount = checkboxes.filter((input) => input.checked).length
+      comparisonForm.querySelector('.compare-selection-count').textContent =
+        `${selectedCount} producto${selectedCount === 1 ? '' : 's'} seleccionado${selectedCount === 1 ? '' : 's'}`
+    }
+    checkboxes.forEach((input) => input.addEventListener('change', updateSelectionCount))
+    document.getElementById('selectAllProducts').addEventListener('click', () => {
+      checkboxes.forEach((input) => {
+        const option = input.closest('.compare-option')
+        if (option && option.hidden) return
+        input.checked = true
+      })
+      updateSelectionCount()
+    })
+    document.getElementById('clearProducts').addEventListener('click', () => {
+      checkboxes.forEach((input) => {
+        input.checked = false
+      })
+      updateSelectionCount()
+    })
+    document.getElementById('compareSearch').addEventListener('input', (event) => {
+      const query = event.target.value.trim().toLowerCase()
+      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
+        option.hidden = !option.dataset.productName.includes(query)
+      })
+    })
+    updateSelectionCount()
+
+    comparisonForm.addEventListener('submit', (event) => {
+      event.preventDefault()
+      state.compareSlugs = Array.from(
+        comparisonForm.querySelectorAll('input[name="compareSlugs"]:checked')
+      ).map((input) => input.value)
+      if (!state.compareSlugs.length) {
+        document.getElementById('app').innerHTML =
+          '<div class="alert warn">Selecciona al menos un producto para mostrar la comparacion.</div>'
+        return
+      }
+      syncURL()
+      onChange()
+    })
+    return
+  }
+
   const form = document.getElementById('controlsForm')
   if (!form) return
+  document.getElementById('productSelect').addEventListener('change', (event) => {
+    state.slug = event.target.value
+    syncURL()
+    onChange()
+  })
   form.addEventListener('submit', (event) => {
     event.preventDefault()
     const share = document.getElementById('shareInput').value.trim()
@@ -124,7 +227,6 @@ function bindControls(onChange) {
     // El input esta en porcentaje (0-100); la API espera fraccion (0-1).
     state.targetShare = share === '' ? '' : (Number(share) / 100).toFixed(4)
     state.price = price === '' ? '' : String(Number(price))
-    state.compare = document.getElementById('compareInput').checked
     syncURL()
     onChange()
   })
@@ -132,6 +234,7 @@ function bindControls(onChange) {
 
 function render(result) {
   const app = document.getElementById('app')
+  destroyCharts()
 
   if (result.error || (result.market && !result.market.available)) {
     showError(result.error || result.market?.message || 'Sin datos.')
@@ -159,11 +262,17 @@ function render(result) {
     tariffs(result),
     investment(result.investment),
     sensitivity(result.investment),
-    state.compare ? comparison(state.comparisonData) : '',
     sources(result),
   ].join('')
 
-  renderAll(result, state.comparisonData)
+  renderAll(result)
+}
+
+function renderComparisonView() {
+  destroyCharts()
+  const app = document.getElementById('app')
+  app.innerHTML = comparison(state.comparisonData)
+  renderComparisonCharts(state.comparisonData)
 }
 
 async function load() {
@@ -187,19 +296,26 @@ async function load() {
     state.slug = state.products[0].slug
     syncURL()
   }
+  if (state.view === 'compare' && !state.compareSlugs.length && state.slug) {
+    state.compareSlugs = [state.slug]
+    syncURL()
+  }
+
+  document.getElementById('controls').innerHTML = renderControls()
+  bindControls(load)
+
+  if (state.view === 'compare') {
+    try {
+      state.comparisonData = await getComparison(state.compareSlugs)
+      renderComparisonView()
+    } catch (err) {
+      showError(err.message)
+    }
+    return
+  }
 
   try {
     const result = await getAnalysis(state.slug, state.targetShare, state.price)
-    state.comparisonData = null
-    if (state.compare) {
-      try {
-        state.comparisonData = await getComparison([])
-      } catch (err) {
-        state.comparisonData = { error: err.message }
-      }
-    }
-    document.getElementById('controls').innerHTML = renderControls()
-    bindControls(load)
     render(result)
   } catch (err) {
     showError(err.message)

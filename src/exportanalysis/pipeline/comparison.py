@@ -10,6 +10,9 @@ import pandas as pd
 from ..config import get_product, load_catalog
 from . import excel_analysis
 
+BASE_YEAR = 2016
+END_YEAR = 2025
+
 
 def _cagr(series: pd.Series) -> float | None:
     s = series.dropna().astype(float)
@@ -28,6 +31,17 @@ def _cagr(series: pd.Series) -> float | None:
         return None
 
 
+def _period_cagr(frame: pd.DataFrame, start_year: int, end_year: int) -> float | None:
+    values = frame.set_index("year")["fob_usd"]
+    if start_year not in values.index or end_year not in values.index:
+        return None
+    first = values.loc[start_year]
+    last = values.loc[end_year]
+    if pd.isna(first) or pd.isna(last) or first <= 0 or last < 0:
+        return None
+    return float((last / first) ** (1.0 / (end_year - start_year)) - 1.0)
+
+
 def _volatility(series: pd.Series) -> float | None:
     s = series.dropna().astype(float).pct_change().dropna()
     if len(s) < 2:
@@ -35,16 +49,15 @@ def _volatility(series: pd.Series) -> float | None:
     return float(s.std())
 
 
-def _get_product_hs6(slug: str) -> str:
-    try:
-        p = get_product(slug)
-        return p.hs6
-    except Exception:
-        return slug
-
-
 def _series_product(slug: str) -> dict[str, Any]:
-    hs6 = _get_product_hs6(slug)
+    try:
+        product = get_product(slug)
+        hs6 = product.hs6
+        name = product.name
+    except KeyError:
+        hs6 = slug
+        name = slug
+
     try:
         df = excel_analysis.peru_exports_ts(hs6)
     except Exception:
@@ -77,9 +90,28 @@ def _series_product(slug: str) -> dict[str, Any]:
         g["fob_usd"] / g["quantity"],
         pd.NA,
     )
+    g = (
+        g.set_index("year")
+        .reindex(range(BASE_YEAR, END_YEAR + 1))
+        .rename_axis("year")
+        .reset_index()
+    )
+    base_value = g.loc[g["year"] == BASE_YEAR, "fob_usd"].iloc[0]
+    g["value_yoy"] = g["fob_usd"].pct_change(fill_method=None)
+    g["cagr_from_2016"] = [
+        float((value / base_value) ** (1.0 / (year - BASE_YEAR)) - 1.0)
+        if year > BASE_YEAR
+        and pd.notna(base_value)
+        and base_value > 0
+        and pd.notna(value)
+        and value >= 0
+        else None
+        for year, value in zip(g["year"], g["fob_usd"], strict=False)
+    ]
 
     # concentration - top destination share by latest year
-    latest_year = int(g["year"].max()) if len(g) > 0 else None
+    observed_years = g.loc[g["fob_usd"].notna(), "year"]
+    latest_year = int(observed_years.max()) if not observed_years.empty else None
     conc = None
     peru_rank = None
     if latest_year is not None and len(df) > 0:
@@ -90,13 +122,23 @@ def _series_product(slug: str) -> dict[str, Any]:
             conc = (top5 / total) if total > 0 else None
             # peru rank in global? not directly - keep None or could compute from world
 
+    series = []
+    for row in g.to_dict("records"):
+        series.append(
+            {
+                key: None if pd.isna(value) else value.item() if isinstance(value, np.generic) else value
+                for key, value in row.items()
+            }
+        )
+
     return {
         "slug": slug,
+        "name": name,
         "hs6": hs6,
         "available": True,
-        "years": g["year"].tolist(),
-        "series": g.where(pd.notna(g), None).to_dict("records"),
-        "cagr_value": _cagr(g["fob_usd"]),
+        "years": list(range(BASE_YEAR, END_YEAR + 1)),
+        "series": series,
+        "cagr_value": _period_cagr(g, BASE_YEAR, END_YEAR),
         "cagr_volume": _cagr(g["quantity"]),
         "cagr_unit_value": _cagr(g["unit_value_usd"]),
         "volatility_value": _volatility(g["fob_usd"]),

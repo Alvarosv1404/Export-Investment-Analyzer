@@ -25,6 +25,11 @@ function init() {
   return true
 }
 
+export function destroyCharts() {
+  if (typeof Chart === 'undefined') return
+  Object.values(Chart.instances).forEach((chart) => chart.destroy())
+}
+
 /** Serie anual: valor FOB en el eje izquierdo, volumen en el derecho. */
 export function series(canvas, m) {
   if (!canvas || !m?.series?.length) return
@@ -179,22 +184,23 @@ export function comparisonChart(canvas, data) {
   if (!canvas || !data?.products?.length) return
   const prods = data.products.filter((p) => p.available && p.series?.length)
   if (!prods.length) return
-  const years = [...new Set(prods.flatMap((p) => p.series.map((r) => r.year)))].sort((a, b) => a - b)
+  const years = Array.from({ length: 10 }, (_, i) => 2016 + i)
   const colors = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#f59e0b', '#0891b2', '#db2777', '#65a30d']
   const datasets = prods.map((p, i) => ({
-    label: p.slug,
+    label: p.name || p.slug,
     data: years.map((y) => {
       const row = p.series.find((r) => r.year === y)
       return row ? row.fob_usd : null
     }),
     borderColor: colors[i % colors.length],
     tension: 0.25,
-    spanGaps: true,
+    spanGaps: false,
   }))
   new Chart(canvas, {
     type: 'line',
     data: { labels: years, datasets },
     options: {
+      maintainAspectRatio: false,
       plugins: {
         legend: { position: 'bottom' },
         tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${money(c.parsed.y)}` } },
@@ -204,8 +210,86 @@ export function comparisonChart(canvas, data) {
   })
 }
 
+/** Barras: compara el FOB del ultimo ano disponible de cada producto. */
+function comparisonLatestChart(canvas, data) {
+  if (!canvas || !data?.products?.length) return
+  const products = data.products.filter((product) => product.available && product.series?.length)
+  if (!products.length) return
+  const colors = ['#2563eb', '#f97316', '#64748b', '#059669', '#7c3aed', '#eab308', '#0891b2', '#db2777']
+  const latest = products.map((product) => {
+    const row = product.series.find((year) => year.year === product.latest_year)
+    return { product, value: row?.fob_usd ?? null }
+  })
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: latest.map(({ product }) => `${product.name || product.slug} (${product.latest_year})`),
+      datasets: [
+        {
+          label: 'Exportaciones FOB',
+          data: latest.map(({ value }) => value),
+          backgroundColor: latest.map((_, index) => colors[index % colors.length]),
+          borderRadius: 5,
+        },
+      ],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (context) => money(context.parsed.y) } },
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: compact }, title: { display: true, text: 'USD FOB' } },
+        x: { ticks: { maxRotation: 35, minRotation: 0 } },
+      },
+    },
+  })
+}
+
+/** Lineas: crecimiento porcentual de las exportaciones frente al ano anterior. */
+function comparisonGrowthChart(canvas, data) {
+  if (!canvas || !data?.products?.length) return
+  const products = data.products.filter((product) => product.available && product.series?.length)
+  if (!products.length) return
+  const years = Array.from({ length: 10 }, (_, i) => 2016 + i)
+  const colors = ['#2563eb', '#f97316', '#64748b', '#059669', '#7c3aed', '#eab308', '#0891b2', '#db2777']
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: products.map((product, index) => ({
+        label: product.name || product.slug,
+        data: years.map((year) => product.series.find((row) => row.year === year)?.value_yoy ?? null),
+        borderColor: colors[index % colors.length],
+        backgroundColor: colors[index % colors.length],
+        pointRadius: 3,
+        tension: 0.2,
+        spanGaps: false,
+      })),
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${(context.parsed.y * 100).toFixed(1)}%` } },
+      },
+      scales: {
+        y: { ticks: { callback: (value) => `${(value * 100).toFixed(0)}%` }, title: { display: true, text: 'Variacion anual' } },
+      },
+    },
+  })
+}
+
+export function renderComparisonCharts(data) {
+  if (!init()) return
+  comparisonLatestChart(document.getElementById('chartComparisonLatest'), data)
+  comparisonChart(document.getElementById('chartComparison'), data)
+  comparisonGrowthChart(document.getElementById('chartComparisonGrowth'), data)
+}
+
 /** Dibuja todos los graficos del reporte. Idempotente por id de canvas. */
-export function renderAll(result, comparisonData) {
+export function renderAll(result) {
   if (!init() || !result) return
   const get = (id) => document.getElementById(id)
   series(get('chartSeries'), result.market)
@@ -214,5 +298,4 @@ export function renderAll(result, comparisonData) {
   headroom(get('chartLadder'), result.headroom)
   cashflows(get('chartCash'), result.investment)
   tornado(get('chartSens'), result.investment?.sensitivity)
-  comparisonChart(get('chartComparison'), comparisonData)
 }

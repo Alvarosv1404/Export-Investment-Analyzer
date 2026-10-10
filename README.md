@@ -141,9 +141,17 @@ puerto esta ocupado, en vez de un `Errno 10048` de uvicorn.
 | `GET /api/analysis/{slug}` | Analisis completo en JSON |
 | `GET /api/analysis/{slug}?target_share=0.12` | Con participacion de mercado objetivo explicita |
 | `GET /api/analysis/{slug}?price_usd_per_kg=6.5` | Con precio FOB de venta explicito |
-| `GET /api/comparison?slugs=cafe_verde,uva_fresca` | Comparacion entre productos |
+| `GET /api/comparison?slugs=cafe_verde,uva_fresca` | Comparacion seleccionada con serie 2016-2025, variacion anual y CAGR desde 2016 |
 | `GET /health` | Sonda de salud |
 | `GET /docs` | Swagger UI interactivo |
+
+La interfaz separa **Analisis por producto** de **Comparacion de productos**.
+En la segunda vista puedes elegir uno o mas productos; la seleccion se conserva
+en la URL. Incluye graficas de FOB del ultimo ano disponible, evolucion de
+exportaciones y crecimiento interanual, junto con tablas anuales y CAGR
+2016-2025. Son exportaciones FOB del Peru reportadas en Trade Map, no valores
+importados de los mercados destino. Si el Excel no contiene un dato anual, se
+muestra como `n/d` y no se interpreta como cero.
 
 ## Correr sin navegador
 
@@ -321,6 +329,12 @@ cotizaciones**. Antes de mirar el VAN reemplaza al menos:
 - `capex_usd` → cotizacion de la planta
 - `opex_fixed_usd_year` → planilla, alquiler, servicios
 - `discount_rate` → tu WACC
+
+Hay escenarios piloto de ejemplo para **todos los productos del catalogo** en
+`config/assumptions.yaml`, para que el reporte y el modelo puedan ejecutarse.
+Son cifras hipoteticas, no cotizaciones ni datos publicados, y no validan la
+rentabilidad. Sustituyelas por cotizaciones de proveedores y costos reales
+antes de tomar una decision.
 
 El reporte distingue siempre entre dato y supuesto, y marca de donde salio la
 curva de ocupacion de la planta (`ramp_source`).

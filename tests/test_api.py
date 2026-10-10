@@ -14,6 +14,7 @@ import math
 import pytest
 
 from exportanalysis.api.main import DIST_DIR, _json_safe, app
+from exportanalysis.config import load_assumptions, load_catalog
 
 fastapi_testclient = pytest.importorskip("fastapi.testclient")
 TestClient = fastapi_testclient.TestClient
@@ -80,6 +81,11 @@ class TestProducts:
 
     def test_sin_parametros_obligatorios(self, client):
         assert client.get("/api/products").status_code == 200
+
+    def test_todos_los_productos_tienen_supuestos_de_inversion(self):
+        assumptions = load_assumptions()
+        for product in load_catalog().products:
+            assumptions.for_product(product.slug)
 
 
 class TestAnalysis:
