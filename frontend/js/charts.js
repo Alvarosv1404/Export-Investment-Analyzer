@@ -21,7 +21,7 @@ function init() {
     return false
   }
   Chart.defaults.font.family = 'system-ui, sans-serif'
-  Chart.defaults.color = '#555'
+  Chart.defaults.color = '#94a3b8'
   return true
 }
 
@@ -150,8 +150,19 @@ export function cashflows(canvas, inv) {
       ],
     },
     options: {
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => money(c.parsed.y) } } },
-      scales: { y: { ticks: { callback: compact } } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#f8fafc',
+          bodyColor: '#e2e8f0',
+          callbacks: { label: (c) => money(c.parsed.y) },
+        },
+      },
+      scales: {
+        y: { ticks: { color: '#cbd5e1', callback: compact }, grid: { color: '#334155' } },
+        x: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+      },
     },
   })
 }
@@ -174,8 +185,19 @@ export function tornado(canvas, sens) {
     },
     options: {
       indexAxis: 'y',
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `swing ${money(c.parsed.x)}` } } },
-      scales: { x: { ticks: { callback: compact } } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#f8fafc',
+          bodyColor: '#e2e8f0',
+          callbacks: { label: (c) => `swing ${money(c.parsed.x)}` },
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#cbd5e1', callback: compact }, grid: { color: '#334155' } },
+        y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+      },
     },
   })
 }
@@ -351,6 +373,9 @@ function rankingChart(canvas, data) {
       plugins: {
         legend: { display: false },
         tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#f8fafc',
+          bodyColor: '#e2e8f0',
           callbacks: {
             label: (context) => {
               const product = products[context.dataIndex]
@@ -401,6 +426,227 @@ function sunatPriceChart(canvas, s) {
   })
 }
 
+/** Histograma de distribución de probabilidades de Monte Carlo. */
+export function monteCarloChart(canvas, mc) {
+  if (!canvas || !mc?.histogram?.length) return
+  const labels = mc.histogram.map((b) => b.label)
+  const data = mc.histogram.map((b) => b.count)
+  const colors = mc.histogram.map((b) => (b.is_negative ? 'rgba(239, 68, 68, 0.7)' : 'rgba(16, 185, 129, 0.7)'))
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Frecuencia de simulaciones',
+          data,
+          backgroundColor: colors,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) =>
+              `${c.parsed.y} iteraciones (${((c.parsed.y / (mc.n_simulations || 500)) * 100).toFixed(1)}%)`,
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#cbd5e1', maxRotation: 35, minRotation: 35, font: { size: 9 } }, grid: { color: '#334155' } },
+        y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, title: { display: true, text: 'N° Simulaciones', color: '#cbd5e1' } },
+      },
+    },
+  })
+}
+
+/** Grafico circular (donut) de participacion de mercado de un anio. */
+export function shareDonut(canvas, yearData) {
+  if (!canvas || !yearData?.slices?.length) return
+  const palette = [
+    '#2563eb', '#059669', '#d97706', '#7c3aed', '#0891b2',
+    '#db2777', '#65a30d', '#ea580c', '#4f46e5', '#94a3b8',
+  ]
+  new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: yearData.slices.map((s) => s.label),
+      datasets: [
+        {
+          data: yearData.slices.map((s) => +(s.share * 100).toFixed(2)),
+          backgroundColor: yearData.slices.map((s, i) => {
+            if (s.is_peru) return '#dc2626'
+            if (s.is_rest) return '#cbd5e1'
+            return palette[i % palette.length]
+          }),
+          borderColor: '#1e293b',
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      cutout: '52%',
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const s = yearData.slices[c.dataIndex]
+              return `${c.label}: ${c.parsed.toFixed(2)}%  (${compact(s.value_usd)})`
+            },
+          },
+        },
+        title: {
+          display: true,
+          text: `Participación de mercado mundial ${yearData.year}`,
+          font: { size: 13, weight: '600' },
+        },
+      },
+    },
+  })
+}
+
+/**
+ * Serie historica + linea de tendencia + proyeccion a futuro.
+ * La proyeccion se dibuja punteada para distinguir "dato" de "estimado": la
+ * parte solida es lo que ya ocurrio, la punteada es la extrapolacion del modelo.
+ * Soporta metodos: moving_average, linear, quadratic, cagr
+ */
+export function projectionChart(canvas, proj) {
+  if (!canvas || !proj?.available) return
+
+  const isMovingAverage = proj.method === 'moving_average' || proj.method === 'media móvil simple'
+  const isTrend = proj.method === 'linear' || proj.method === 'quadratic'
+  const isCagr = proj.method === 'cagr'
+
+  const hist = proj.historical || []
+  const trend = proj.trend || []
+  const fc = proj.forecast || []
+
+  if (!hist.length && !trend.length && !fc.length) return
+
+  const labels = [...new Set([...hist.map((p) => p.year), ...trend.map((p) => p.year), ...fc.map((p) => p.year)])].sort((a, b) => a - b)
+
+  let histData = labels.map((year) => {
+    const h = hist.find((p) => p.year === year)
+    return h ? h.value : null
+  })
+  let trendData = labels.map((year) => {
+    const t = trend.find((p) => p.year === year)
+    return t ? t.value : null
+  })
+  let forecastData = labels.map((year) => {
+    const f = fc.find((p) => p.year === year)
+    return f ? f.value : null
+  })
+
+  // Conectar la ultima tendencia con la primera proyeccion para linea continua
+  if (trendData.length && forecastData.length) {
+    const lastTrendIdx = trendData.lastIndexOf(trendData.find(v => v !== null))
+    const firstForecastIdx = forecastData.findIndex(v => v !== null)
+    if (lastTrendIdx >= 0 && firstForecastIdx >= 0 && labels[lastTrendIdx] === labels[firstForecastIdx]) {
+      forecastData[firstForecastIdx] = trendData[lastTrendIdx]
+    }
+  }
+
+  // Etiquetas y colores segun metodo
+  let trendLabel = 'Tendencia'
+  let trendColor = '#d97706'
+  let titleText = 'Proyección FOB'
+  let subtitleText = ''
+
+  if (isMovingAverage) {
+    trendLabel = `Media móvil (${proj.window} años)`
+    titleText = `Proyección FOB por media móvil de ${proj.window} años`
+    subtitleText = `Promedio de ${proj.window_years?.join(', ') ?? ''}`
+  } else if (isTrend) {
+    const degreeLabel = proj.degree === 1 ? 'lineal' : 'cuadrática'
+    trendLabel = `Tendencia ${degreeLabel} (R² = ${proj.r_squared ?? 'n/d'})`
+    titleText = `Proyección FOB por tendencia ${degreeLabel}`
+    if (proj.equation) subtitleText = `Ecuación: ${proj.equation}`
+  } else if (isCagr) {
+    trendLabel = `CAGR ${proj.cagr_pct ? proj.cagr_pct + '%' : 'histórico'}`
+    titleText = `Proyección FOB por CAGR histórico`
+    subtitleText = `Basado en últimos años disponibles`
+  }
+
+  const datasets = [
+    {
+      label: 'Exportación FOB (dato)',
+      data: histData,
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37,99,235,.08)',
+      fill: true,
+      tension: 0.25,
+      spanGaps: true,
+    },
+  ]
+
+  if (trendData.some(v => v !== null)) {
+    datasets.push({
+      label: trendLabel,
+      data: trendData,
+      borderColor: trendColor,
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.3,
+      spanGaps: true,
+    })
+  }
+
+  if (forecastData.some(v => v !== null)) {
+    datasets.push({
+      label: 'Proyección',
+      data: forecastData,
+      borderColor: '#dc2626',
+      borderDash: [6, 5],
+      borderWidth: 2,
+      pointRadius: 3,
+      pointStyle: 'rectRot',
+      tension: 0.3,
+      fill: false,
+      spanGaps: true,
+    })
+  }
+
+  new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        title: {
+          display: true,
+          text: titleText,
+          font: { size: 13, weight: '600' },
+        },
+        subtitle: subtitleText ? {
+          display: true,
+          text: subtitleText,
+          font: { size: 11, style: 'italic' },
+          color: '#475569',
+          padding: { bottom: 6 },
+        } : { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => (c.parsed.y == null ? null : `${c.dataset.label}: ${compact(c.parsed.y)}`),
+          },
+        },
+      },
+      scales: {
+        y: { ticks: { callback: compact }, title: { display: true, text: 'FOB (USD)' } },
+      },
+    },
+  })
+}
+
 /** Dibuja todos los graficos del reporte. Idempotente por id de canvas. */
 export function renderAll(result) {
   if (!init() || !result) return
@@ -412,4 +658,22 @@ export function renderAll(result) {
   headroom(get('chartLadder'), result.headroom)
   cashflows(get('chartCash'), result.investment)
   tornado(get('chartSens'), result.investment?.sensitivity)
+  monteCarloChart(get('chartMonteCarlo'), result.investment?.monte_carlo)
+  const donutYear = window.__shareYear || result.share_by_year?.years?.slice(-1)[0]
+  const yearData = result.share_by_year?.by_year?.find((y) => y.year === donutYear)
+  shareDonut(get('chartShare'), yearData)
+  projectionChart(get('chartProjection'), result.projection)
+}
+
+export function renderFinancialCharts(investment) {
+  if (!init()) return
+  const cashCanvas = document.getElementById('chartCash')
+  const sensitivityCanvas = document.getElementById('chartSens')
+  const monteCarloCanvas = document.getElementById('chartMonteCarlo')
+  if (cashCanvas) Chart.getChart(cashCanvas)?.destroy()
+  if (sensitivityCanvas) Chart.getChart(sensitivityCanvas)?.destroy()
+  if (monteCarloCanvas) Chart.getChart(monteCarloCanvas)?.destroy()
+  cashflows(cashCanvas, investment)
+  tornado(sensitivityCanvas, investment?.sensitivity)
+  monteCarloChart(monteCarloCanvas, investment?.monte_carlo)
 }
