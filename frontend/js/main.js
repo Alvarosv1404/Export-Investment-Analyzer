@@ -158,13 +158,47 @@ async function refreshComparison() {
   }
 }
 
-/** Opciones de producto para el selector (lista plana, sin optgroup).
- * El filtro por industria se hace via chips arriba, no dentro del select. */
-function productOptions() {
-  const option = (p) =>
-    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">` +
-    `${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</option>`
+/** Genera las opciones para el custom select (con role="option" y atributos necesarios). */
+function productOptionsForCustomSelect() {
+  const option = (p, idx) =>
+    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})${p.industry ? `<span class="custom-select-option-industry">${escapeHTML(p.industry)}</span>` : ''}</div>`
   return state.products.map(option).join('')
+}
+
+/** Genera las opciones para el select nativo (fallback/form submission). */
+function productOptionsForNativeSelect() {
+  const option = (p) =>
+    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</option>`
+  return state.products.map(option).join('')
+}
+
+/** Genera el HTML del custom select para la vista de análisis. */
+function renderCustomSelect() {
+  const selected = state.products.find(p => p.slug === state.slug) || state.products[0]
+  const selectedLabel = selected ? `${selected.name} (HS ${selected.hs6})` : 'Seleccionar producto'
+  const customOptionsHtml = productOptionsForCustomSelect()
+  const nativeOptionsHtml = productOptionsForNativeSelect()
+
+  return `
+    <div class="custom-select" id="customSelect" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-label="Producto para analizar">
+      <label class="custom-select-label" for="customSelectTrigger">Producto para analizar</label>
+      <div class="custom-select-trigger" id="customSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" aria-expanded="false">
+        <span class="custom-select-value">${escapeHTML(selectedLabel)}</span>
+        <svg class="custom-select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+      <div class="custom-select-dropdown" id="customSelectDropdown" role="listbox" hidden>
+        <div class="custom-select-search-wrapper">
+          <input type="search" class="custom-select-search" placeholder="Buscar producto o HS..." aria-label="Buscar en la lista" autocomplete="off">
+        </div>
+        <div class="custom-select-options" id="customSelectOptions" role="listbox">
+          ${customOptionsHtml}
+        </div>
+      </div>
+      <!-- Hidden native select for form submission / SSR fallback -->
+      <select id="productSelect" name="slug" class="custom-select-native" hidden>
+        ${nativeOptionsHtml}
+      </select>
+    </div>`
 }
 
 /** Controles para analisis individual o comparacion de productos. */
@@ -239,12 +273,7 @@ function renderControls() {
   const form = `
     <div class="controls-form" id="controlsForm">
       ${industryChips}
-      <div class="control-block">
-        <label for="productSelect">Producto para analizar</label>
-        <select id="productSelect" name="slug">
-          ${productOptions()}
-        </select>
-      </div>
+      ${renderCustomSelect()}
     </div>`
 
   return `${tabs}${form}`
@@ -329,10 +358,16 @@ function bindControls(onChange) {
     return
   }
 
+  return
+  }
+
   const form = document.getElementById('controlsForm')
   if (!form) return
 
-  // Analysis view: industry filter chips
+  // --- Custom Select binding (Analysis view) ---
+  bindCustomSelect(form, onChange)
+
+  // Analysis view: industry filter chips (sync with custom select)
   const analysisChips = form.querySelectorAll('#analysisIndustryChips .filter-chip')
   if (analysisChips.length) {
     analysisChips.forEach((chip) => {
@@ -340,33 +375,200 @@ function bindControls(onChange) {
         analysisChips.forEach((c) => c.classList.remove('active'))
         chip.classList.add('active')
         const industry = chip.dataset.industry
-        const select = document.getElementById('productSelect')
-        // Filter options in the select
-        Array.from(select.options).forEach((opt) => {
-          if (!industry) {
-            opt.hidden = false
-          } else {
-            const optIndustry = opt.dataset.industry || ''
-            opt.hidden = optIndustry !== industry
-          }
-        })
-        // Reset selection to first visible
-        const firstVisible = Array.from(select.options).find((o) => !o.hidden)
-        if (firstVisible) {
-          select.value = firstVisible.value
-          state.slug = firstVisible.value
-          syncURL()
-          onChange()
-        }
+        // Filter custom select options
+        filterCustomSelectOptions(form, industry)
+        // Sync native select for form submission
+        syncNativeSelect(form, industry)
+        // Select first visible option
+        selectFirstVisibleCustomOption(form)
       })
     })
   }
+}
 
-  document.getElementById('productSelect').addEventListener('change', (event) => {
-    state.slug = event.target.value
+/** Vincula el comportamiento del custom select (abrir/cerrar, teclado, búsqueda, selección). */
+function bindCustomSelect(form, onChange) {
+  const trigger = form.querySelector('#customSelectTrigger')
+  const dropdown = form.querySelector('#customSelectDropdown')
+  const optionsContainer = form.querySelector('#customSelectOptions')
+  const searchInput = form.querySelector('#customSelectDropdown .custom-select-search')
+  const nativeSelect = form.querySelector('#productSelect')
+  if (!trigger || !dropdown || !optionsContainer) return
+
+  let highlightedIndex = -1
+  let allOptions = []
+
+  // Inicializa la lista de opciones
+  function refreshOptionsList() {
+    allOptions = Array.from(optionsContainer.querySelectorAll('[role="option"]'))
+    highlightedIndex = -1
+  }
+
+  // Abre el dropdown
+  function openDropdown() {
+    dropdown.hidden = false
+    trigger.setAttribute('aria-expanded', 'true')
+    searchInput.value = ''
+    filterDropdownOptions('')
+    refreshOptionsList()
+    highlightOption(0)
+    searchInput.focus()
+    document.addEventListener('click', handleOutsideClick)
+    document.addEventListener('keydown', handleKeydown)
+  }
+
+  // Cierra el dropdown
+  function closeDropdown() {
+    dropdown.hidden = true
+    trigger.setAttribute('aria-expanded', 'false')
+    searchInput.value = ''
+    filterDropdownOptions('')
+    document.removeEventListener('click', handleOutsideClick)
+    document.removeEventListener('keydown', handleKeydown)
+    trigger.focus()
+  }
+
+  function toggleDropdown() {
+    if (dropdown.hidden) openDropdown()
+    else closeDropdown()
+  }
+
+  // Click fuera cierra
+  function handleOutsideClick(e) {
+    if (!form.contains(e.target)) closeDropdown()
+  }
+
+  // Navegación por teclado
+  function handleKeydown(e) {
+    const options = Array.from(optionsContainer.querySelectorAll('[role="option"]:not([hidden])'))
+    if (!options.length) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        highlightedIndex = Math.min(highlightedIndex + 1, options.length - 1)
+        highlightOption(highlightedIndex)
+        scrollIntoView(options[highlightedIndex])
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        highlightedIndex = Math.max(highlightedIndex - 1, 0)
+        highlightOption(highlightedIndex)
+        scrollIntoView(options[highlightedIndex])
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        if (highlightedIndex >= 0 && options[highlightedIndex]) {
+          selectOption(options[highlightedIndex])
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        closeDropdown()
+        break
+      case 'Tab':
+        closeDropdown()
+        break
+    }
+  }
+
+  function highlightIndex(idx) {
+    highlightedIndex = idx
+    refreshOptionsList()
+    const options = Array.from(optionsContainer.querySelectorAll('[role="option"]:not([hidden])'))
+    options.forEach((opt, i) => {
+      opt.classList.toggle('highlighted', i === highlightedIndex)
+      opt.setAttribute('aria-selected', i === highlightedIndex)
+    })
+  }
+
+  function highlightOption(idx) {
+    highlightIndex(idx)
+  }
+
+  function scrollIntoView(el) {
+    if (el) el.scrollIntoView({ block: 'nearest' })
+  }
+
+  // Filtra opciones del dropdown por texto de búsqueda
+  function filterDropdownOptions(query) {
+    const q = query.trim().toLowerCase()
+    const optionElements = optionsContainer.querySelectorAll('[role="option"]')
+    optionElements.forEach((opt) => {
+      const text = opt.textContent.toLowerCase()
+      const matches = !q || text.includes(q)
+      opt.hidden = !matches
+    })
+    refreshOptionsList()
+    highlightOption(0)
+  }
+
+  // Selecciona una opción
+  function selectOption(option) {
+    const value = option.dataset.value
+    const label = option.textContent.trim()
+    trigger.querySelector('.custom-select-value').textContent = label
+    trigger.setAttribute('aria-activedescendant', option.id)
+    // Sync native select
+    nativeSelect.value = value
+    // Sync state
+    state.slug = value
     syncURL()
+    closeDropdown()
     onChange()
+  }
+
+  function filterCustomSelectOptions(form, industry) {
+    const optionElements = form.querySelectorAll('#customSelectOptions [role="option"]')
+    optionElements.forEach((opt) => {
+      const optIndustry = opt.dataset.industry || ''
+      const matches = !industry || optIndustry === industry
+      opt.hidden = !matches
+    })
+    refreshOptionsList()
+    highlightOption(0)
+  }
+
+  function syncNativeSelect(form, industry) {
+    const nativeSelect = form.querySelector('#productSelect')
+    Array.from(nativeSelect.options).forEach((opt) => {
+      const optIndustry = opt.dataset.industry || ''
+      opt.hidden = industry && optIndustry !== industry
+    })
+    // Select first visible in native
+    const firstVisible = Array.from(nativeSelect.options).find((o) => !o.hidden)
+    if (firstVisible) nativeSelect.value = firstVisible.value
+  }
+
+  function selectFirstVisibleCustomOption(form) {
+    const optionsContainer = form.querySelector('#customSelectOptions')
+    const firstVisible = Array.from(optionsContainer.querySelectorAll('[role="option"]:not([hidden])'))[0]
+    if (firstVisible) selectOption(firstVisible)
+  }
+
+  // Event listeners
+  trigger.addEventListener('click', (e) => {
+    e.preventDefault()
+    toggleDropdown()
   })
+  trigger.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (dropdown.hidden) openDropdown()
+    }
+  })
+  searchInput.addEventListener('input', (e) => filterDropdownOptions(e.target.value))
+  searchInput.addEventListener('keydown', (e) => e.stopPropagation()) // Evita que Tab cierre al buscar
+  searchInput.addEventListener('click', (e) => e.stopPropagation())
+
+  // Delegación de click en opciones
+  optionsContainer.addEventListener('click', (e) => {
+    const option = e.target.closest('[role="option"]')
+    if (option && !option.hidden) selectOption(option)
+  })
+
+  refreshOptionsList()
 }
 
 /**
