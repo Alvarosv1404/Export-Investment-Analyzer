@@ -389,7 +389,6 @@ function bindControls(onChange) {
     })
   }
 }
-}
 
 /** Filtra opciones del custom select por industria (scope global). */
 function filterCustomSelectOptions(form, industry) {
