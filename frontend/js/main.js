@@ -358,9 +358,6 @@ function bindControls(onChange) {
     return
   }
 
-  return
-  }
-
   const form = document.getElementById('controlsForm')
   if (!form) return
 
