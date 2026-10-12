@@ -266,7 +266,6 @@ function renderControls() {
 
   return `${tabs}${form}`
 }
-}
 
 /** Inserta los controles que disparan una recarga suave. */
 function bindControls(onChange) {
