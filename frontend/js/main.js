@@ -117,10 +117,11 @@ function showError(message) {
 
 /** Mensaje de la vista de comparación cuando aún no hay productos marcados. */
 const EMPTY_COMPARISON = `
-  <div class="alert">
-    Aún no hay productos seleccionados. Marca uno o varios en el panel de arriba
-    para ver su ranking ("¿por cuál empezar?") y comparar su crecimiento
-    interanual y CAGR desde la base (2016, o el primer año en que exportaron).
+  <div class="alert comparison-empty">
+    <div class="comparison-empty-icon">📊</div>
+    <strong>Sin productos seleccionados</strong>
+    <p>Marca uno o varios productos en el panel <strong>"Elige los productos que quieres comparar"</strong> de arriba.<br>
+    La comparación y el ranking se actualizan automáticamente.</p>
   </div>`
 
 /**
@@ -358,19 +359,8 @@ function bindControls(onChange) {
       refreshComparison()
     })
 
-    // Asegurar que los clicks en el label también marquen el checkbox
-    comparisonForm.querySelectorAll('.compare-option').forEach((label) => {
-      const checkbox = label.querySelector('input[name="compareSlugs"]')
-      if (checkbox) {
-        label.addEventListener('click', (e) => {
-          // Si el click fue directo en el checkbox, no hacer nada extra
-          if (e.target === checkbox) return
-          // Toggle manual
-          checkbox.checked = !checkbox.checked
-          checkbox.dispatchEvent(new Event('change', { bubbles: true }))
-        })
-      }
-    })
+    // Comportamiento nativo label+checkbox: no necesita handler extra
+    // El listener 'change' en checkboxes ya llama a scheduleReload
 
     return
   }
