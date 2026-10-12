@@ -545,12 +545,15 @@ export function projectionChart(canvas, proj) {
     return f ? f.value : null
   })
 
-  // Conectar la ultima tendencia con la primera proyeccion para linea continua
-  if (trendData.length && forecastData.length) {
-    const lastTrendIdx = trendData.lastIndexOf(trendData.find(v => v !== null))
+  // Conectar el último dato histórico con la primera proyección para línea continua
+  // Esto hace que la proyección (roja punteada) salga visualmente desde el último punto real
+  if (histData.length && forecastData.length) {
+    const lastHistIdx = histData.lastIndexOf(histData.find(v => v !== null))
     const firstForecastIdx = forecastData.findIndex(v => v !== null)
-    if (lastTrendIdx >= 0 && firstForecastIdx >= 0 && labels[lastTrendIdx] === labels[firstForecastIdx]) {
-      forecastData[firstForecastIdx] = trendData[lastTrendIdx]
+    if (lastHistIdx >= 0 && firstForecastIdx >= 0) {
+      // El forecast empieza en el año siguiente al último histórico
+      // Para que se vea continuo, duplicamos el valor histórico en el primer forecast
+      forecastData[firstForecastIdx] = histData[lastHistIdx]
     }
   }
 

@@ -1,4 +1,4 @@
-﻿# Data organizada por producto e industria
+# Data organizada por producto e industria
 
 El catalogo se arma solo a partir de estas carpetas: no hace falta tocar codigo
 para sumar un producto. Hay dos formas de dejar la data, y se pueden mezclar.
@@ -12,7 +12,7 @@ data/
     081040 arandano fresco/
     ...
   Agroindustria/
-    151110 aceite palma crudo/
+    150420 aceite de pescado crudo/
     ...
   Pesquero/
     030743 pota calamar congelado/
@@ -52,6 +52,10 @@ Por producto se esperan 4 archivos Excel (nombres exactos):
 3. perus-exports-to-world-by-importer_<hs6>.xlsx - Exportaciones peruanas por socio destino (serie historica, valores USD Thousand)
 4. perus-exports-to-world-in-2025-by-importer_<hs6>.xlsx - Indicadores Peru 2025 por socio (Value kUSD, Quantity, Unit Value)
 
+Opcional para calcular la demanda importadora por destino:
+
+5. kg_importing-economies_<hs6>.xlsx - Cantidades importadas por pais y anio. La hoja debe tener columnas anuales y sus unidades (`<año>_unit`).
+
 ## Fuentes
 
 - Trade Map (ITC) - datos publicos de comercio internacional
@@ -63,6 +67,8 @@ Por producto se esperan 4 archivos Excel (nombres exactos):
 - El snapshot 2025 trae `Quantity` en toneladas (`Quantity Unit` = Tons); el
   pipeline la normaliza a kilos. El volumen solo existe en 2025: en los demas
   anos queda vacio, no en cero.
+- El Excel opcional de cantidades importadas se combina con `importing-economies_<hs6>.xlsx` por país y año. Las unidades Tons se convierten a kg; filas sin unidad compatible se dejan sin dato.
+- Las cantidades importadas describen la demanda total reportada por cada destino y no deben confundirse con las exportaciones peruanas a ese destino.
 - `reporterCd`/`partnerCd` son codigos M49; `partnerCd = 0` es el total "World".
 - La busqueda de archivos ignora cualquier carpeta `_cache`.
 
