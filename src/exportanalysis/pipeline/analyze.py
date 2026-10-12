@@ -226,7 +226,7 @@ def _analyze_product_uncached(
 
     # Datos 100% locales: Trade Map en Excel. La ventana de anos sale de los
     # anios que realmente trae el archivo, no de una funcion que asuma red.
-    trade = excel_analysis.peru_exports_trade(product.hs6)
+    trade = excel_analysis.peru_exports_trade(product.hs6, product.nandina)
     years = sorted(trade["year"].dropna().astype(int).unique().tolist())
     try:
         import_demand = market.import_demand_summary(

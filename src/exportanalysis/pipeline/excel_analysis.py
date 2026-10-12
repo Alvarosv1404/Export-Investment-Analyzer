@@ -9,6 +9,7 @@ Nombres de archivo esperados (exactos):
     2. importing-economies_<hs6>.xlsx                 importadores mundiales
     3. perus-exports-to-world-by-importer_<hs6>.xlsx  serie historica por destino (USD Thousand)
     4. perus-exports-to-world-in-2025-by-importer_<hs6>.xlsx  snapshot 2025 (Value kUSD, Quantity, Unit Value)
+    5. kg_importing-economies_<hs6>.xlsx                cantidades importadas por destino y anio
 """
 from __future__ import annotations
 
@@ -17,18 +18,32 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .._cache import read_excel_cached
 from ..config import DATA_DIR
+
+# Resolucion de rutas memoizada. Cada _find hacia DATA_DIR.rglob(), que camina
+# todo el arbol data/; en un analisis se llama una docena de veces. La data es
+# estatica, asi que la ruta de un (hs6, patron) no cambia. Solo se cachea el
+# acierto: un archivo que aun no existe se vuelve a buscar, para que agregarlo
+# después se descubra sin reiniciar el proceso.
+_find_cache: dict[tuple[str, str], Path] = {}
+_nandina_cache: dict[str, Path] = {}
 
 
 def _find(hs6: str, pattern: str) -> Path:
     """Busca un Excel por HS6 en data/, ignorando la carpeta de cache."""
+    key = (hs6, pattern)
+    cached = _find_cache.get(key)
+    if cached is not None:
+        return cached
     for p in DATA_DIR.rglob(pattern.format(hs6=hs6)):
         if "_cache" not in str(p):
+            _find_cache[key] = p
             return p
     raise FileNotFoundError(pattern.format(hs6=hs6))
 
 
-# Los cuatro Excel que Trade Map exporta por producto, con una etiqueta corta.
+# Los cuatro Excel base que Trade Map exporta por producto, con una etiqueta corta.
 TRADEMAP_FILES: dict[str, str] = {
     "exportadores": "exporting-economies_{hs6}.xlsx",
     "importadores": "importing-economies_{hs6}.xlsx",
@@ -64,8 +79,17 @@ def data_files_status(hs6: str, nandina: str | None = None) -> dict:
         "trademap": present,
         "trademap_count": sum(present.values()),
         "trademap_expected": len(TRADEMAP_FILES),
+        "importer_quantities": _has_import_quantities(hs6),
         "sunat": sunat,
     }
+
+
+def _has_import_quantities(hs6: str) -> bool:
+    try:
+        _find(hs6, "kg_importing-economies_{hs6}.xlsx")
+        return True
+    except FileNotFoundError:
+        return False
 
 
 def _year_columns(df: pd.DataFrame) -> list[str]:
@@ -80,7 +104,7 @@ def peru_exports_ts(hs6: str) -> pd.DataFrame:
     sumarla duplicaria el total. Para el total usa `peru_exports_trade`.
     """
     p = _find(hs6, "perus-exports-to-world-by-importer_{hs6}.xlsx")
-    df = pd.read_excel(p)
+    df = read_excel_cached(p)
     df = df[df["partnerLabel"] != "World"].copy()
     year_cols = _year_columns(df)
     df_m = pd.melt(
@@ -95,16 +119,17 @@ def peru_exports_ts(hs6: str) -> pd.DataFrame:
     return df_m[["year", "partnerCd", "partnerLabel", "fob_usd"]].dropna(subset=["fob_usd"])
 
 
-def peru_exports_trade(hs6: str) -> pd.DataFrame:
+def peru_exports_trade(hs6: str, nandina: str | None = None) -> pd.DataFrame:
     """Exportaciones peruanas por destino en formato compatible con `market.py`.
 
     Incluye la fila de total "World" (partner 0) porque los totales anuales y la
-    concentracion se calculan sobre ella. El volumen (`net_weight_kg`) solo
-    existe en el snapshot 2025 (Quantity, Tons); los demas anios quedan sin
-    volumen, que es un hueco real de la fuente, no un cero.
+    concentracion se calculan sobre ella. El volumen (`net_weight_kg`) viene de:
+      - Snapshot 2025 (Trade Map): para todos los destinos en 2025
+      - SUNAT (anual, ponderado por destino): para el total "World" en años históricos
+    Los años sin dato quedan en NaN (hueco real, no cero).
     """
     p = _find(hs6, "perus-exports-to-world-by-importer_{hs6}.xlsx")
-    df = pd.read_excel(p)
+    df = read_excel_cached(p)
     year_cols = _year_columns(df)
 
     df = df[["partnerCd", "partnerLabel", *year_cols]].copy()
@@ -124,7 +149,7 @@ def peru_exports_trade(hs6: str) -> pd.DataFrame:
     melted["fob_usd"] = pd.to_numeric(melted["fob_usd_thousand"], errors="coerce") * 1000.0
     melted["net_weight_kg"] = np.nan
 
-    # Volumen del ultimo anio (2025): el unico Excel que publica cantidad.
+    # 1) Volumen del snapshot 2025 (Trade Map): disponible para todos los destinos
     try:
         ind = peru_exports_indicators_2025(hs6, include_world=True)
         qty = {
@@ -137,6 +162,24 @@ def peru_exports_trade(hs6: str) -> pd.DataFrame:
     except (FileNotFoundError, KeyError, ValueError):
         pass
 
+    # 2) Volumen histórico del total "World" desde SUNAT (si está disponible)
+    if nandina:
+        try:
+            sunat_summary = sunat_annual_summary(nandina)
+            # Mapear year -> net_weight_kg para el total World
+            sunat_vol = {
+                int(row["year"]): float(row["net_weight_kg"])
+                for _, row in sunat_summary.iterrows()
+                if pd.notna(row["net_weight_kg"])
+            }
+            is_world = melted["is_world"]
+            for year, vol in sunat_vol.items():
+                mask = is_world & (melted["year"] == year)
+                if mask.any():
+                    melted.loc[mask, "net_weight_kg"] = vol
+        except (FileNotFoundError, KeyError, ValueError):
+            pass
+
     return (
         melted[["year", "partner_code", "partner_name", "is_world", "fob_usd", "net_weight_kg"]]
         .sort_values(["year", "fob_usd"], ascending=[True, False])
@@ -147,7 +190,7 @@ def peru_exports_trade(hs6: str) -> pd.DataFrame:
 def world_exports(hs6: str) -> pd.DataFrame:
     """Exportaciones por pais exportador (partner = World), serie historica."""
     p = _find(hs6, "exporting-economies_{hs6}.xlsx")
-    df = pd.read_excel(p)
+    df = read_excel_cached(p)
     year_cols = _year_columns(df)
     df_m = pd.melt(
         df,
@@ -164,7 +207,7 @@ def world_exports(hs6: str) -> pd.DataFrame:
 def world_imports(hs6: str) -> pd.DataFrame:
     """Importaciones por pais importador (partner = World), serie historica."""
     p = _find(hs6, "importing-economies_{hs6}.xlsx")
-    df = pd.read_excel(p)
+    df = read_excel_cached(p)
     year_cols = _year_columns(df)
     df_m = pd.melt(
         df,
@@ -178,6 +221,46 @@ def world_imports(hs6: str) -> pd.DataFrame:
     return df_m
 
 
+def world_import_quantities(hs6: str) -> pd.DataFrame:
+    """Cantidad importada por pais y anio, normalizada a kilos."""
+    p = _find(hs6, "kg_importing-economies_{hs6}.xlsx")
+    df = read_excel_cached(p)
+    reporter_code = pd.to_numeric(df["reporterCd"], errors="coerce")
+    partner_code = pd.to_numeric(df["partnerCd"], errors="coerce")
+    frame = df[(partner_code == 0) & (reporter_code != 0)].copy()
+    frame["reporter_code"] = reporter_code.loc[frame.index].astype("Int64")
+
+    rows: list[pd.DataFrame] = []
+    for column in df.columns:
+        year = str(column)
+        if not (len(year) == 4 and year.isdigit()):
+            continue
+
+        unit_column = f"{year}_unit"
+        if unit_column not in frame.columns:
+            continue
+        quantity = pd.to_numeric(frame[column], errors="coerce")
+        unit = frame[unit_column].astype(str).str.strip().str.lower()
+        factor = pd.Series(np.nan, index=frame.index, dtype=float)
+        factor.loc[unit.str.contains("ton", na=False)] = 1000.0
+        factor.loc[unit.str.contains(r"\bkg\b|kilogram", regex=True, na=False)] = 1.0
+
+        annual = pd.DataFrame(
+            {
+                "reporter_code": frame["reporter_code"],
+                "reporter_name": frame["reporterLabel"],
+                "year": int(year),
+                "quantity_kg": quantity * factor,
+            },
+            index=frame.index,
+        )
+        rows.append(annual)
+
+    if not rows:
+        return pd.DataFrame(columns=["reporter_code", "reporter_name", "year", "quantity_kg"])
+    return pd.concat(rows, ignore_index=True).dropna(subset=["quantity_kg"])
+
+
 def peru_exports_indicators_2025(hs6: str, *, include_world: bool = False) -> pd.DataFrame:
     """Snapshot 2025 por destino: Value (kUSD), Quantity, Unit Value.
 
@@ -186,7 +269,10 @@ def peru_exports_indicators_2025(hs6: str, *, include_world: bool = False) -> pd
     queda en la unidad original de la fuente.
     """
     p = _find(hs6, "perus-exports-to-world-in-2025-by-importer_{hs6}.xlsx")
-    df = pd.read_excel(p)
+    # copy() incondicional: abajo se reasigna partnerCd y se agregan columnas.
+    # Con el cache compartido, mutar el frame cacheado (caso include_world=True,
+    # que no filtra) corromperia la data de las siguientes llamadas.
+    df = read_excel_cached(p).copy()
     if not include_world:
         df = df[df["partnerLabel"] != "World"].copy()
     df["partnerCd"] = df["partnerCd"].astype(str).str.zfill(3)
@@ -223,10 +309,41 @@ def available_years(hs6: str) -> list[int]:
     return sorted(df["year"].dropna().astype(int).unique().tolist())
 
 
+def data_token(hs6: str, nandina: str | None = None) -> tuple:
+    """Huella de los archivos de un producto: (patron, mtime) de cada uno.
+
+    Sirve para invalidar caches derivados (p. ej. el analisis completo): si un
+    Excel cambia en data/, su mtime cambia, la huella cambia y lo que dependa de
+    ella se recalcula solo, sin reiniciar el proceso ni limpiar nada a mano.
+    `None` en el mtime significa que ese archivo no existe todavia.
+    """
+    parts: list = []
+    for pattern in TRADEMAP_FILES.values():
+        try:
+            parts.append((pattern, _find(hs6, pattern).stat().st_mtime_ns))
+        except FileNotFoundError:
+            parts.append((pattern, None))
+    quantity_pattern = "kg_importing-economies_{hs6}.xlsx"
+    try:
+        parts.append((quantity_pattern, _find(hs6, quantity_pattern).stat().st_mtime_ns))
+    except FileNotFoundError:
+        parts.append((quantity_pattern, None))
+    if nandina:
+        try:
+            parts.append(("sunat", _find_nandina_file(nandina).stat().st_mtime_ns))
+        except FileNotFoundError:
+            parts.append(("sunat", None))
+    return tuple(parts)
+
+
 def _find_nandina_file(nandina: str) -> Path:
     """Busca el Excel de SUNAT (hojas por anio) por partida NANDINA."""
+    cached = _nandina_cache.get(nandina)
+    if cached is not None:
+        return cached
     for p in DATA_DIR.rglob(f"{nandina}.xlsx"):
         if "_cache" not in str(p):
+            _nandina_cache[nandina] = p
             return p
     raise FileNotFoundError(f"{nandina}.xlsx")
 
@@ -256,7 +373,7 @@ def sunat_exports_by_nandina(nandina: str) -> pd.DataFrame:
         label = str(sheet).strip()
         if not (len(label) == 4 and label.isdigit()):
             continue
-        raw = pd.read_excel(xls, sheet_name=sheet)
+        raw = read_excel_cached(path, sheet_name=sheet)
         if raw.empty:
             continue
         partner_col = raw.columns[0]
