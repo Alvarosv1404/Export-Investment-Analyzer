@@ -117,11 +117,10 @@ function showError(message) {
 
 /** Mensaje de la vista de comparación cuando aún no hay productos marcados. */
 const EMPTY_COMPARISON = `
-  <div class="alert comparison-empty">
-    <div class="comparison-empty-icon">📊</div>
-    <strong>Sin productos seleccionados</strong>
-    <p>Marca uno o varios productos en el panel <strong>"Elige los productos que quieres comparar"</strong> de arriba.<br>
-    La comparación y el ranking se actualizan automáticamente.</p>
+  <div class="alert">
+    Aún no hay productos seleccionados. Marca uno o varios en el panel de arriba
+    para ver su ranking ("¿por cuál empezar?") y comparar su crecimiento
+    interanual y CAGR desde la base (2016, o el primer año en que exportaron).
   </div>`
 
 /**
@@ -162,24 +161,23 @@ async function refreshComparison() {
 /** Genera las opciones para el custom select (con role="option" y atributos necesarios). */
 function productOptionsForCustomSelect() {
   const option = (p, idx) =>
-    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)}</div>`
+    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})${p.industry ? `<span class="custom-select-option-industry">${escapeHTML(p.industry)}</span>` : ''}</div>`
   return state.products.map(option).join('')
 }
 
 /** Genera las opciones para el select nativo (fallback/form submission). */
 function productOptionsForNativeSelect() {
   const option = (p) =>
-    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)}</option>`
+    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</option>`
   return state.products.map(option).join('')
 }
 
 /** Genera el HTML del custom select para la vista de análisis. */
 function renderCustomSelect() {
   const selected = state.products.find(p => p.slug === state.slug) || state.products[0]
-  const selectedLabel = selected ? selected.name : 'Seleccionar producto'
+  const selectedLabel = selected ? `${selected.name} (HS ${selected.hs6})` : 'Seleccionar producto'
   const customOptionsHtml = productOptionsForCustomSelect()
   const nativeOptionsHtml = productOptionsForNativeSelect()
-  const showSearch = state.products.length > 20
 
   return `
     <div class="custom-select" id="customSelect" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-label="Producto para analizar">
@@ -189,10 +187,9 @@ function renderCustomSelect() {
         <svg class="custom-select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
       <div class="custom-select-dropdown" id="customSelectDropdown" role="listbox" hidden>
-        ${showSearch ? `
         <div class="custom-select-search-wrapper">
-          <input type="search" class="custom-select-search" placeholder="Buscar producto..." aria-label="Buscar en la lista" autocomplete="off">
-        </div>` : ''}
+          <input type="search" class="custom-select-search" placeholder="Buscar producto o HS..." aria-label="Buscar en la lista" autocomplete="off">
+        </div>
         <div class="custom-select-options" id="customSelectOptions" role="listbox">
           ${customOptionsHtml}
         </div>
@@ -286,14 +283,7 @@ function renderControls() {
 function bindControls(onChange) {
   document.querySelectorAll('.view-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
-      const newView = tab.dataset.view
-      // Aislar estado entre pestañas: limpiar estado irrelevante al cambiar
-      if (newView === 'analysis') {
-        state.compareSlugs = [] // Limpiar selección de comparación
-      } else if (newView === 'compare') {
-        // En comparación no necesitamos slug de análisis individual
-      }
-      state.view = newView
+      state.view = tab.dataset.view
       syncURL()
       onChange()
     })
@@ -365,10 +355,6 @@ function bindControls(onChange) {
       window.clearTimeout(reloadTimer)
       refreshComparison()
     })
-
-    // Comportamiento nativo label+checkbox: no necesita handler extra
-    // El listener 'change' en checkboxes ya llama a scheduleReload
-
     return
   }
 
@@ -397,31 +383,27 @@ function bindControls(onChange) {
   }
 }
 
-/** Filtra opciones del custom select por industria (scope global). */
 function filterCustomSelectOptions(form, industry) {
-  const optionElements = form.querySelectorAll('#customSelectOptions [role="option"]')
-  optionElements.forEach((opt) => {
-    const optIndustry = opt.dataset.industry || ''
-    const matches = !industry || optIndustry === industry
-    opt.hidden = !matches
+  const options = form.querySelectorAll('#customSelectOptions [role="option"]')
+  options.forEach((option) => {
+    const optionIndustry = option.dataset.industry || ''
+    option.hidden = Boolean(industry && optionIndustry !== industry)
   })
 }
 
-/** Sincroniza el select nativo oculto con el filtro de industria (scope global). */
 function syncNativeSelect(form, industry) {
   const nativeSelect = form.querySelector('#productSelect')
-  Array.from(nativeSelect.options).forEach((opt) => {
-    const optIndustry = opt.dataset.industry || ''
-    opt.hidden = industry && optIndustry !== industry
+  Array.from(nativeSelect.options).forEach((option) => {
+    const optionIndustry = option.dataset.industry || ''
+    option.hidden = Boolean(industry && optionIndustry !== industry)
   })
-  const firstVisible = Array.from(nativeSelect.options).find((o) => !o.hidden)
+  const firstVisible = Array.from(nativeSelect.options).find((option) => !option.hidden)
   if (firstVisible) nativeSelect.value = firstVisible.value
 }
 
-/** Selecciona la primera opción visible en el custom select (scope global). */
 function selectFirstVisibleCustomOption(form) {
   const optionsContainer = form.querySelector('#customSelectOptions')
-  const firstVisible = Array.from(optionsContainer.querySelectorAll('[role="option"]:not([hidden])'))[0]
+  const firstVisible = optionsContainer.querySelector('[role="option"]:not([hidden])')
   if (firstVisible) firstVisible.click()
 }
 
@@ -432,15 +414,12 @@ function bindCustomSelect(form, onChange) {
   const optionsContainer = form.querySelector('#customSelectOptions')
   const searchInput = form.querySelector('#customSelectDropdown .custom-select-search')
   const nativeSelect = form.querySelector('#productSelect')
-  const hasSearch = !!searchInput
   if (!trigger || !dropdown || !optionsContainer) return
 
   let highlightedIndex = -1
-  let allOptions = []
 
   // Inicializa la lista de opciones
   function refreshOptionsList() {
-    allOptions = Array.from(optionsContainer.querySelectorAll('[role="option"]'))
     highlightedIndex = -1
   }
 
@@ -448,19 +427,11 @@ function bindCustomSelect(form, onChange) {
   function openDropdown() {
     dropdown.hidden = false
     trigger.setAttribute('aria-expanded', 'true')
-    // Posicionar dropdown con position: fixed relativo al viewport
-    const rect = trigger.getBoundingClientRect()
-    dropdown.style.top = `${rect.bottom + 4}px`
-    dropdown.style.left = `${rect.left}px`
-    dropdown.style.width = `${rect.width}px`
-    if (hasSearch) {
-      searchInput.value = ''
-      filterDropdownOptions('')
-    }
+    searchInput.value = ''
+    filterDropdownOptions('')
     refreshOptionsList()
     highlightOption(0)
-    if (hasSearch) searchInput.focus()
-    else trigger.focus()
+    searchInput.focus()
     document.addEventListener('click', handleOutsideClick)
     document.addEventListener('keydown', handleKeydown)
   }
@@ -469,7 +440,7 @@ function bindCustomSelect(form, onChange) {
   function closeDropdown() {
     dropdown.hidden = true
     trigger.setAttribute('aria-expanded', 'false')
-    if (hasSearch) searchInput.value = ''
+    searchInput.value = ''
     filterDropdownOptions('')
     document.removeEventListener('click', handleOutsideClick)
     document.removeEventListener('keydown', handleKeydown)
@@ -523,7 +494,6 @@ function bindCustomSelect(form, onChange) {
 
   function highlightIndex(idx) {
     highlightedIndex = idx
-    refreshOptionsList()
     const options = Array.from(optionsContainer.querySelectorAll('[role="option"]:not([hidden])'))
     options.forEach((opt, i) => {
       opt.classList.toggle('highlighted', i === highlightedIndex)
@@ -548,7 +518,6 @@ function bindCustomSelect(form, onChange) {
       const matches = !q || text.includes(q)
       opt.hidden = !matches
     })
-    refreshOptionsList()
     highlightOption(0)
   }
 
@@ -790,7 +759,7 @@ function render(result) {
   renderAll(result)
   bindSimulator()
   bindShareYear(result)
-  bindProjectionMethod(result)
+  bindProjectionMethod()
 }
 
 /**
@@ -817,7 +786,7 @@ function bindShareYear(result) {
  * Selector de método de proyección. Cambiar el método recarga el análisis
  * desde la API con el nuevo parámetro, ya que el cálculo se hace en el backend.
  */
-function bindProjectionMethod(result) {
+function bindProjectionMethod() {
   const sel = document.getElementById('projectionMethod')
   if (!sel) return
   sel.addEventListener('change', async () => {

@@ -46,7 +46,7 @@ function table(headers, rows, className = '') {
 
 // --- Bloque 1: economia unitaria -------------------------------------------------
 export function unitEconomics(pricing) {
-  if (!pricing?.price_usd_per_kg) return ''
+  if (pricing?.price_usd_per_kg == null || !Number.isFinite(pricing.price_usd_per_kg)) return ''
   return `
     <section class="card">
       <h2>Precio FOB de referencia ${tagData}</h2>
@@ -142,8 +142,8 @@ export function marketShare(result, state) {
   )
 
   const peruNote = peru.in_top
-    ? `Perú está en el top ${s.top_n} (puesto #${peru.rank}) con ${(peru.share * 100).toFixed(2)}% del mercado mundial.`
-    : `Perú NO está en el top ${s.top_n}: ocupa el puesto #${peru.rank ?? 'N/D'} con ${(peru.share != null ? (peru.share * 100).toFixed(2) : 'N/D')}% del total mundial (${fullUSD(peru.value_usd)}).`
+    ? `Perú está en el top ${s.top_n} (puesto #${peru.rank}) con ${(peru.share != null && Number.isFinite(peru.share) ? (peru.share * 100).toFixed(2) : 'n/d')}% del mercado mundial.`
+    : `Perú NO está en el top ${s.top_n}: ocupa el puesto #${peru.rank ?? 'n/d'} con ${(peru.share != null && Number.isFinite(peru.share) ? (peru.share * 100).toFixed(2) : 'n/d')}% del total mundial (${fullUSD(peru.value_usd)}).`
 
   return `
     <section class="card">
@@ -172,14 +172,6 @@ export function projection(proj, state) {
   if (!proj.available) {
     return `<section class="card"><h2>2d. Proyección de exportación</h2><p class="note">${escapeHTML(proj.message || 'No hay suficientes datos para proyectar.')}</p></section>`
   }
-
-  const methodLabels = {
-    moving_average: 'Media móvil simple',
-    linear: 'Tendencia lineal',
-    quadratic: 'Tendencia cuadrática',
-    cagr: 'CAGR histórico',
-  }
-  const methodLabel = methodLabels[proj.method?.replace('media móvil simple', 'moving_average')] || proj.method || 'Desconocido'
 
   let note = ''
   let avgValue = ''
@@ -274,7 +266,7 @@ export function competitors(c) {
         <td class="num">${fullUSD(r.value_usd)}</td>
         <td class="num">${kg(r.volume_kg)}</td>
         <td class="num">${pct(r.share)}</td>
-        <td class="num">${r.unit_value_usd ? usd(r.unit_value_usd, 2) : 'n/d'}</td>
+        <td class="num">${r.unit_value_usd != null && Number.isFinite(r.unit_value_usd) ? usd(r.unit_value_usd, 2) : 'n/d'}</td>
       </tr>`
   )
   return `
@@ -311,7 +303,7 @@ export function headroom(h) {
         <td class="num">${pct(r.target_share)}</td>
         <td class="num">${pct(r.share_gap)} pp</td>
         <td class="num">${fullUSD(r.headroom_usd)}</td>
-        <td class="num">${r.headroom_kg ? kg(r.headroom_kg) : 'n/d'}</td>
+        <td class="num">${r.headroom_kg != null && Number.isFinite(r.headroom_kg) ? kg(r.headroom_kg) : 'n/d'}</td>
       </tr>`
   )
   return `
@@ -347,7 +339,7 @@ export function investment(inv) {
         <td class="num">${fullUSD(r.variable_costs_usd)}</td>
         <td class="num ${r.ebit_usd < 0 ? 'neg' : ''}">${fullUSD(r.ebit_usd)}</td>
         <td class="num">${pct(r.ebit_margin)}</td>
-        <td class="num ${(inv.cashflows[r.year] ?? 0) < 0 ? 'neg' : ''}">${fullUSD(inv.cashflows[r.year])}</td>
+        <td class="num">${fullUSD(inv.cashflows[r.year])}</td>
       </tr>`
   )
   const be = inv.breakeven || {}
@@ -370,7 +362,7 @@ export function investment(inv) {
         ${kpi('Inversión inicial', fullUSD(s.initial_outflow_usd))}
         ${kpi('ROI acumulado', s.roi_unlevered_pct !== null && s.roi_unlevered_pct !== undefined ? `${s.roi_unlevered_pct}%` : 'n/d')}
       </div>
-      <p class="note">El flujo usa el precio FOB calculado desde Excel y los supuestos operativos seleccionados. No se incluye capital de trabajo porque no se proporcionó ese dato.</p>
+      <p class="note">El flujo usa el precio FOB calculado desde Excel y los supuestos operativos seleccionados.</p>
       ${
         be.available
           ? `<p class="note">Punto de equilibrio: FOB mínimo <b>${usd(be.fob_price_floor_usd_per_kg)}</b>/kg,

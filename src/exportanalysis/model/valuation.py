@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import numpy as np
+
 from .financials import ProjectInputs, ProjectOutputs, build_cashflows
 
 
@@ -205,3 +207,99 @@ def _bisect(func, low: float, high: float, tolerance: float = 0.001, iterations:
         if high - low < tolerance:
             break
     return (low + high) / 2
+
+
+def run_monte_carlo(
+    inputs: ProjectInputs,
+    price_volatility: float,
+    variable_cost_volatility: float,
+    volume_volatility: float,
+    n_simulations: int = 2_000,
+    seed: int = 42,
+) -> dict:
+    """Simulación estocástica Monte Carlo de riesgo de inversión.
+
+    Las volatilidades son coeficientes de variación (fracciones entre 0 y 1)
+    ingresados por el usuario. Se muestrean variaciones independientes y
+    constantes para todo el horizonte; no se asume correlación entre variables.
+    """
+    volatilities = (price_volatility, variable_cost_volatility, volume_volatility)
+    if n_simulations <= 0:
+        raise ValueError("El número de simulaciones debe ser mayor que cero.")
+    if any(not 0 <= volatility <= 1 for volatility in volatilities):
+        raise ValueError("Las volatilidades deben estar entre 0 y 1.")
+
+    rng = np.random.default_rng(seed)
+
+    def factors(coefficient_of_variation: float) -> np.ndarray:
+        if coefficient_of_variation == 0:
+            return np.ones(n_simulations)
+        sigma = np.sqrt(np.log1p(coefficient_of_variation**2))
+        return rng.lognormal(-0.5 * sigma**2, sigma, n_simulations)
+
+    price_factors = factors(price_volatility)
+    variable_cost_factors = factors(variable_cost_volatility)
+    volume_factors = factors(volume_volatility)
+
+    npvs: list[float] = []
+    for i in range(n_simulations):
+        ramp = [min(1.0, max(0.0, u * volume_factors[i])) for u in inputs.utilization_ramp]
+        sim_input = _with(
+            inputs,
+            fob_price_usd_per_kg=inputs.fob_price_usd_per_kg * float(price_factors[i]),
+            purchase_cost_usd_per_kg=(
+                inputs.purchase_cost_usd_per_kg * float(variable_cost_factors[i])
+            ),
+            variable_cost_usd_per_kg=(
+                inputs.variable_cost_usd_per_kg * float(variable_cost_factors[i])
+            ),
+            utilization_ramp=ramp,
+        )
+        out = build_cashflows(sim_input)
+        npvs.append(out.npv)
+
+    arr = np.array(npvs)
+    loss_count = int(np.sum(arr < 0))
+    prob_loss = round((loss_count / n_simulations) * 100, 1)
+
+    counts, bin_edges = np.histogram(arr, bins=12)
+    histogram = []
+    for i in range(len(counts)):
+        b_start = round(float(bin_edges[i]), 1)
+        b_end = round(float(bin_edges[i + 1]), 1)
+        histogram.append(
+            {
+                "bin_start": b_start,
+                "bin_end": b_end,
+                "label": f"${b_start:,.0f} a ${b_end:,.0f}",
+                "count": int(counts[i]),
+                "is_negative": b_start < 0,
+            }
+        )
+
+    return {
+        "n_simulations": n_simulations,
+        "assumptions": {
+            "price_volatility_pct": round(price_volatility * 100, 2),
+            "variable_cost_volatility_pct": round(variable_cost_volatility * 100, 2),
+            "purchase_cost_volatility_pct": round(variable_cost_volatility * 100, 2),
+            "volume_volatility_pct": round(volume_volatility * 100, 2),
+            "distribution": "lognormal",
+            "independent_variables": True,
+        },
+        "prob_loss_pct": prob_loss,
+        "prob_profit_pct": round(100.0 - prob_loss, 1),
+        "npv_mean_usd": round(float(np.mean(arr)), 2),
+        "npv_median_usd": round(float(np.median(arr)), 2),
+        "npv_std_usd": round(float(np.std(arr)), 2),
+        "npv_p10_usd": round(float(np.percentile(arr, 10)), 2),
+        "npv_p90_usd": round(float(np.percentile(arr, 90)), 2),
+        "histogram": histogram,
+        "verdict": (
+            "Riesgo bajo"
+            if prob_loss < 15.0
+            else "Riesgo moderado"
+            if prob_loss < 35.0
+            else "Riesgo alto"
+        ),
+    }

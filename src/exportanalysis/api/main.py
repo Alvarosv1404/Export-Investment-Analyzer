@@ -311,47 +311,93 @@ def ranking(slugs: str = Query(default="", description="slugs separados por coma
 @app.get("/simple", response_class=HTMLResponse)
 def simple(request: Request, hs6: str = "081040", year: int = 2024):
     from ..pipeline import excel_analysis
+    import pandas as pd
+
     ts = excel_analysis.peru_exports_ts(hs6)
     y = ts[ts["year"] == year].copy()
-    if y.empty:
+    if y.empty and not ts.empty:
         year = int(ts["year"].max())
         y = ts[ts["year"] == year].copy()
+    if y.empty:
+        return templates.TemplateResponse(
+            request,
+            "simple.html",
+            {
+                "hs6": hs6,
+                "year": year,
+                "top": [],
+                "labels": [],
+                "values": [],
+                "error": "Sin datos de comercio para este HS6.",
+            },
+        )
     total = y["fob_usd"].sum()
-    y["share"] = y["fob_usd"] / total if total else 0
+    if total:
+        y = y.assign(share=y["fob_usd"] / total)
+    else:
+        y = y.assign(share=0.0)
     y = y.sort_values("fob_usd", ascending=False).head(15)
-    labels = y["partnerLabel"].tolist()
-    values = y["fob_usd"].tolist()
+    y_safe = y.where(pd.notna(y), None)
+    labels = [v for v in y_safe["partnerLabel"].tolist()]
+    values = [v for v in y_safe["fob_usd"].tolist()]
+    top = y_safe.to_dict("records")
     return templates.TemplateResponse(
         request,
         "simple.html",
         {
             "hs6": hs6,
             "year": year,
-            "top": y.to_dict("records"),
+            "top": top,
             "labels": labels,
             "values": values,
         },
     )
+
+
 @app.get("/explorar", response_class=HTMLResponse)
 def explorar(request: Request, hs6: str = "081040"):
     from ..pipeline import excel_analysis
+    import pandas as pd
+
     ts = excel_analysis.peru_exports_ts(hs6)
-    y2024 = ts[ts['year'] == 2024].copy()
-    total = y2024['fob_usd'].sum()
-    y2024['share'] = y2024['fob_usd'] / total if total else 0
-    y2024 = y2024.sort_values('fob_usd', ascending=False).head(20)
-    labels = y2024['partnerLabel'].tolist()
-    values = y2024['fob_usd'].tolist()
-    # trend total
-    trend = ts.groupby('year')['fob_usd'].sum().sort_index()
-    trend_labels = [str(x) for x in trend.index.tolist()]
-    trend_vals = trend.tolist()
+    if ts.empty:
+        return templates.TemplateResponse(
+            request,
+            "simple.html",
+            {
+                "hs6": hs6,
+                "top": [],
+                "labels": [],
+                "values": [],
+                "trend_labels": [],
+                "trend_vals": [],
+                "error": "Sin datos de comercio para este HS6.",
+            },
+        )
+    y2024 = ts[ts["year"] == 2024].copy()
+    if y2024.empty:
+        y2024 = ts[ts["year"] == ts["year"].max()].copy()
+    total = y2024["fob_usd"].sum() if not y2024.empty else 0
+    if not y2024.empty and total:
+        y2024 = y2024.assign(share=y2024["fob_usd"] / total)
+    elif not y2024.empty:
+        y2024 = y2024.assign(share=0.0)
+    if not y2024.empty:
+        y2024 = y2024.sort_values("fob_usd", ascending=False).head(20)
+    y2024_safe = y2024.where(pd.notna(y2024), None)
+    labels = [v for v in y2024_safe["partnerLabel"].tolist()]
+    values = [v for v in y2024_safe["fob_usd"].tolist()]
+    top = y2024_safe.to_dict("records")
+    trend = ts.groupby("year", dropna=True)["fob_usd"].sum().sort_index()
+    trend_safe = trend.where(pd.notna(trend), None)
+    trend_labels = [str(x) for x in trend_safe.index.tolist()]
+    trend_vals = [v for v in trend_safe.tolist()]
     return templates.TemplateResponse(
         request,
         "simple.html",
         {
             "hs6": hs6,
-            "top": y2024.to_dict('records'),
+            "top": top,
             "labels": labels,
             "values": values,
             "trend_labels": trend_labels,

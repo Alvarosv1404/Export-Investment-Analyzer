@@ -176,7 +176,7 @@ class Assumptions(BaseModel):
             base.update({k: v for k, v in override.model_dump().items() if v is not None})
         return base
 
-    def missing_for(self, slug: str) -> list[str]:
+    def missing_for(self, slug: str, overrides: dict[str, Any] | None = None) -> list[str]:
         """Supuestos numericos clave que le faltan a un producto (vacio = completo).
 
         Se expone para que el pipeline pueda degradar con un aviso en vez de
@@ -184,15 +184,19 @@ class Assumptions(BaseModel):
         no tiene supuestos, y eso no deberia impedir ver su analisis de mercado.
         """
         base = self.effective(slug)
+        if overrides:
+            base = {**base, **{k: v for k, v in overrides.items() if v is not None}}
         return [k for k in REQUIRED_ASSUMPTIONS if base.get(k) is None]
 
-    def for_product(self, slug: str) -> dict[str, Any]:
+    def for_product(self, slug: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
         """Supuestos efectivos de un producto: defaults + override del producto.
 
         Falla explicito si al producto le falta un supuesto numerico clave,
         en vez de propagar None y romper mas abajo con un error confuso.
         """
         base = self.effective(slug)
+        if overrides:
+            base = {**base, **{k: v for k, v in overrides.items() if v is not None}}
         missing = self.missing_for(slug)
         if missing:
             raise ValueError(

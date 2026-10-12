@@ -260,3 +260,94 @@ def default_target_share(hs6: str, reporter: int, competitors: list[int], step: 
     if not trends.get("available") or trends.get("origin_share") is None:
         return 0.05
     return round(min(0.95, trends["origin_share"] + step), 4)
+
+
+def world_share_by_year(hs6: str, reporter: int, top_n: int = 9) -> dict:
+    """Participación de mercado mundial por año: top N países + resto, destacando Perú."""
+    try:
+        world = excel_analysis.world_exports(hs6)
+    except FileNotFoundError:
+        return {"available": False, "message": "No hay datos de exportadores mundiales."}
+    if world.empty:
+        return {"available": False, "message": "Sin datos comparables entre los exportadores."}
+
+    world = world[world["partnerCd"].astype(int) == 0].copy()
+    if world.empty:
+        return {"available": False, "message": "Sin datos comparables entre los exportadores."}
+
+    world["country_code"] = world["reporterCd"].astype(int)
+    world = world.rename(columns={"reporterLabel": "country"})
+
+    grouped = (
+        world.groupby(["country_code", "country", "year"], as_index=False)
+        .agg(value_usd=("fob_usd", "sum"))
+    )
+    grouped["is_origin_country"] = grouped["country_code"] == reporter
+
+    years = sorted(grouped["year"].dropna().astype(int).unique().tolist())
+    if not years:
+        return {"available": False, "message": "Sin años con data."}
+
+    by_year_list = []
+    for year in years:
+        df_year = grouped[grouped["year"] == year].copy()
+        if df_year.empty:
+            continue
+        total_usd = float(df_year["value_usd"].sum()) if len(df_year) > 0 else 0.0
+        df_year["share"] = df_year["value_usd"] / total_usd if total_usd > 0 else 0.0
+        df_year = df_year.sort_values("value_usd", ascending=False).reset_index(drop=True)
+
+        slices = []
+        top = df_year.head(top_n).copy()
+        for _, row in top.iterrows():
+            slices.append(
+                {
+                    "label": row["country"],
+                    "country_code": int(row["country_code"]),
+                    "value_usd": float(row["value_usd"]),
+                    "share": float(row["share"]),
+                    "is_peru": bool(row["is_origin_country"]),
+                }
+            )
+
+        if len(df_year) > top_n:
+            rest_df = df_year.iloc[top_n:].copy()
+            rest_value = float(rest_df["value_usd"].sum())
+            rest_share = float(rest_df["share"].sum())
+            slices.append(
+                {
+                    "label": f"Resto ({len(rest_df)} países)",
+                    "country_code": None,
+                    "value_usd": rest_value,
+                    "share": rest_share,
+                    "is_peru": False,
+                }
+            )
+
+        peru_row = df_year[df_year["is_origin_country"]]
+        peru_info = {}
+        if not peru_row.empty:
+            peru_pos = int(peru_row.index[0] + 1)
+            peru_info = {
+                "in_top": peru_pos <= top_n,
+                "rank": peru_pos,
+                "share": float(peru_row["share"].iloc[0]),
+                "value_usd": float(peru_row["value_usd"].iloc[0]),
+            }
+
+        by_year_list.append(
+            {
+                "year": int(year),
+                "total_usd": total_usd,
+                "countries_with_data": int(len(df_year)),
+                "slices": slices,
+                "peru": peru_info,
+            }
+        )
+
+    return {
+        "available": True,
+        "years": years,
+        "by_year": by_year_list,
+        "top_n": top_n,
+    }
