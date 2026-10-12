@@ -389,6 +389,35 @@ function bindControls(onChange) {
     })
   }
 }
+}
+
+/** Filtra opciones del custom select por industria (scope global). */
+function filterCustomSelectOptions(form, industry) {
+  const optionElements = form.querySelectorAll('#customSelectOptions [role="option"]')
+  optionElements.forEach((opt) => {
+    const optIndustry = opt.dataset.industry || ''
+    const matches = !industry || optIndustry === industry
+    opt.hidden = !matches
+  })
+}
+
+/** Sincroniza el select nativo oculto con el filtro de industria (scope global). */
+function syncNativeSelect(form, industry) {
+  const nativeSelect = form.querySelector('#productSelect')
+  Array.from(nativeSelect.options).forEach((opt) => {
+    const optIndustry = opt.dataset.industry || ''
+    opt.hidden = industry && optIndustry !== industry
+  })
+  const firstVisible = Array.from(nativeSelect.options).find((o) => !o.hidden)
+  if (firstVisible) nativeSelect.value = firstVisible.value
+}
+
+/** Selecciona la primera opción visible en el custom select (scope global). */
+function selectFirstVisibleCustomOption(form) {
+  const optionsContainer = form.querySelector('#customSelectOptions')
+  const firstVisible = Array.from(optionsContainer.querySelectorAll('[role="option"]:not([hidden])'))[0]
+  if (firstVisible) firstVisible.click()
+}
 
 /** Vincula el comportamiento del custom select (abrir/cerrar, teclado, búsqueda, selección). */
 function bindCustomSelect(form, onChange) {
@@ -525,34 +554,6 @@ function bindCustomSelect(form, onChange) {
     syncURL()
     closeDropdown()
     onChange()
-  }
-
-  function filterCustomSelectOptions(form, industry) {
-    const optionElements = form.querySelectorAll('#customSelectOptions [role="option"]')
-    optionElements.forEach((opt) => {
-      const optIndustry = opt.dataset.industry || ''
-      const matches = !industry || optIndustry === industry
-      opt.hidden = !matches
-    })
-    refreshOptionsList()
-    highlightOption(0)
-  }
-
-  function syncNativeSelect(form, industry) {
-    const nativeSelect = form.querySelector('#productSelect')
-    Array.from(nativeSelect.options).forEach((opt) => {
-      const optIndustry = opt.dataset.industry || ''
-      opt.hidden = industry && optIndustry !== industry
-    })
-    // Select first visible in native
-    const firstVisible = Array.from(nativeSelect.options).find((o) => !o.hidden)
-    if (firstVisible) nativeSelect.value = firstVisible.value
-  }
-
-  function selectFirstVisibleCustomOption(form) {
-    const optionsContainer = form.querySelector('#customSelectOptions')
-    const firstVisible = Array.from(optionsContainer.querySelectorAll('[role="option"]:not([hidden])'))[0]
-    if (firstVisible) selectOption(firstVisible)
   }
 
   // Event listeners
