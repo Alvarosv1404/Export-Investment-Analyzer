@@ -67,8 +67,8 @@ export function series(canvas, m) {
         y1: {
           position: 'right',
           grid: { drawOnChartArea: false },
-          ticks: { callback: (v) => `${(v / 1e6).toFixed(0)}M kg` },
-          title: { display: true, text: 'Volumen' },
+          ticks: { callback: (v) => `${(v / 1e6).toFixed(0)} M kg` },
+          title: { display: true, text: 'Volumen (millones de kg)' },
         },
       },
     },
