@@ -147,7 +147,7 @@ products:
   - slug: aji_paprika
     name: Aji y paprika
     hs6: "090421"
-    nandina: "0904211000"
+    nandina: "0904211090"
     unit: kg
     industry: Agricola
     competitors: [156, 699, 724, 484, 764, 792]  # China, India, Espana, Mexico, Tailandia, Turquia
@@ -165,27 +165,6 @@ products:
     presentations:
       - {hs6: "091011", label: "Sin triturar ni pulverizar"}
       - {hs6: "091012", label: "Triturado o pulverizado"}
-
-  - slug: aceite_palma
-    name: Aceite de palma
-    hs6: "151110"
-    nandina: "1511100000"
-    unit: kg
-    industry: Agroindustria
-    competitors: [360, 458, 764, 566, 170, 320]  # Indonesia, Malasia, Tailandia, Nigeria, Colombia, Guatemala
-    presentations:
-      - {hs6: "151110", label: "Crudo"}
-      - {hs6: "151190", label: "Refinado"}
-
-  - slug: cochinilla_carmin
-    name: Cochinilla y carmin
-    hs6: "320300"
-    nandina: "3203001900"
-    unit: kg
-    industry: Agroindustria
-    competitors: [152, 484, 76, 724, 170]  # Chile, Mexico, Brasil, Espana, Colombia
-    presentations:
-      - {hs6: "320300", label: "Materias colorantes de origen animal o vegetal"}
 
   - slug: pota_calamar
     name: Pota y calamar
