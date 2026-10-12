@@ -158,30 +158,13 @@ async function refreshComparison() {
   }
 }
 
-/** Opciones de producto para el selector, agrupadas por industria (optgroup). */
+/** Opciones de producto para el selector (lista plana, sin optgroup).
+ * El filtro por industria se hace via chips arriba, no dentro del select. */
 function productOptions() {
-  const groups = new Map()
-  for (const p of state.products) {
-    const key = p.industry || ''
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(p)
-  }
   const option = (p) =>
     `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">` +
     `${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</option>`
-
-  // Sin industrias declaradas no tiene sentido envolver todo en un optgroup.
-  if (groups.size <= 1 && groups.has('')) {
-    return state.products.map(option).join('')
-  }
-  const label = (key) => key || 'Sin industria'
-  return [...groups.entries()]
-    .sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))
-    .map(
-      ([key, items]) =>
-        `<optgroup label="${escapeHTML(label(key))}">${items.map(option).join('')}</optgroup>`
-    )
-    .join('')
+  return state.products.map(option).join('')
 }
 
 /** Controles para analisis individual o comparacion de productos. */
