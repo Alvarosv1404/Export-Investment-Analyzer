@@ -286,7 +286,14 @@ function renderControls() {
 function bindControls(onChange) {
   document.querySelectorAll('.view-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
-      state.view = tab.dataset.view
+      const newView = tab.dataset.view
+      // Aislar estado entre pestañas: limpiar estado irrelevante al cambiar
+      if (newView === 'analysis') {
+        state.compareSlugs = [] // Limpiar selección de comparación
+      } else if (newView === 'compare') {
+        // En comparación no necesitamos slug de análisis individual
+      }
+      state.view = newView
       syncURL()
       onChange()
     })
@@ -441,6 +448,11 @@ function bindCustomSelect(form, onChange) {
   function openDropdown() {
     dropdown.hidden = false
     trigger.setAttribute('aria-expanded', 'true')
+    // Posicionar dropdown con position: fixed relativo al viewport
+    const rect = trigger.getBoundingClientRect()
+    dropdown.style.top = `${rect.bottom + 4}px`
+    dropdown.style.left = `${rect.left}px`
+    dropdown.style.width = `${rect.width}px`
     if (hasSearch) {
       searchInput.value = ''
       filterDropdownOptions('')
