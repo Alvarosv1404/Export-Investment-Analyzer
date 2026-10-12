@@ -54,7 +54,7 @@ defaults:
 
 products:
   - slug: cafe_verde
-    name: Cafe
+    name: Café verde
     hs6: "090111"
     nandina: "0901119000"
     unit: kg
