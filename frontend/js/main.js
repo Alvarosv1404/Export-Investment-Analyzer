@@ -357,6 +357,21 @@ function bindControls(onChange) {
       window.clearTimeout(reloadTimer)
       refreshComparison()
     })
+
+    // Asegurar que los clicks en el label también marquen el checkbox
+    comparisonForm.querySelectorAll('.compare-option').forEach((label) => {
+      const checkbox = label.querySelector('input[name="compareSlugs"]')
+      if (checkbox) {
+        label.addEventListener('click', (e) => {
+          // Si el click fue directo en el checkbox, no hacer nada extra
+          if (e.target === checkbox) return
+          // Toggle manual
+          checkbox.checked = !checkbox.checked
+          checkbox.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+      }
+    })
+
     return
   }
 
