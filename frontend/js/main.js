@@ -161,23 +161,24 @@ async function refreshComparison() {
 /** Genera las opciones para el custom select (con role="option" y atributos necesarios). */
 function productOptionsForCustomSelect() {
   const option = (p, idx) =>
-    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})${p.industry ? `<span class="custom-select-option-industry">${escapeHTML(p.industry)}</span>` : ''}</div>`
+    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)}</div>`
   return state.products.map(option).join('')
 }
 
 /** Genera las opciones para el select nativo (fallback/form submission). */
 function productOptionsForNativeSelect() {
   const option = (p) =>
-    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</option>`
+    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)}</option>`
   return state.products.map(option).join('')
 }
 
 /** Genera el HTML del custom select para la vista de análisis. */
 function renderCustomSelect() {
   const selected = state.products.find(p => p.slug === state.slug) || state.products[0]
-  const selectedLabel = selected ? `${selected.name} (HS ${selected.hs6})` : 'Seleccionar producto'
+  const selectedLabel = selected ? selected.name : 'Seleccionar producto'
   const customOptionsHtml = productOptionsForCustomSelect()
   const nativeOptionsHtml = productOptionsForNativeSelect()
+  const showSearch = state.products.length > 20
 
   return `
     <div class="custom-select" id="customSelect" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-label="Producto para analizar">
@@ -187,9 +188,10 @@ function renderCustomSelect() {
         <svg class="custom-select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
       <div class="custom-select-dropdown" id="customSelectDropdown" role="listbox" hidden>
+        ${showSearch ? `
         <div class="custom-select-search-wrapper">
-          <input type="search" class="custom-select-search" placeholder="Buscar producto o HS..." aria-label="Buscar en la lista" autocomplete="off">
-        </div>
+          <input type="search" class="custom-select-search" placeholder="Buscar producto..." aria-label="Buscar en la lista" autocomplete="off">
+        </div>` : ''}
         <div class="custom-select-options" id="customSelectOptions" role="listbox">
           ${customOptionsHtml}
         </div>
@@ -390,6 +392,7 @@ function bindCustomSelect(form, onChange) {
   const optionsContainer = form.querySelector('#customSelectOptions')
   const searchInput = form.querySelector('#customSelectDropdown .custom-select-search')
   const nativeSelect = form.querySelector('#productSelect')
+  const hasSearch = !!searchInput
   if (!trigger || !dropdown || !optionsContainer) return
 
   let highlightedIndex = -1
@@ -405,11 +408,14 @@ function bindCustomSelect(form, onChange) {
   function openDropdown() {
     dropdown.hidden = false
     trigger.setAttribute('aria-expanded', 'true')
-    searchInput.value = ''
-    filterDropdownOptions('')
+    if (hasSearch) {
+      searchInput.value = ''
+      filterDropdownOptions('')
+    }
     refreshOptionsList()
     highlightOption(0)
-    searchInput.focus()
+    if (hasSearch) searchInput.focus()
+    else trigger.focus()
     document.addEventListener('click', handleOutsideClick)
     document.addEventListener('keydown', handleKeydown)
   }
@@ -418,7 +424,7 @@ function bindCustomSelect(form, onChange) {
   function closeDropdown() {
     dropdown.hidden = true
     trigger.setAttribute('aria-expanded', 'false')
-    searchInput.value = ''
+    if (hasSearch) searchInput.value = ''
     filterDropdownOptions('')
     document.removeEventListener('click', handleOutsideClick)
     document.removeEventListener('keydown', handleKeydown)
