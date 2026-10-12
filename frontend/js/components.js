@@ -11,6 +11,7 @@
  * vienen de APIs externas, y un nombre con "<" romperia el DOM.
  */
 
+import { getExportUrl } from './api.js'
 import { fullUSD, kg, pct, pctSigned, usd, years, verdictClass } from './format.js'
 
 export function escapeHTML(value) {
@@ -44,21 +45,15 @@ function table(headers, rows, className = '') {
 }
 
 // --- Bloque 1: economia unitaria -------------------------------------------------
-export function unitEconomics(u) {
-  if (!u) return ''
-  const viable = u.is_viable
+export function unitEconomics(pricing) {
+  if (!pricing?.price_usd_per_kg) return ''
   return `
-    <section class="card ${viable ? '' : 'card-bad'}">
-      <h2>1. Economía unitaria
-        <span class="tag ${viable ? 'tag-ok' : 'tag-bad'}">${viable ? 'viable' : 'margen negativo'}</span>
-      </h2>
+    <section class="card">
+      <h2>Precio FOB de referencia ${tagData}</h2>
       <div class="kpis">
-        ${kpi('Precio FOB de mercado', usd(u.fob_price_usd_per_kg), 'Trade Map / input')}
-        ${kpi('Costo variable total', usd(u.total_variable_cost_usd_per_kg), 'supuesto tuyo')}
-        ${kpi('Margen bruto', usd(u.gross_margin_usd_per_kg), `${pct(u.gross_margin_pct)} por kilo`, viable ? '' : 'neg')}
-        ${kpi('Precio de equilibrio', usd(u.breakeven_fob_price_usd_per_kg), 'mínimo para no perder')}
+        ${kpi('Precio FOB calculado', usd(pricing.price_usd_per_kg), 'USD/kg')}
       </div>
-      ${(u.warnings || []).map((w) => `<div class="alert warn">${escapeHTML(w)}</div>`).join('')}
+      <p class="note">Calculado desde los Excel locales: ${escapeHTML(pricing.origin || 'fuente Excel')}.</p>
     </section>`
 }
 
@@ -68,20 +63,18 @@ export function missingAssumptions(result) {
   if (!missing || !missing.length) return ''
   return `
     <section class="card">
-      <h2>Modelo de inversión <span class="tag tag-assumed">faltan supuestos</span></h2>
+      <h2>Evaluación financiera <span class="tag tag-assumed">pendiente</span></h2>
       <div class="alert warn">
-        Este producto tiene datos de mercado, pero todavía no tiene supuestos de inversión
-        (capacidad, CAPEX, costos). Complétalos en <code>config/assumptions.yaml</code> bajo
-        <code>products.${escapeHTML(result.slug)}</code> para habilitar los bloques 1, 7 y 8.
-        Falta: ${missing.map((key) => `<code>${escapeHTML(key)}</code>`).join(', ')}.
+        El análisis de mercado está disponible. Completa los datos del formulario de evaluación
+        para calcular VAN, TIR, recuperación y flujo de caja. No se completan automáticamente
+        con cifras de ejemplo.
       </div>
-      <p class="note">El análisis de mercado de arriba (Trade Map / SUNAT) sí es real y no depende
-        de estos valores. La separación es la del resto del proyecto: datos vs. tus supuestos.</p>
+      <p class="note">Campos pendientes: ${missing.map((key) => `<code>${escapeHTML(key)}</code>`).join(', ')}.</p>
     </section>`
 }
 
 // --- Bloque 2: mercado -----------------------------------------------------------
-export function market(m) {
+export function market(m, demand) {
   if (!m || !m.available) {
     return `<section class="card"><div class="alert error">${escapeHTML(m?.message || 'Sin datos de mercado.')}</div></section>`
   }
@@ -89,15 +82,136 @@ export function market(m) {
     <section class="card">
       <h2>2. Mercado ${tagData}</h2>
       <div class="kpis">
-        ${kpi('Exportaciones FOB', fullUSD(m.latest_fob_usd), String(m.latest_year))}
-        ${kpi('Volumen', kg(m.latest_volume_kg), 'peso neto')}
-        ${kpi('Precio unitario', usd(m.latest_unit_value_usd), 'por kg, promedio ponderado')}
-        ${kpi('CAGR valor', pct(m.cagr_value), 'ventana analizada', m.cagr_value < 0 ? 'neg' : '')}
-        ${kpi('CAGR volumen', pct(m.cagr_volume), 'físico', m.cagr_volume < 0 ? 'neg' : '')}
-        ${kpi('CAGR precio', pctSigned(m.cagr_unit_value), 'efecto precio vs volumen', m.cagr_unit_value < 0 ? 'neg' : '')}
+        ${kpi('Exportaciones FOB de Perú', fullUSD(m.latest_fob_usd), String(m.latest_year))}
+        ${kpi(`Volumen exportado por Perú (${m.latest_year})`, kg(m.latest_volume_kg), 'peso neto')}
+        ${kpi('Precio unitario FOB de Perú', usd(m.latest_unit_value_usd), 'USD/kg')}
+        ${kpi('CAGR valor exportado', pct(m.cagr_value), 'serie FOB', m.cagr_value < 0 ? 'neg' : '')}
         ${kpi('Concentración top 5', pct(m.top5_concentration, 0), 'en 5 destinos')}
+        ${kpi('Índice HHI destinos', m.hhi ? `${m.hhi} pts` : 'n/d', m.hhi_category || 'concentración')}
       </div>
+      ${m.hhi_interpretation ? `<p class="note"><b>HHI (${escapeHTML(m.hhi_category)}):</b> ${escapeHTML(m.hhi_interpretation)}</p>` : ''}
       <div class="chart"><canvas id="chartSeries" height="90"></canvas></div>
+      ${
+        demand?.available
+          ? `<h3>Demanda de importación por destino (${demand.latest_year})</h3>
+             <p class="note">Importaciones de cada país desde todos sus proveedores. Valor CIF y cantidad vienen de los Excel de Trade Map; el precio unitario es CIF dividido entre kg y no representa el FOB peruano.</p>
+             <div class="table-scroll">${table(
+               [
+                 { label: 'País importador' },
+                 { label: 'Importaciones CIF', num: true },
+                 { label: 'Cantidad importada', num: true },
+                 { label: 'CIF/kg', num: true },
+                 { label: 'CAGR valor', num: true },
+                 { label: 'CAGR cantidad', num: true },
+               ],
+               demand.destinations.map((row) => `<tr>
+                 <td>${escapeHTML(row.country)}</td>
+                 <td class="num">${fullUSD(row.import_value_usd)}</td>
+                 <td class="num">${kg(row.import_quantity_kg)}</td>
+                 <td class="num">${usd(row.unit_value_usd_per_kg)}</td>
+                 <td class="num">${pct(row.cagr_value)}</td>
+                 <td class="num">${pct(row.cagr_quantity)}</td>
+               </tr>`)
+             )}</div>
+             <p class="note">CAGR calculado entre el primer y último año con cantidad y valor válidos; hay ${demand.destination_count} destinos con dato coincidente en ${demand.latest_year}.</p>`
+          : `<p class="note">No hay un Excel de cantidades importadas para calcular la demanda por destino de este producto.</p>`
+      }
+    </section>`
+}
+
+// --- Bloque 2c: participación de mercado mundial (gráfico circular + filtro de año) ---
+export function marketShare(result, state) {
+  const s = result?.share_by_year
+  if (!s || !s.available) return ''
+  const years = s.years || []
+  // El año mostrado vive en el estado (y en la URL), para que sea compartible.
+  const current = (state?.shareYear && years.includes(state.shareYear))
+    ? state.shareYear
+    : years[years.length - 1]
+  const yearData = s.by_year?.find((y) => y.year === current)
+  if (!yearData) return ''
+
+  const peru = yearData.peru || {}
+  const rows = yearData.slices.map(
+    (sl) => `
+      <tr class="${sl.is_peru ? 'hl' : ''}">
+        <td>${escapeHTML(sl.label)}</td>
+        <td class="num">${(sl.share * 100).toFixed(2)}%</td>
+        <td class="num">${fullUSD(sl.value_usd)}</td>
+      </tr>`
+  )
+
+  const peruNote = peru.in_top
+    ? `Perú está en el top ${s.top_n} (puesto #${peru.rank}) con ${(peru.share * 100).toFixed(2)}% del mercado mundial.`
+    : `Perú NO está en el top ${s.top_n}: ocupa el puesto #${peru.rank ?? 'N/D'} con ${(peru.share != null ? (peru.share * 100).toFixed(2) : 'N/D')}% del total mundial (${fullUSD(peru.value_usd)}).`
+
+  return `
+    <section class="card">
+      <h2>2c. Participación de mercado mundial ${tagData}
+        <span class="share-year-filter">
+          <label for="shareYear">Año</label>
+          <select id="shareYear" class="sim-select">
+            ${years.slice().reverse().map((y) => `<option value="${y}" ${y === current ? 'selected' : ''}>${y}</option>`).join('')}
+          </select>
+        </span>
+      </h2>
+      <p class="note">Reparto del mercado mundial de exportación entre los ${s.top_n} mayores países, el resto y Perú. Total ${yearData.year}: <b>${fullUSD(yearData.total_usd)}</b> entre ${yearData.countries_with_data} países con dato.</p>
+      <div class="share-grid">
+        <div class="chart"><canvas id="chartShare" height="260"></canvas></div>
+        <div class="share-table">
+          ${table([{ label: 'País exportador' }, { label: 'Share', num: true }, { label: 'Valor FOB', num: true }], rows)}
+        </div>
+      </div>
+      <p class="note"><b>Perú:</b> ${peruNote}</p>
+    </section>`
+}
+
+// --- Bloque 2d: proyección de exportación (media móvil) ---
+export function projection(proj, state) {
+  if (!proj) return ''
+  if (!proj.available) {
+    return `<section class="card"><h2>2d. Proyección de exportación</h2><p class="note">${escapeHTML(proj.message || 'No hay suficientes datos para proyectar.')}</p></section>`
+  }
+
+  const methodLabels = {
+    moving_average: 'Media móvil simple',
+    linear: 'Tendencia lineal',
+    quadratic: 'Tendencia cuadrática',
+    cagr: 'CAGR histórico',
+  }
+  const methodLabel = methodLabels[proj.method?.replace('media móvil simple', 'moving_average')] || proj.method || 'Desconocido'
+
+  let note = ''
+  let avgValue = ''
+  if (proj.method === 'moving_average' || proj.method === 'media móvil simple') {
+    note = `Media móvil simple de ${proj.window} años consecutivos aplicada al valor FOB histórico de Perú.`
+    avgValue = `Promedio móvil: <b>${fullUSD(proj.average_value)}</b>.`
+  } else if (proj.method === 'linear' || proj.method === 'quadratic') {
+    note = `Tendencia polinomial grado ${proj.degree} (R² = ${proj.r_squared ?? 'n/d'}) ajustada a la serie histórica.`
+    if (proj.equation) note += ` Ecuación: ${escapeHTML(proj.equation)}.`
+  } else if (proj.method?.startsWith('CAGR')) {
+    note = `Proyección por CAGR ${proj.cagr_pct ? proj.cagr_pct + '%' : 'histórico'} calculado sobre los últimos años disponibles.`
+  }
+  note += ` La línea <b>punteada</b> muestra los años siguientes (${proj.forecast_years?.join(', ') ?? ''}); es una proyección, no un dato observado.`
+
+  const fc = proj.forecast?.map((f) => fullUSD(f.value)).join(' → ') || ''
+
+  return `
+    <section class="card">
+      <h2>2d. Proyección de exportación ${tagAssumed}
+        <span class="projection-method-selector">
+          <label for="projectionMethod">Método:</label>
+          <select id="projectionMethod" class="sim-select">
+            <option value="moving_average" ${state?.projectionMethod === 'moving_average' ? 'selected' : ''}>Media móvil simple</option>
+            <option value="linear" ${state?.projectionMethod === 'linear' ? 'selected' : ''}>Tendencia lineal</option>
+            <option value="quadratic" ${state?.projectionMethod === 'quadratic' ? 'selected' : ''}>Tendencia cuadrática</option>
+            <option value="cagr" ${state?.projectionMethod === 'cagr' ? 'selected' : ''}>CAGR histórico</option>
+          </select>
+        </span>
+      </h2>
+      <p class="note">${note}</p>
+      <div class="chart chart-tall"><canvas id="chartProjection" height="280"></canvas></div>
+      <p class="note">Proyección anual FOB: <b>${fc}</b>. ${avgValue}</p>
     </section>`
 }
 
@@ -125,7 +239,7 @@ export function sunatPrice(result) {
         <b>${escapeHTML(s.nandina || '')}</b>, ponderado por destino. Más confiable que el unit
         value del snapshot cuando este trae la cantidad en otra unidad.</p>
       <div class="chart"><canvas id="chartSunatPrice" height="90"></canvas></div>
-      ${table(
+      <div class="table-scroll">${table(
         [
           { label: 'Año', num: true },
           { label: 'FOB SUNAT', num: true },
@@ -133,7 +247,7 @@ export function sunatPrice(result) {
           { label: 'USD/kg', num: true },
         ],
         rows
-      )}
+      )}</div>
     </section>`
 }
 
@@ -170,9 +284,10 @@ export function competitors(c) {
         ${kpi('Puesto de Perú', `#${c.origin_rank}`, `de ${c.origin_countries} con data`)}
         ${kpi('Participación', pct(c.origin_share), String(c.latest_year))}
         ${kpi('Tendencia', escapeHTML(c.share_trend), 'ganando o perdiendo share')}
+        ${kpi('HHI competidores', c.hhi ? `${c.hhi} pts` : 'n/d', c.hhi_category || '')}
       </div>
       ${c.coverage_warning ? `<div class="alert warn">${escapeHTML(c.coverage_warning)}</div>` : ''}
-      ${table(
+      <div class="table-scroll">${table(
         [
           { label: '#' },
           { label: 'País' },
@@ -182,7 +297,7 @@ export function competitors(c) {
           { label: 'Precio USD/kg', num: true },
         ],
         rows
-      )}
+      )}</div>
       <div class="chart"><canvas id="chartComp" height="90"></canvas></div>
     </section>`
 }
@@ -204,7 +319,7 @@ export function headroom(h) {
       <h2>5. Espacio de mercado ${tagData}</h2>
       <p class="note">TAM del año ${h.latest_year}: <b>${fullUSD(h.market_value_usd)}</b> entre los países
         comparados. Share actual de Perú: <b>${pct(h.current_share)}</b>.</p>
-      ${table(
+      <div class="table-scroll">${table(
         [
           { label: 'Share objetivo', num: true },
           { label: 'Brecha', num: true },
@@ -212,39 +327,9 @@ export function headroom(h) {
           { label: 'Volumen equivalente', num: true },
         ],
         rows
-      )}
+      )}</div>
       <p class="note">${escapeHTML(h.note)}</p>
       <div class="chart"><canvas id="chartLadder" height="90"></canvas></div>
-    </section>`
-}
-
-// --- Bloque 6: aranceles ---------------------------------------------------------
-export function tariffs(result) {
-  const l = result.landed_cost || {}
-  const rows = (result.tariffs || []).map(
-    (t) => `
-      <tr>
-        <td>${escapeHTML(t.destination_name)}</td>
-        <td class="num">${t.duty_pct !== null && t.duty_pct !== undefined ? `${t.duty_pct.toFixed(2)}%` : 'n/d'}</td>
-        <td>${t.is_estimated ? '<span class="muted">sin dato cargado</span>' : 'cargado'}</td>
-      </tr>`
-  )
-  return `
-    <section class="card">
-      <h2>6. Aranceles y costo puesto en destino ${tagAssumed}</h2>
-      ${rows.length ? table([{ label: 'Destino' }, { label: 'Arancel', num: true }, { label: 'Estado' }], rows) : ''}
-      ${
-        l.fob_usd_per_kg !== undefined
-          ? `<div class="kpis">
-              ${kpi('FOB', usd(l.fob_usd_per_kg))}
-              ${kpi('CIF (flete + seguro)', usd(l.cif_usd_per_kg))}
-              ${kpi('Arancel', usd(l.duty_usd_per_kg), `${(l.duty_pct ?? 0).toFixed(2)}%`)}
-              ${kpi('Costo en destino', usd(l.landed_usd_per_kg))}
-              ${kpi('Peso del arancel', pct(l.duty_share_of_landed), 'de la factura del importador')}
-            </div>`
-          : ''
-      }
-      <div class="alert warn">${escapeHTML(result.data_quality?.warning || '')}</div>
     </section>`
 }
 
@@ -267,29 +352,38 @@ export function investment(inv) {
   )
   const be = inv.breakeven || {}
   return `
-    <section class="card">
-      <h2>7. Decisión de inversión ${tagAssumed}</h2>
+    <section class="card financial-result-card">
+      <div class="financial-result-header">
+        <div>
+          <span class="evaluation-eyebrow">RESULTADO DEL MODELO</span>
+          <h2>Decisión de inversión</h2>
+        </div>
+        <span class="tag ${s.npv_usd >= 0 ? 'tag-ok' : 'tag-bad'}">${escapeHTML(v.label)}</span>
+      </div>
       <div class="${verdictClass(v.label)}">
-        <span class="verdict-label">${escapeHTML(v.label)}</span>
         <p>${escapeHTML(v.detail)}</p>
       </div>
-      <div class="kpis">
+      <div class="kpis financial-kpis">
         ${kpi('VAN', fullUSD(s.npv_usd), `al ${s.discount_rate_pct}%`, s.npv_usd < 0 ? 'neg' : '')}
         ${kpi('TIR', s.irr_pct !== null && s.irr_pct !== undefined ? `${s.irr_pct}%` : 'no existe')}
         ${kpi('Payback', s.payback_years !== null && s.payback_years !== undefined ? years(s.payback_years) : 'no se recupera')}
         ${kpi('Inversión inicial', fullUSD(s.initial_outflow_usd))}
+        ${kpi('ROI acumulado', s.roi_unlevered_pct !== null && s.roi_unlevered_pct !== undefined ? `${s.roi_unlevered_pct}%` : 'n/d')}
       </div>
-      <p class="note">Curva de ocupación: <code>${escapeHTML(JSON.stringify(inv.inputs.utilization_ramp))}</code>
-        &mdash; origen: <b>${escapeHTML(inv.ramp_source.source)}</b>. ${escapeHTML(inv.ramp_source.reason)}</p>
+      <p class="note">El flujo usa el precio FOB calculado desde Excel y los supuestos operativos seleccionados. No se incluye capital de trabajo porque no se proporcionó ese dato.</p>
       ${
         be.available
           ? `<p class="note">Punto de equilibrio: FOB mínimo <b>${usd(be.fob_price_floor_usd_per_kg)}</b>/kg,
              ocupación mínima <b>${pct(be.utilization_floor_pct / 100)}</b>.</p>`
           : ''
       }
-      <div class="chart"><canvas id="chartCash" height="90"></canvas></div>
-      <h3>Estado de resultados por año</h3>
-      ${table(
+      <div class="financial-panel">
+        <h3>Flujo de caja libre por año</h3>
+        <div class="chart"><canvas id="chartCash" height="100"></canvas></div>
+      </div>
+      <div class="financial-panel financial-table-panel">
+        <h3>Estado de resultados y caja por año</h3>
+        <div class="financial-table-scroll">${table(
         [
           { label: 'Año', num: true },
           { label: 'Volumen', num: true },
@@ -299,8 +393,10 @@ export function investment(inv) {
           { label: 'Margen', num: true },
           { label: 'FCF', num: true },
         ],
-        rows
-      )}
+        rows,
+        'financial-table'
+      )}</div>
+      </div>
     </section>`
 }
 
@@ -308,11 +404,59 @@ export function investment(inv) {
 export function sensitivity(inv) {
   if (!inv || !inv.sensitivity) return ''
   return `
-    <section class="card">
-      <h2>8. Sensibilidad ${tagAssumed}</h2>
-      <p class="note">Cada variable se mueve sola, una a la vez. El largo de la barra es cuánto mueve el VAN.</p>
+    <section class="card financial-sensitivity-card">
+      <div class="financial-result-header">
+        <div>
+          <span class="evaluation-eyebrow">ESCENARIOS DETERMINÍSTICOS</span>
+          <h2>Sensibilidad del VAN ${tagAssumed}</h2>
+        </div>
+      </div>
+      <p class="note">Cada supuesto varía por separado según los rangos de estrés configurados. No son probabilidades ni pronósticos.</p>
       <div class="chart chart-tall"><canvas id="chartSens" height="200"></canvas></div>
       <p class="note">VAN base: <b>${fullUSD(inv.sensitivity.base_npv_usd)}</b>.</p>
+    </section>`
+}
+
+export function monteCarloRisk(inv) {
+  const mc = inv?.monte_carlo
+  if (!mc || !mc.assumptions || mc.assumptions.variable_cost_volatility_pct === undefined) {
+    const message = mc
+      ? 'La API no identifica la volatilidad del costo variable total. Se oculta la probabilidad para no presentar resultados con supuestos incompletos; reinicia el backend para aplicar los cambios.'
+      : 'Pendiente de datos históricos de precio FOB, costo variable unitario y volumen. Sin esas series no se estiman volatilidades ni probabilidades, y no se dibuja una distribución ficticia.'
+    return `
+      <section class="card financial-monte-carlo-card">
+        <div class="financial-result-header">
+          <div>
+            <span class="evaluation-eyebrow">INCERTIDUMBRE EXPLÍCITA</span>
+            <h2>Distribución de riesgo (Monte Carlo)</h2>
+          </div>
+          <span class="tag tag-assumed">pendiente</span>
+        </div>
+        <p class="note">${escapeHTML(message)}</p>
+      </section>`
+  }
+  const assumptions = mc.assumptions
+  const lossPct = mc.prob_loss_pct
+  const riskClass = lossPct < 20 ? 'tag-ok' : lossPct > 40 ? 'tag-bad' : 'tag-assumed'
+  return `
+    <section class="card financial-monte-carlo-card">
+      <div class="financial-result-header">
+        <div>
+          <span class="evaluation-eyebrow">INCERTIDUMBRE EXPLÍCITA</span>
+          <h2>Distribución de riesgo (Monte Carlo)</h2>
+        </div>
+        <span class="tag ${riskClass}">${escapeHTML(mc.verdict)}</span>
+      </div>
+      <p class="note">${mc.n_simulations.toLocaleString('es-PE')} simulaciones con variaciones lognormales e independientes. Las volatilidades ingresadas son coeficientes de variación alrededor del caso base; cada variación se mantiene constante durante el horizonte.</p>
+      <div class="kpis financial-kpis">
+        ${kpi('Probabilidad de VAN negativo', `${lossPct}%`, 'en las simulaciones', lossPct > 40 ? 'neg' : '')}
+        ${kpi('Probabilidad de VAN positivo', `${mc.prob_profit_pct}%`, 'en las simulaciones')}
+        ${kpi('VAN medio simulado', fullUSD(mc.npv_mean_usd))}
+        ${kpi('VAN P10', fullUSD(mc.npv_p10_usd), 'percentil 10')}
+        ${kpi('VAN P90', fullUSD(mc.npv_p90_usd), 'percentil 90')}
+      </div>
+      <p class="sim-hint">Volatilidad precio: ${assumptions.price_volatility_pct}% · costo variable total: ${assumptions.variable_cost_volatility_pct}% · volumen: ${assumptions.volume_volatility_pct}% · sin correlación asumida.</p>
+      <div class="chart"><canvas id="chartMonteCarlo" height="100"></canvas></div>
     </section>`
 }
 
@@ -485,13 +629,10 @@ function metricValue(key, value) {
 function readinessChips(r) {
   const tm = `<span class="chip ${r.trademap_count === r.trademap_expected ? 'chip-ok' : 'chip-warn'}">Trade Map ${r.trademap_count}/${r.trademap_expected}</span>`
   const sunat = r.sunat ? '<span class="chip chip-ok">SUNAT</span>' : '<span class="chip chip-off">sin SUNAT</span>'
-  const tariff = r.tariffs_known
-    ? `<span class="chip chip-ok">arancel ${r.tariffs_known}/${r.tariffs_total}</span>`
-    : '<span class="chip chip-off">sin arancel</span>'
   const assumed = r.assumptions_verified
     ? '<span class="chip chip-ok">supuestos verificados</span>'
-    : '<span class="chip chip-warn">supuestos de ejemplo</span>'
-  return `<span class="chips">${tm}${sunat}${tariff}${assumed}</span>`
+    : '<span class="chip chip-warn">supuestos pendientes</span>'
+  return `<span class="chips">${tm}${sunat}${assumed}</span>`
 }
 
 export function ranking(data) {
@@ -581,10 +722,140 @@ export function sources(result) {
       <h3>Procedencia de los datos</h3>
       <ul class="sources">
         <li><b>Mercado y competencia:</b> ${escapeHTML(q.market_data_source)}. Años con data: ${escapeHTML(JSON.stringify(q.years_with_data))}.</li>
-        <li><b>Aranceles:</b> ${escapeHTML(q.tariff_source)}.</li>
         <li><b>Supuestos financieros:</b> ${escapeHTML(q.assumptions_source)}. No provienen de ninguna API.</li>
       </ul>
       <p class="note">Lo marcado ${tagData} viene de una fuente oficial. Lo marcado ${tagAssumed} lo defines tú.
         La distinción es deliberada: confundir ambos es el error más común en este tipo de análisis.</p>
+    </section>`
+}
+
+// --- Comparativa por perfil de escala -----------------------------------------
+export function scaleProfiles(scales, currentProfile = 'mediana') {
+  if (!scales || !scales.length) return ''
+  const rows = scales.map(
+    (s) => `
+      <tr class="${s.profile === currentProfile ? 'hl' : ''}">
+        <td><b>${escapeHTML(s.label)}</b><br><small class="muted">${escapeHTML(s.description)}</small></td>
+        <td class="num">${kg(s.capacity_kg_year)}</td>
+        <td class="num">${fullUSD(s.capex_usd)}</td>
+        <td class="num">${usd(s.variable_cost_usd_per_kg)}</td>
+        <td class="num ${s.npv_usd < 0 ? 'neg' : ''}"><b>${fullUSD(s.npv_usd)}</b></td>
+        <td class="num">${s.irr_pct !== null && s.irr_pct !== undefined ? `${s.irr_pct}%` : 'N/D'}</td>
+        <td class="num">${s.payback_years !== null && s.payback_years !== undefined ? years(s.payback_years) : 'No recupera'}</td>
+      </tr>`
+  )
+  return `
+    <section class="card">
+      <h2>7b. Perfiles de Escala de Inversión ${tagAssumed}</h2>
+      <p class="note">Compara la viabilidad según el tamaño del inversionista (desde maquila / piloto hasta planta industrial completa).</p>
+      ${table(
+        [
+          { label: 'Perfil de Escala' },
+          { label: 'Capacidad/Año', num: true },
+          { label: 'CAPEX', num: true },
+          { label: 'Costo Var./kg', num: true },
+          { label: 'VAN', num: true },
+          { label: 'TIR', num: true },
+          { label: 'Payback', num: true },
+        ],
+        rows
+      )}
+    </section>`
+}
+
+function hasFinancialInputs(state) {
+  return [
+    state.year1Volume,
+    state.annualGrowth,
+    state.variableCost,
+    state.capex,
+    state.opex,
+    state.discountRate,
+  ].every((value) => value !== undefined && value !== '')
+}
+
+// --- Panel del Simulador Interactivo y Exportación ----------------------------
+export function simulatorPanel(result, state) {
+  const pricing = result?.pricing || {}
+  const slug = result?.slug || ''
+  const year1VolumeVal = state.year1Volume || ''
+  const growthVal = state.annualGrowth || ''
+  const varVal = state.variableCost || ''
+  const capexVal = state.capex || ''
+  const opexVal = state.opex || ''
+  const waccVal = state.discountRate || ''
+  const hasInputs = hasFinancialInputs(state)
+  const waccFraction = waccVal === '' ? '' : Number(waccVal) / 100
+  const field = (id, label, fieldValue, { min = '0', step = '0.01', max = '', hint = '' } = {}) => {
+    const current = Number(fieldValue)
+    const rangeMax = max
+      ? String(Math.max(Number(max), current || 0))
+      : String(Math.max(current * 2, current + 100, Number(min) + 100))
+    const formattedValue = fieldValue === ''
+      ? 'Por definir'
+      : new Intl.NumberFormat('en-US', {
+        maximumFractionDigits: step.includes('.') ? step.split('.')[1].length : 0,
+      }).format(current)
+    return `
+      <div class="sim-group">
+        <div class="sim-field-head">
+          <label for="${id}">${label}</label>
+          <output class="sim-value" id="${id}Value" for="${id}" aria-live="polite">${escapeHTML(formattedValue)}</output>
+        </div>
+        <input type="range" id="${id}" data-configured="${fieldValue !== ''}" aria-label="${label}" min="${min}" max="${rangeMax}" step="${step}" value="${escapeHTML(fieldValue || 0)}" class="sim-range" />
+        ${hint ? `<span class="sim-hint">${hint}</span>` : ''}
+      </div>`
+  }
+
+  const exportUrl = getExportUrl(slug, {
+    year1Volume: year1VolumeVal,
+    annualGrowth: growthVal,
+    variableCost: varVal,
+    capex: capexVal,
+    opex: opexVal,
+    discountRate: waccFraction,
+  })
+
+  return `
+    <section class="card simulator-card">
+      <div class="simulator-header">
+        <div>
+          <span class="evaluation-eyebrow">EVALUACIÓN DEL PROYECTO</span>
+          <h2>Evaluación financiera del proyecto</h2>
+          <p class="note">El precio FOB se calcula desde los Excel disponibles. Los demás valores se dejan pendientes hasta que los definas con información de tu operación; no se precargan cifras ilustrativas.</p>
+        </div>
+        <div class="simulator-actions">
+          <a href="${exportUrl}" class="btn btn-export" target="_blank" download>
+            Exportar dossier Excel
+          </a>
+          <button type="button" class="btn btn-secondary" onclick="window.print()">
+            Imprimir / guardar PDF
+          </button>
+        </div>
+      </div>
+
+      <form id="simulatorForm" class="simulator-grid">
+        <div class="simulator-section">
+          <h3>Supuestos de operación e inversión</h3>
+          <div class="simulator-price-reference">
+            <span class="kpi-label">Precio FOB calculado desde Excel</span>
+            <strong>${pricing.price_usd_per_kg ? `${usd(pricing.price_usd_per_kg)} / kg` : 'Sin dato disponible'}</strong>
+            <span class="kpi-note">${escapeHTML(pricing.origin || 'Se necesita un Excel con valor y cantidad.')}</span>
+          </div>
+          <div class="simulator-fields">
+            ${field('simCapex', 'Inversión inicial (USD)', capexVal, { max: '2500000', step: '1000' })}
+            ${field('simVar', 'Costo variable total por kg (compra + proceso)', varVal, { max: '100', step: '0.01' })}
+            ${field('simYear1Volume', 'Volumen del año 1 (kg)', year1VolumeVal, { max: '1000000', step: '100' })}
+            ${field('simAnnualGrowth', 'Crecimiento del volumen (%)', growthVal, { min: '-100', max: '100', step: '0.1' })}
+            ${field('simOpex', 'Costos fijos del año 1 (USD)', opexVal, { max: '300000', step: '100' })}
+            ${field('simWacc', 'COK / tasa de descuento (%)', waccVal, { max: '100', step: '0.1' })}
+          </div>
+        </div>
+
+        <div class="sim-footer">
+          <span class="evaluation-status" id="evaluationStatus" aria-live="polite">${hasInputs ? 'Supuestos cargados.' : 'Selecciona los supuestos de operación para calcular VAN, TIR y flujos.'}</span>
+          <button type="button" id="simReset" class="text-btn">Limpiar supuestos</button>
+        </div>
+      </form>
     </section>`
 }

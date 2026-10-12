@@ -13,13 +13,14 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ..config import load_catalog
 from ..pipeline import comparison, screener
 from ..pipeline.analyze import analyze_product
+from .dossier import generate_excel_dossier
 
 log = logging.getLogger(__name__)
 
@@ -95,18 +96,39 @@ def analysis(
     slug: str,
     target_share: float | None = Query(default=None, ge=0.0, le=1.0),
     price_usd_per_kg: float | None = Query(default=None, gt=0.0),
+    capacity_kg_year: float | None = Query(default=None, gt=0.0),
+    year1_volume_kg: float | None = Query(default=None, gt=0.0),
+    annual_volume_growth_pct: float | None = Query(default=None, ge=-100.0, le=1000.0),
+    purchase_cost_usd_per_kg: float | None = Query(default=None, ge=0.0),
+    variable_cost_usd_per_kg: float | None = Query(default=None, ge=0.0),
+    capex_usd: float | None = Query(default=None, ge=0.0),
+    opex_fixed_usd_year: float | None = Query(default=None, ge=0.0),
+    working_capital_usd: float | None = Query(default=None, ge=0.0),
+    discount_rate: float | None = Query(default=None, ge=0.0, le=1.0),
+    price_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    purchase_cost_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    volume_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    projection_method: str = Query(default="moving_average", pattern="^(moving_average|linear|quadratic|cagr)$"),
 ) -> JSONResponse:
-    """Analisis completo de un producto.
-
-    target_share: participacion de mercado objetivo. Opcional; si se omite se
-    deriva como "share actual + 2 pp".
-
-    price_usd_per_kg: precio FOB de venta. Opcional; si se omite se calcula de
-    los historicos y, en ultimo caso, del unit value del Excel.
-    """
+    """Análisis de mercado y evaluación financiera con supuestos ingresados."""
     try:
         result = analyze_product(
-            slug, target_share=target_share, price_usd_per_kg=price_usd_per_kg
+            slug,
+            target_share=target_share,
+            price_usd_per_kg=price_usd_per_kg,
+            capacity_kg_year=capacity_kg_year,
+            year1_volume_kg=year1_volume_kg,
+            annual_volume_growth_pct=annual_volume_growth_pct,
+            purchase_cost_usd_per_kg=purchase_cost_usd_per_kg,
+            variable_cost_usd_per_kg=variable_cost_usd_per_kg,
+            capex_usd=capex_usd,
+            opex_fixed_usd_year=opex_fixed_usd_year,
+            working_capital_usd=working_capital_usd,
+            discount_rate=discount_rate,
+            price_volatility_pct=price_volatility_pct,
+            purchase_cost_volatility_pct=purchase_cost_volatility_pct,
+            volume_volatility_pct=volume_volatility_pct,
+            projection_method=projection_method,
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -116,12 +138,77 @@ def analysis(
     return JSONResponse(content=_json_safe(result))
 
 
+@app.get("/api/analysis/{slug}/export/excel")
+def export_excel(
+    slug: str,
+    target_share: float | None = Query(default=None, ge=0.0, le=1.0),
+    price_usd_per_kg: float | None = Query(default=None, gt=0.0),
+    capacity_kg_year: float | None = Query(default=None, gt=0.0),
+    year1_volume_kg: float | None = Query(default=None, gt=0.0),
+    annual_volume_growth_pct: float | None = Query(default=None, ge=-100.0, le=1000.0),
+    purchase_cost_usd_per_kg: float | None = Query(default=None, ge=0.0),
+    variable_cost_usd_per_kg: float | None = Query(default=None, ge=0.0),
+    capex_usd: float | None = Query(default=None, ge=0.0),
+    opex_fixed_usd_year: float | None = Query(default=None, ge=0.0),
+    working_capital_usd: float | None = Query(default=None, ge=0.0),
+    discount_rate: float | None = Query(default=None, ge=0.0, le=1.0),
+    price_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    purchase_cost_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    volume_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    projection_method: str = Query(default="moving_average", pattern="^(moving_average|linear|quadratic|cagr)$"),
+) -> Response:
+    """Descarga el Dossier Ejecutivo completo en formato Excel (.xlsx)."""
+    try:
+        result = analyze_product(
+            slug,
+            target_share=target_share,
+            price_usd_per_kg=price_usd_per_kg,
+            capacity_kg_year=capacity_kg_year,
+            year1_volume_kg=year1_volume_kg,
+            annual_volume_growth_pct=annual_volume_growth_pct,
+            purchase_cost_usd_per_kg=purchase_cost_usd_per_kg,
+            variable_cost_usd_per_kg=variable_cost_usd_per_kg,
+            capex_usd=capex_usd,
+            opex_fixed_usd_year=opex_fixed_usd_year,
+            working_capital_usd=working_capital_usd,
+            discount_rate=discount_rate,
+            price_volatility_pct=price_volatility_pct,
+            purchase_cost_volatility_pct=purchase_cost_volatility_pct,
+            volume_volatility_pct=volume_volatility_pct,
+            projection_method=projection_method,
+        )
+        stream = generate_excel_dossier(result)
+        filename = f"dossier_exportacion_{slug}.xlsx"
+        return Response(
+            content=stream.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(
     request: Request,
     slug: str | None = None,
-    target_share: float | None = None,
-    price_usd_per_kg: float | None = None,
+    target_share: float | None = Query(default=None, ge=0.0, le=1.0),
+    price_usd_per_kg: float | None = Query(default=None, gt=0.0),
+    capacity_kg_year: float | None = Query(default=None, gt=0.0),
+    year1_volume_kg: float | None = Query(default=None, gt=0.0),
+    annual_volume_growth_pct: float | None = Query(default=None, ge=-100.0, le=1000.0),
+    purchase_cost_usd_per_kg: float | None = Query(default=None, ge=0.0),
+    variable_cost_usd_per_kg: float | None = Query(default=None, ge=0.0),
+    capex_usd: float | None = Query(default=None, ge=0.0),
+    opex_fixed_usd_year: float | None = Query(default=None, ge=0.0),
+    working_capital_usd: float | None = Query(default=None, ge=0.0),
+    discount_rate: float | None = Query(default=None, ge=0.0, le=1.0),
+    price_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    purchase_cost_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    volume_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    projection_method: str = Query(default="moving_average", pattern="^(moving_average|linear|quadratic|cagr)$"),
 ):
     """Sirve el frontend.
 
@@ -149,7 +236,22 @@ def index(
     if selected_slug:
         try:
             analysis_result = analyze_product(
-                selected_slug, target_share=target_share, price_usd_per_kg=price_usd_per_kg
+                selected_slug,
+                target_share=target_share,
+                price_usd_per_kg=price_usd_per_kg,
+                capacity_kg_year=capacity_kg_year,
+                year1_volume_kg=year1_volume_kg,
+                annual_volume_growth_pct=annual_volume_growth_pct,
+                purchase_cost_usd_per_kg=purchase_cost_usd_per_kg,
+                variable_cost_usd_per_kg=variable_cost_usd_per_kg,
+                capex_usd=capex_usd,
+                opex_fixed_usd_year=opex_fixed_usd_year,
+                working_capital_usd=working_capital_usd,
+                discount_rate=discount_rate,
+                price_volatility_pct=price_volatility_pct,
+                purchase_cost_volatility_pct=purchase_cost_volatility_pct,
+                volume_volatility_pct=volume_volatility_pct,
+                projection_method=projection_method,
             )
         except (KeyError, ValueError) as exc:
             error = str(exc)
@@ -166,6 +268,21 @@ def index(
             "error": error,
             "target_share": target_share,
             "price_usd_per_kg": price_usd_per_kg,
+            "financial_inputs": {
+                "capacity_kg_year": capacity_kg_year,
+                "year1_volume_kg": year1_volume_kg,
+                "annual_volume_growth_pct": annual_volume_growth_pct,
+                "purchase_cost_usd_per_kg": purchase_cost_usd_per_kg,
+                "variable_cost_usd_per_kg": variable_cost_usd_per_kg,
+                "capex_usd": capex_usd,
+                "opex_fixed_usd_year": opex_fixed_usd_year,
+                "working_capital_usd": working_capital_usd,
+                "discount_rate": discount_rate,
+                "price_volatility_pct": price_volatility_pct,
+                "purchase_cost_volatility_pct": purchase_cost_volatility_pct,
+                "volume_volatility_pct": volume_volatility_pct,
+                "projection_method": projection_method,
+            },
         },
     )
 @app.get("/api/comparison")

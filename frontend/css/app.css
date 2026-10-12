@@ -2,6 +2,7 @@
    Un solo archivo, sin framework. La pagina es un reporte: la tipografia y el
    espacio en blanco hacen mas trabajo que cualquier libreria. */
 
+/* Tema claro del reporte. */
 :root {
   --ink: #0f172a;
   --ink-soft: #475569;
@@ -68,7 +69,7 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   gap: 0.35rem;
   padding: 0.3rem;
   margin-bottom: 0.75rem;
-  background: #e2e8f0;
+  background: var(--line);
   border-radius: 8px;
 }
 .view-tab {
@@ -142,6 +143,11 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   transition: background-color .12s, border-color .12s, box-shadow .12s;
 }
 .compare-option:hover { border-color: #94a3b8; background: #f8fafc; }
+/* El filtro oculta opciones con el atributo `hidden`, pero .compare-option fija
+   `display: flex`, y una regla de autor gana sobre el `[hidden]` del navegador.
+   Sin esta regla el filtro por industria/búsqueda marcaba hidden y no ocultaba
+   nada. El selector [hidden] sube la especificidad para imponer display: none. */
+.compare-option[hidden] { display: none; }
 .compare-option:has(input:checked) {
   border-color: var(--data);
   background: #eff6ff;
@@ -178,17 +184,169 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
 .share-hint { font-size: 0.78rem; color: var(--ink-faint); }
 .btn {
   padding: 0.42rem 0.9rem;
-  border: 1px solid var(--ink);
+  border: 1px solid #2563eb;
   border-radius: 6px;
-  background: var(--ink);
+  background: #2563eb;
   color: #fff;
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
 }
-.btn:hover { background: #1e293b; }
+.btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.btn-primary { background: #2563eb; border-color: #2563eb; }
+.btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.btn-secondary { background: var(--card); color: var(--ink-soft); border-color: var(--line); }
+.btn-secondary:hover { background: #e2e8f0; color: var(--ink); }
+.btn-export { background: #059669; border-color: #059669; }
+.btn-export:hover { background: #047857; border-color: #047857; }
+/* El enlace de exportación es un <a>, no un <button>: sin esto se vería como
+   texto con subrayado en lugar de un botón. */
+a.btn { display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; }
 
 .hs6 { color: var(--ink-faint); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+
+/* --- simulador interactivo de supuestos --- */
+.simulator-card { border-color: #c7d2fe; }
+.project-evaluation {
+  margin-top: 1.75rem;
+  padding: clamp(0.75rem, 1.5vw, 1.25rem);
+  border: 1px solid #c7d2fe;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #eef2ff 0%, #f8fafc 42%, #eff6ff 100%);
+}
+.project-evaluation > .simulator-card {
+  box-shadow: 0 10px 30px rgba(30, 64, 175, 0.08);
+}
+.evaluation-pending { border-style: dashed; }
+.simulator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.simulator-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.simulator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem 1.25rem;
+  margin-top: 0.5rem;
+}
+.sim-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.sim-field-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; }
+.sim-group label { font-size: 0.8rem; font-weight: 600; color: var(--ink-soft); }
+.sim-value {
+  flex: 0 0 auto;
+  color: #b45309;
+  font: 600 0.82rem/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.sim-range {
+  width: 100%;
+  height: 1.4rem;
+  margin: 0.15rem 0 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--data);
+}
+.sim-range::-webkit-slider-runnable-track {
+  height: 0.38rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fcd34d, #f59e0b);
+}
+.sim-range::-moz-range-track {
+  height: 0.38rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fcd34d, #f59e0b);
+}
+.sim-range::-webkit-slider-thumb {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: -0.36rem;
+  appearance: none;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #d97706;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.28);
+}
+.sim-range::-moz-range-thumb {
+  width: 0.78rem;
+  height: 0.78rem;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #d97706;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.28);
+}
+.sim-range:focus-visible { outline: 2px solid var(--data); outline-offset: 4px; }
+.sim-range:disabled { cursor: not-allowed; opacity: 0.4; }
+.sim-input-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.sim-input, .sim-select {
+  flex: 1 1 7rem;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.sim-select { flex-basis: 100%; }
+.sim-input:focus, .sim-select:focus { outline: 2px solid var(--data); outline-offset: -1px; border-color: transparent; }
+.sim-hint { font-size: 0.74rem; color: var(--ink-faint); }
+.sim-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+.evaluation-status {
+  flex: 1;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+/* --- participación de mercado (donut + filtro de año) --- */
+/* El filtro de año vive en el <h2> de la tarjeta, alineado a la derecha. */
+.share-year-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  float: right;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.share-year-filter .sim-select { flex: 0 0 auto; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+
+/* --- selector de método de proyección --- */
+.projection-method-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  float: right;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.projection-method-selector .sim-select { flex: 0 0 auto; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+.share-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+.share-table { overflow-x: auto; }
+.share-table table { margin-top: 0; }
+@media (max-width: 820px) {
+  .share-grid { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* --- tarjetas --- */
 .card {
@@ -208,8 +366,8 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   flex-wrap: wrap;
 }
 .card h3 { margin: 1.75rem 0 0.6rem; font-size: 0.92rem; color: var(--ink-soft); }
-.card-bad { border-color: #fecaca; }
-.card-quiet { background: #fbfcfe; }
+.card-bad { border-color: #7f1d1d; }
+.card-quiet { background: #f8fafc; }
 .card-quiet h3 { margin-top: 0; }
 .meta { display: flex; flex-wrap: wrap; gap: 1.25rem; color: var(--ink-soft); font-size: 0.88rem; }
 
@@ -224,11 +382,11 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   letter-spacing: 0.04em;
   vertical-align: middle;
 }
-.tag-data { background: #dbeafe; color: var(--data); }
-.tag-assumed { background: #fef3c7; color: var(--warn); }
-.tag-ok { background: #d1fae5; color: var(--ok); }
-.tag-bad { background: #fee2e2; color: var(--bad); }
-.tag-self { background: var(--bad); color: #fff; }
+.tag-data { background: #dbeafe; color: #1d4ed8; }
+.tag-assumed { background: #fef3c7; color: #92400e; }
+.tag-ok { background: #d1fae5; color: #065f46; }
+.tag-bad { background: #fee2e2; color: #991b1b; }
+.tag-self { background: #dc2626; color: #fff; }
 
 /* --- KPIs --- */
 .kpis {
@@ -248,6 +406,7 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
 
 /* --- tablas --- */
 table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.88rem; }
+.table-scroll { max-width: 100%; overflow-x: auto; }
 th, td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid var(--line); }
 th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); font-weight: 600; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -293,7 +452,7 @@ tr.muted td { color: var(--ink-faint); }
 .comparison-table-card th[scope="row"] { white-space: nowrap; }
 code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
 .sources { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; color: var(--ink-soft); }
-.sources li { margin-bottom: 0.3rem; }
+.sources li { margin-bottom: 0.3rem; overflow-wrap: anywhere; }
 
 /* --- ranking: por cual producto empezar --- */
 .ranking-table { min-width: 1080px; }
@@ -311,10 +470,10 @@ code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 4px; font-si
   font-weight: 600;
   white-space: nowrap;
 }
-.chip-ok { background: #d1fae5; color: var(--ok); }
-.chip-warn { background: #fef3c7; color: var(--warn); }
+.chip-ok { background: #d1fae5; color: #065f46; }
+.chip-warn { background: #fef3c7; color: #92400e; }
 .chip-off { background: #e2e8f0; color: var(--ink-soft); }
-.chip-bad { background: #fee2e2; color: var(--bad); }
+.chip-bad { background: #fee2e2; color: #991b1b; }
 .chip-industry { background: #dbeafe; color: #1d4ed8; }
 
 footer { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
@@ -332,8 +491,176 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
   .compare-picker { padding: 0.75rem; }
   .compare-picker-footer { align-items: flex-start; flex-direction: column; }
   .compare-picker-actions { width: 100%; justify-content: space-between; }
+  .sim-footer { align-items: stretch; flex-direction: column; }
+  .sim-footer .btn, .sim-footer .text-btn { width: 100%; }
 }
 
 @media (min-width: 1400px) {
   .comparison-charts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* --- dashboard de evaluación financiera --- */
+.project-evaluation {
+  max-width: 1600px;
+  padding: clamp(0.75rem, 1.7vw, 1.5rem);
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(145deg, #eef2ff 0%, #f8fafc 42%, #eff6ff 100%);
+  color: var(--ink);
+  box-shadow: 0 10px 30px rgba(30, 64, 175, 0.08);
+}
+.project-evaluation .card,
+.project-evaluation .simulator-card {
+  margin-bottom: 1rem;
+  border-color: var(--line);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 4px 14px rgba(30, 64, 175, 0.06);
+}
+.project-evaluation .simulator-card { padding: clamp(1rem, 2vw, 1.75rem); }
+.project-evaluation h2 { color: var(--ink); font-size: clamp(1.1rem, 1.7vw, 1.4rem); }
+.project-evaluation h3 { color: var(--ink); }
+.project-evaluation .note,
+.project-evaluation .evaluation-status { color: var(--ink-soft); }
+.project-evaluation .evaluation-eyebrow {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: #1d4ed8;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+.project-evaluation .simulator-header { align-items: center; margin-bottom: 1.25rem; }
+.project-evaluation .simulator-header h2 { margin-bottom: 0.25rem; }
+.project-evaluation .simulator-header .note { max-width: 68rem; margin-top: 0.25rem; }
+.project-evaluation .simulator-grid { display: flex; flex-direction: column; gap: 1.25rem; }
+.project-evaluation .simulator-section {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.project-evaluation .simulator-section > h3 { margin: 0 0 0.85rem; font-size: 0.95rem; }
+.project-evaluation .simulator-price-reference {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.85rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.project-evaluation .simulator-price-reference strong { color: var(--ink); font-size: 1rem; }
+.project-evaluation .simulator-price-reference .kpi-note { color: var(--ink-faint); font-size: 0.75rem; }
+.project-evaluation .simulator-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 0.75rem;
+}
+.project-evaluation .simulator-volatility-fields { margin-top: 0.75rem; }
+.project-evaluation .simulator-section > .sim-hint { display: block; color: var(--ink-soft); }
+.project-evaluation .sim-group {
+  min-width: 0;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.project-evaluation .sim-group label { color: var(--ink-soft); font-size: 0.78rem; }
+.project-evaluation .sim-value { color: #b45309; }
+.project-evaluation .sim-input {
+  border-color: #cbd5e1;
+  background: #fff;
+  color: var(--ink);
+}
+.project-evaluation .sim-input:focus { outline-color: #2563eb; }
+.project-evaluation .sim-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, #fcd34d, #f59e0b); }
+.project-evaluation .sim-range::-moz-range-track { background: linear-gradient(90deg, #fcd34d, #f59e0b); }
+.project-evaluation .sim-range::-webkit-slider-thumb { border-color: #fff; }
+.project-evaluation .sim-range::-moz-range-thumb { border-color: #fff; }
+.project-evaluation .sim-hint { color: var(--ink-faint); }
+.project-evaluation .sim-footer {
+  flex-wrap: wrap;
+  border-color: var(--line);
+}
+.project-evaluation .sim-footer .text-btn { color: #1d4ed8; }
+.project-evaluation .btn-secondary {
+  border-color: var(--line);
+  background: #fff;
+  color: var(--ink-soft);
+}
+.project-evaluation .btn-secondary:hover { background: #e2e8f0; color: var(--ink); }
+.project-evaluation .financial-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.project-evaluation .financial-result-header h2 { margin: 0; }
+.project-evaluation .verdict { margin: 0 0 1rem; }
+.project-evaluation .financial-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr));
+  gap: 0.65rem;
+  margin: 1rem 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.project-evaluation .financial-kpis .kpi {
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.project-evaluation .kpi-label { color: var(--ink-soft); }
+.project-evaluation .kpi-value { color: var(--ink); font-size: clamp(1rem, 1.6vw, 1.3rem); overflow-wrap: anywhere; }
+.project-evaluation .kpi-value.neg { color: var(--bad); }
+.project-evaluation .kpi-note { color: var(--ink-faint); }
+.project-evaluation .financial-panel {
+  min-width: 0;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+}
+.project-evaluation .financial-panel h3 { margin: 0 0 0.4rem; }
+.project-evaluation .financial-panel .chart { height: clamp(250px, 30vw, 350px); margin-top: 0.5rem; position: relative; }
+.project-evaluation .financial-table-panel { overflow: hidden; }
+.project-evaluation .financial-table-scroll { overflow-x: auto; }
+.project-evaluation .financial-table { min-width: 760px; margin-top: 0.2rem; }
+.project-evaluation .financial-table th { color: var(--ink-soft); }
+.project-evaluation .financial-table td { border-color: var(--line); color: var(--ink); }
+.project-evaluation .financial-table tr.hl { background: #eff6ff; }
+.project-evaluation .financial-sensitivity-card .chart { height: clamp(280px, 32vw, 410px); position: relative; }
+.project-evaluation .financial-monte-carlo-card .chart { height: clamp(260px, 30vw, 360px); position: relative; }
+.project-evaluation code {
+  background: #f1f5f9;
+  color: #1e40af;
+  overflow-wrap: anywhere;
+}
+.project-evaluation .alert {
+  border-color: var(--ink-faint);
+  background: #f8fafc;
+  color: var(--ink-soft);
+}
+.project-evaluation .alert.warn { border-left-color: var(--warn); background: #fffbeb; color: #78350f; }
+.project-evaluation .alert.error { border-left-color: var(--bad); background: #fef2f2; color: #7f1d1d; }
+.project-evaluation .evaluation-pending { border-color: #a5b4fc; }
+
+@media (max-width: 640px) {
+  .project-evaluation { padding: 0.65rem; }
+  .project-evaluation .simulator-section { padding: 0.75rem; }
+  .project-evaluation .simulator-price-reference { grid-template-columns: 1fr; gap: 0.2rem; }
+  .project-evaluation .financial-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .project-evaluation .financial-panel { padding: 0.7rem; }
+  .project-evaluation .financial-panel .chart { height: 250px; }
+  .control-block { min-width: 0; }
+  .control-block select { width: 100%; min-width: 0; }
 }

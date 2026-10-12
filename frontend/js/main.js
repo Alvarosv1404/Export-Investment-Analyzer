@@ -10,8 +10,16 @@
  * En produccion, el mismo build lo sirve FastAPI desde el mismo origen.
  */
 
-import { getAnalysis, getComparison, getProducts, getRanking } from './api.js'
-import { destroyCharts, renderAll, renderComparisonCharts, renderRankingChart } from './charts.js'
+import { getAnalysis, getComparison, getExportUrl, getProducts, getRanking } from './api.js'
+import {
+  destroyCharts,
+  projectionChart,
+  renderFinancialCharts,
+  renderAll,
+  renderComparisonCharts,
+  renderRankingChart,
+  shareDonut,
+} from './charts.js'
 import {
   comparison,
   competitors,
@@ -19,21 +27,36 @@ import {
   headroom,
   investment,
   market,
+  marketShare,
   missingAssumptions,
+  projection,
   ranking,
   sensitivity,
+  monteCarloRisk,
+  simulatorPanel,
   sources,
   sunatPrice,
-  tariffs,
   unitEconomics,
 } from './components.js'
 import { escapeHTML } from './components.js'
 
 const urlParams = new URLSearchParams(location.search)
+const hasSavedFinancialInputs = urlParams.get('evaluation_inputs') === '1'
+const initialFinancialValue = (param) =>
+  hasSavedFinancialInputs ? (urlParams.get(param) || '') : ''
 const state = {
   slug: urlParams.get('slug'),
-  targetShare: urlParams.get('target_share') || '',
-  price: urlParams.get('price') || '',
+  // Año del gráfico circular de participación de mercado. Vive en la URL.
+  shareYear: urlParams.get('share_year') ? Number(urlParams.get('share_year')) : null,
+  // Método de proyección para el gráfico de exportación. Vive en la URL.
+  projectionMethod: urlParams.get('projection_method') || 'moving_average',
+  capex: initialFinancialValue('capex'),
+  variableCost: initialFinancialValue('variable_cost'),
+  year1Volume: initialFinancialValue('year1_volume'),
+  annualGrowth: initialFinancialValue('annual_growth'),
+  opex: initialFinancialValue('opex'),
+  // COK se maneja en porcentaje (12); la API espera fracción (0.12).
+  discountRate: initialFinancialValue('wacc'),
   view: urlParams.get('view') === 'compare' || urlParams.get('compare') === '1' ? 'compare' : 'analysis',
   compareSlugs: (urlParams.get('compare_slugs') || '').split(',').filter(Boolean),
   products: [],
@@ -44,15 +67,47 @@ const state = {
 /** Actualiza la URL sin recargar, para que la vista sea compartible. */
 function syncURL() {
   const params = new URLSearchParams()
+  const set = (key, value) => {
+    if (value !== undefined && value !== null && value !== '') params.set(key, value)
+  }
   if (state.slug) params.set('slug', state.slug)
-  if (state.targetShare) params.set('target_share', state.targetShare)
-  if (state.price) params.set('price', state.price)
+  if (state.shareYear) params.set('share_year', state.shareYear)
+  if (state.projectionMethod) params.set('projection_method', state.projectionMethod)
+  set('year1_volume', state.year1Volume)
+  set('annual_growth', state.annualGrowth)
+  set('variable_cost', state.variableCost)
+  set('capex', state.capex)
+  set('opex', state.opex)
+  set('wacc', state.discountRate)
+  if ([state.year1Volume, state.annualGrowth, state.variableCost, state.capex, state.opex, state.discountRate]
+    .some((value) => value !== '')) {
+    params.set('evaluation_inputs', '1')
+  }
   if (state.view === 'compare') {
     params.set('view', 'compare')
     if (state.compareSlugs.length) params.set('compare_slugs', state.compareSlugs.join(','))
   }
   const qs = params.toString()
   history.replaceState(null, '', qs ? `?${qs}` : location.pathname)
+}
+
+/**
+ * Opciones de análisis a partir del estado (simulador + controles superiores).
+ * Un solo lugar traduce el estado del frontend a los query params de la API,
+ * para que la carga inicial y el simulador hablen con el mismo contrato.
+ */
+function analysisOpts() {
+  const waccFraction =
+    state.discountRate !== '' ? (Number(state.discountRate) / 100).toFixed(4) : ''
+  return {
+    year1Volume: state.year1Volume,
+    annualGrowth: state.annualGrowth,
+    variableCost: state.variableCost,
+    capex: state.capex,
+    opex: state.opex,
+    discountRate: waccFraction,
+    projectionMethod: state.projectionMethod,
+  }
 }
 
 function showError(message) {
@@ -192,45 +247,16 @@ function renderControls() {
   }
 
   const form = `
-    <form class="controls-form" id="controlsForm">
+    <div class="controls-form" id="controlsForm">
       <div class="control-block">
         <label for="productSelect">Producto para analizar</label>
         <select id="productSelect" name="slug">
           ${productOptions()}
         </select>
       </div>
-      <div class="control-block">
-        <label for="shareInput">Participación de mercado objetivo (opcional)</label>
-        <div class="share-controls">
-          <input type="number" id="shareInput" name="target_share" min="0" max="100" step="0.5"
-                 placeholder="auto" value="${escapeHTML(shareInputValue())}" />
-          <span class="share-hint">% &mdash; vacío = share actual + 2 pp</span>
-        </div>
-      </div>
-      <div class="control-block">
-        <label for="priceInput">Precio FOB de venta (opcional)</label>
-        <div class="share-controls">
-          <input type="number" id="priceInput" name="price" min="0" step="0.001"
-                 placeholder="auto" value="${escapeHTML(state.price)}" />
-          <span class="share-hint">USD/kg &mdash; vacío = calculado de los históricos</span>
-        </div>
-      </div>
-      <button type="submit" class="btn">Aplicar</button>
-    </form>`
+    </div>`
 
   return `${tabs}${form}`
-}
-
-/**
- * La URL y la API trabajan en fraccion (0.12); el input trabaja en porcentaje
- * (12). Sin esta conversion, abrir un link con `?target_share=0.12` muestra
- * "0.12 %" en el input y al pulsar Aplicar manda 0.0012.
- */
-function shareInputValue() {
-  if (state.targetShare === '') return ''
-  const percent = Number(state.targetShare) * 100
-  if (!Number.isFinite(percent)) return ''
-  return String(Math.round(percent * 100) / 100)
 }
 
 /** Inserta los controles que disparan una recarga suave. */
@@ -310,16 +336,149 @@ function bindControls(onChange) {
     syncURL()
     onChange()
   })
-  form.addEventListener('submit', (event) => {
-    event.preventDefault()
-    const share = document.getElementById('shareInput').value.trim()
-    const price = document.getElementById('priceInput').value.trim()
-    // El input esta en porcentaje (0-100); la API espera fraccion (0-1).
-    state.targetShare = share === '' ? '' : (Number(share) / 100).toFixed(4)
-    state.price = price === '' ? '' : String(Number(price))
+}
+
+/**
+ * Enlaza el formulario del simulador. Vive dentro de #app, así que se recrea en
+ * cada render: por eso el binding va aquí y no una sola vez al arranque. El
+ * Los sliders empiezan sin seleccionar un supuesto, y el reset los limpia.
+ */
+function bindSimulator() {
+  const form = document.getElementById('simulatorForm')
+  if (!form) return
+
+  const fields = {
+    capex: 'simCapex',
+    variableCost: 'simVar',
+    year1Volume: 'simYear1Volume',
+    annualGrowth: 'simAnnualGrowth',
+    opex: 'simOpex',
+    discountRate: 'simWacc',
+  }
+  const numbers = Object.entries(fields).map(([key, id]) => ({
+    key,
+    range: document.getElementById(id),
+    output: document.getElementById(`${id}Value`),
+  }))
+  let timer = null
+  let requestId = 0
+
+  const numberValue = (range) => {
+    if (range.dataset.configured !== 'true') return ''
+    return String(Number(range.value))
+  }
+
+  const updateOutput = ({ range, output }) => {
+    if (!output) return
+    const digits = range.step.includes('.') ? range.step.split('.')[1].length : 0
+    output.value = range.dataset.configured !== 'true'
+      ? 'Por definir'
+      : new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(Number(range.value))
+  }
+
+  const syncState = () => {
+    numbers.forEach(({ key, range }) => {
+      state[key] = numberValue(range)
+    })
     syncURL()
-    onChange()
+  }
+
+  const showPending = (message) => {
+    const status = document.getElementById('evaluationStatus')
+    if (status) status.textContent = message
+    const results = document.getElementById('evaluationResults')
+    if (results) {
+      results.innerHTML = `
+        <section class="card evaluation-pending">
+          <h2>Resultados de la evaluación</h2>
+          <p class="note">${escapeHTML(message)}</p>
+        </section>${monteCarloRisk(null)}`
+    }
+  }
+
+  const complete = () => {
+    const year1Volume = document.getElementById('simYear1Volume')
+    year1Volume.setCustomValidity(
+      Number(year1Volume.value) <= 0
+        ? 'El volumen del año 1 debe ser mayor que cero.'
+        : ''
+    )
+    return numbers.every(({ range }) => range.dataset.configured === 'true') && form.checkValidity()
+  }
+
+  const refreshResults = async () => {
+    syncState()
+    if (!complete()) {
+      requestId += 1
+      showPending('Selecciona todos los supuestos con los sliders. El volumen del año 1 debe ser mayor que cero.')
+      return
+    }
+
+    const currentRequest = ++requestId
+    const status = document.getElementById('evaluationStatus')
+    if (status) status.textContent = 'Actualizando evaluación…'
+    try {
+      const result = await getAnalysis(state.slug, analysisOpts())
+      if (currentRequest !== requestId) return
+      const results = document.getElementById('evaluationResults')
+      if (!results) return
+      results.innerHTML = [
+        missingAssumptions(result),
+        investment(result.investment),
+        sensitivity(result.investment),
+        monteCarloRisk(result.investment),
+      ].join('')
+      renderFinancialCharts(result.investment)
+      const exportLink = document.querySelector('.btn-export')
+      if (exportLink) exportLink.href = getExportUrl(state.slug, analysisOpts())
+      if (status) status.textContent = 'Evaluación actualizada con los valores seleccionados.'
+    } catch (error) {
+      if (currentRequest !== requestId) return
+      const results = document.getElementById('evaluationResults')
+      if (results) {
+        results.innerHTML = `<section class="card"><div class="alert error">No se pudo actualizar la evaluación: ${escapeHTML(error.message)}</div></section>`
+      }
+      if (status) status.textContent = 'No se pudo actualizar la evaluación.'
+    }
+  }
+
+  const scheduleRefresh = () => {
+    syncState()
+    requestId += 1
+    if (!complete()) {
+      window.clearTimeout(timer)
+      showPending('Selecciona todos los supuestos con los sliders. El volumen del año 1 debe ser mayor que cero.')
+      return
+    }
+    const status = document.getElementById('evaluationStatus')
+    if (status) status.textContent = 'Ajustando supuestos…'
+    window.clearTimeout(timer)
+    timer = window.setTimeout(refreshResults, 250)
+  }
+
+  numbers.forEach((field) => {
+    updateOutput(field)
+    field.range.addEventListener('input', () => {
+      field.range.dataset.configured = 'true'
+      updateOutput(field)
+      scheduleRefresh()
+    })
   })
+
+  const reset = document.getElementById('simReset')
+  if (reset) {
+    reset.addEventListener('click', () => {
+      numbers.forEach(({ range, output }) => {
+        range.value = '0'
+        range.dataset.configured = 'false'
+        updateOutput({ range, output })
+      })
+      syncState()
+      window.clearTimeout(timer)
+      requestId += 1
+      showPending('Selecciona los supuestos operativos para calcular la evaluación.')
+    })
+  }
 }
 
 function render(result) {
@@ -332,6 +491,21 @@ function render(result) {
   }
 
   const product = result.product || {}
+  const hasFinancialInputs = [
+    state.year1Volume,
+    state.annualGrowth,
+    state.variableCost,
+    state.capex,
+    state.opex,
+    state.discountRate,
+  ].every((value) => value !== '')
+  const evaluationResults = hasFinancialInputs && result.investment
+    ? `${investment(result.investment)}${sensitivity(result.investment)}${monteCarloRisk(result.investment)}`
+    : `${missingAssumptions(result) || `
+        <section class="card evaluation-pending">
+          <h2>Resultados de la evaluación</h2>
+          <p class="note">No hay suficientes datos para calcular VAN, TIR, recuperación y flujos de caja.</p>
+        </section>`}${monteCarloRisk(result.investment)}`
   const meta = `
     <section class="card">
       <h2>${escapeHTML(product.name || '')}</h2>
@@ -345,20 +519,67 @@ function render(result) {
 
   app.innerHTML = [
     meta,
-    missingAssumptions(result),
-    unitEconomics(result.unit_economics),
-    market(result.market),
+    unitEconomics(result.pricing),
+    market(result.market, result.import_demand),
+    marketShare(result, state),
+    projection(result.projection, state),
     sunatPrice(result),
     destinations(result.destinations),
     competitors(result.competitors),
     headroom(result.headroom),
-    tariffs(result),
-    investment(result.investment),
-    sensitivity(result.investment),
     sources(result),
+    `<section class="project-evaluation" id="projectEvaluation">
+      ${simulatorPanel(result, state)}
+      <div id="evaluationResults">${evaluationResults}</div>
+    </section>`,
   ].join('')
 
   renderAll(result)
+  bindSimulator()
+  bindShareYear(result)
+  bindProjectionMethod(result)
+}
+
+/**
+ * Filtro de año del grafico circular de participacion de mercado. Como vive
+ * dentro de #app se re-crea en cada render, asi que se enlaza aqui. Cambiar el
+ * ano solo redibuja el donut con la rebanada de ese ano: no hace falta recargar
+ * el analisis, y el año queda en la URL para poder compartir la vista.
+ */
+function bindShareYear(result) {
+  const sel = document.getElementById('shareYear')
+  if (!sel) return
+  sel.addEventListener('change', () => {
+    state.shareYear = Number(sel.value)
+    syncURL()
+    window.__shareYear = state.shareYear
+    destroyCharts()
+    const yearData = result.share_by_year?.by_year?.find((y) => y.year === state.shareYear)
+    shareDonut(document.getElementById('chartShare'), yearData)
+    projectionChart(document.getElementById('chartProjection'), result.projection)
+  })
+}
+
+/**
+ * Selector de método de proyección. Cambiar el método recarga el análisis
+ * desde la API con el nuevo parámetro, ya que el cálculo se hace en el backend.
+ */
+function bindProjectionMethod(result) {
+  const sel = document.getElementById('projectionMethod')
+  if (!sel) return
+  sel.addEventListener('change', async () => {
+    state.projectionMethod = sel.value
+    syncURL()
+    // Recargar el análisis completo con el nuevo método de proyección
+    const status = document.getElementById('evaluationStatus')
+    if (status) status.textContent = 'Actualizando proyección…'
+    try {
+      const fresh = await getAnalysis(state.slug, analysisOpts())
+      render(fresh)
+    } catch (err) {
+      showError(err.message)
+    }
+  })
 }
 
 function renderComparisonView() {
@@ -422,7 +643,7 @@ async function load() {
   }
 
   try {
-    const result = await getAnalysis(state.slug, state.targetShare, state.price)
+    const result = await getAnalysis(state.slug, analysisOpts())
     if (reqId !== load.reqId) return
     render(result)
   } catch (err) {
