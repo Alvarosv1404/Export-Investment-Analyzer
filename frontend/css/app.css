@@ -125,6 +125,49 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   font: inherit;
 }
 .compare-industry:focus { outline: 2px solid var(--data); outline-offset: -1px; border-color: transparent; }
+
+/* --- Filtros tipo chips/pills (estilo propio, no nativo del navegador) --- */
+.filter-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.filter-chip {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink-soft);
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.filter-chip:hover {
+  border-color: var(--data);
+  color: var(--data);
+  background: #eff6ff;
+}
+.filter-chip.active {
+  border-color: var(--data);
+  background: var(--data);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+.filter-chip:focus-visible {
+  outline: 2px solid var(--data);
+  outline-offset: 2px;
+}
+
+/* Ocultar el select nativo de industria en vista comparacion (usamos chips) */
+.compare-industry { display: none; }
+.compare-filter { display: flex; flex-direction: column; }
+.compare-filter .compare-search { margin-bottom: 0; }
+
 .compare-options {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));

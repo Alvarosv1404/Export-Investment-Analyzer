@@ -167,7 +167,7 @@ function productOptions() {
     groups.get(key).push(p)
   }
   const option = (p) =>
-    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''}>` +
+    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">` +
     `${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</option>`
 
   // Sin industrias declaradas no tiene sentido envolver todo en un optgroup.
@@ -199,12 +199,9 @@ function renderControls() {
     const industries = [...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort()
     const industryFilter = industries.length
       ? `
-          <div class="compare-filter">
-            <label class="compare-search-label" for="compareIndustry">Filtrar por industria</label>
-            <select id="compareIndustry" class="compare-industry">
-              <option value="">Todas las industrias</option>
-              ${industries.map((name) => `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join('')}
-            </select>
+          <div class="filter-chips" id="compareIndustryChips" role="group" aria-label="Filtrar por industria">
+            <button type="button" class="filter-chip active" data-industry="">Todas</button>
+            ${industries.map((name) => `<button type="button" class="filter-chip" data-industry="${escapeHTML(name)}">${escapeHTML(name)}</button>`).join('')}
           </div>`
       : ''
     return `${tabs}
@@ -246,8 +243,19 @@ function renderControls() {
       </form>`
   }
 
+  // Analysis view: selector + industry filter chips
+  const industries = [...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort()
+  const industryChips = industries.length
+    ? `
+        <div class="filter-chips" id="analysisIndustryChips" role="group" aria-label="Filtrar por industria">
+          <button type="button" class="filter-chip active" data-industry="">Todas</button>
+          ${industries.map((name) => `<button type="button" class="filter-chip" data-industry="${escapeHTML(name)}">${escapeHTML(name)}</button>`).join('')}
+        </div>`
+    : ''
+
   const form = `
     <div class="controls-form" id="controlsForm">
+      ${industryChips}
       <div class="control-block">
         <label for="productSelect">Producto para analizar</label>
         <select id="productSelect" name="slug">
@@ -257,6 +265,7 @@ function renderControls() {
     </div>`
 
   return `${tabs}${form}`
+}
 }
 
 /** Inserta los controles que disparan una recarga suave. */
@@ -287,11 +296,12 @@ function bindControls(onChange) {
     checkboxes.forEach((input) => input.addEventListener('change', scheduleReload))
 
     const searchInput = document.getElementById('compareSearch')
-    const industrySelect = document.getElementById('compareIndustry')
+    const industryChips = comparisonForm.querySelectorAll('#compareIndustryChips .filter-chip')
     // Filtra la lista por texto (nombre/HS/industria) y por industria elegida.
     const applyProductFilter = () => {
       const query = searchInput.value.trim().toLowerCase()
-      const industry = industrySelect ? industrySelect.value : ''
+      const activeChip = comparisonForm.querySelector('#compareIndustryChips .filter-chip.active')
+      const industry = activeChip ? activeChip.dataset.industry : ''
       comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
         const matchesQuery = option.dataset.productName.includes(query)
         const matchesIndustry = !industry || option.dataset.productIndustry === industry
@@ -299,7 +309,13 @@ function bindControls(onChange) {
       })
     }
     searchInput.addEventListener('input', applyProductFilter)
-    if (industrySelect) industrySelect.addEventListener('change', applyProductFilter)
+    industryChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        industryChips.forEach((c) => c.classList.remove('active'))
+        chip.classList.add('active')
+        applyProductFilter()
+      })
+    })
 
     document.getElementById('selectAllProducts').addEventListener('click', () => {
       // Marca todos y limpia los filtros: el boton dice "Seleccionar todos", no
@@ -309,7 +325,9 @@ function bindControls(onChange) {
         input.checked = true
       })
       searchInput.value = ''
-      if (industrySelect) industrySelect.value = ''
+      const allChip = comparisonForm.querySelector('#compareIndustryChips .filter-chip[data-industry=""]')
+      industryChips.forEach((c) => c.classList.remove('active'))
+      if (allChip) allChip.classList.add('active')
       applyProductFilter()
       scheduleReload()
     })
@@ -331,6 +349,37 @@ function bindControls(onChange) {
 
   const form = document.getElementById('controlsForm')
   if (!form) return
+
+  // Analysis view: industry filter chips
+  const analysisChips = form.querySelectorAll('#analysisIndustryChips .filter-chip')
+  if (analysisChips.length) {
+    analysisChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        analysisChips.forEach((c) => c.classList.remove('active'))
+        chip.classList.add('active')
+        const industry = chip.dataset.industry
+        const select = document.getElementById('productSelect')
+        // Filter options in the select
+        Array.from(select.options).forEach((opt) => {
+          if (!industry) {
+            opt.hidden = false
+          } else {
+            const optIndustry = opt.dataset.industry || ''
+            opt.hidden = optIndustry !== industry
+          }
+        })
+        // Reset selection to first visible
+        const firstVisible = Array.from(select.options).find((o) => !o.hidden)
+        if (firstVisible) {
+          select.value = firstVisible.value
+          state.slug = firstVisible.value
+          syncURL()
+          onChange()
+        }
+      })
+    })
+  }
+
   document.getElementById('productSelect').addEventListener('change', (event) => {
     state.slug = event.target.value
     syncURL()
