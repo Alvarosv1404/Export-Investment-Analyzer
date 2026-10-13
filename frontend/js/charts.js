@@ -520,7 +520,6 @@ export function shareDonut(canvas, yearData) {
 export function projectionChart(canvas, proj) {
   if (!canvas || !proj?.available) return
 
-  const isMovingAverage = proj.method === 'moving_average' || proj.method === 'media móvil simple'
   const isTrend = proj.method === 'linear' || proj.method === 'quadratic'
   const isCagr = proj.method === 'cagr'
 
@@ -539,7 +538,7 @@ export function projectionChart(canvas, proj) {
     return h ? h.value : null
   })
 
-  // Tendencia (media móvil / tendencia): valores donde existen, null en el resto
+  // Tendencia (lineal/cuadrática): valores donde existen, null en el resto
   let trendData = labels.map((year) => {
     const t = trend.find((p) => p.year === year)
     return t ? t.value : null
@@ -556,7 +555,6 @@ export function projectionChart(canvas, proj) {
 
   // PROYECCIÓN: Calcular correctamente según el método
   // ------------------------------------------------------------
-  // Media móvil: proyectar la última media móvil hacia adelante (línea plana)
   // Tendencia lineal/cuadrática: extender la curva ajustada (trend)
   // CAGR: crecimiento compuesto hacia adelante
   // ------------------------------------------------------------
