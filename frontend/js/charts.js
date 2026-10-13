@@ -530,24 +530,49 @@ export function projectionChart(canvas, proj) {
 
   if (!hist.length && !trend.length && !fc.length) return
 
+  // Labels para el eje X completo (2016-2027) para las series históricas
   const labels = [...new Set([...hist.map((p) => p.year), ...trend.map((p) => p.year), ...fc.map((p) => p.year)])].sort((a, b) => a - b)
 
+  // Datos históricos: un valor por cada año en labels (2016-2027)
   let histData = labels.map((year) => {
     const h = hist.find((p) => p.year === year)
     return h ? h.value : null
   })
+
+  // Tendencia (media móvil / tendencia): valores donde existen, null en el resto
   let trendData = labels.map((year) => {
     const t = trend.find((p) => p.year === year)
     return t ? t.value : null
   })
-  let forecastData = labels.map((year) => {
-    const f = fc.find((p) => p.year === year)
-    return f ? f.value : null
-  })
 
-  // Las proyecciones deben respetar el modelo del dato y no anclar el primer
-  // punto futuro al último valor histórico. Ese “pegado” crea una línea falsa y
-  // distorsiona la interpretación de media móvil, tendencia y CAGR.
+  // PROYECCIÓN: Solo 3 puntos: (2025, valor_2025), (2026, valor_2026), (2027, valor_2027)
+  // El punto 2025 es el empalme: valor de la tendencia/histórico en 2025
+  // Los puntos 2026 y 2027 son los valores proyectados del modelo
+  const lastTrendIdx = trendData.lastIndexOf(trendData.find(v => v !== null))
+  const forecastData = []
+  const forecastLabels = [2025, 2026, 2027]
+
+  if (lastTrendIdx >= 0) {
+    const lastTrendValue = trendData[lastTrendIdx]
+    // Punto 2025: empalme con último dato histórico/tendencia
+    forecastData.push(lastTrendValue)
+    // Puntos 2026 y 2027: valores proyectados del modelo (fc)
+    const f2026 = fc.find((p) => p.year === 2026)
+    const f2027 = fc.find((p) => p.year === 2027)
+    forecastData.push(f2026 ? f2026.value : null)
+    forecastData.push(f2027 ? f2027.value : null)
+  } else {
+    // Sin datos de tendencia: usar solo forecast
+    forecastData.push(fc.find((p) => p.year === 2025)?.value ?? null)
+    forecastData.push(fc.find((p) => p.year === 2026)?.value ?? null)
+    forecastData.push(fc.find((p) => p.year === 2027)?.value ?? null)
+  }
+
+  // Convertir a formato {x, y} para que Chart.js use coordenadas exactas (2025, 2026, 2027)
+  const forecastPoints = forecastLabels.map((year, i) => ({
+    x: year,
+    y: forecastData[i]
+  }))
 
   // Etiquetas y colores segun metodo
   let trendLabel = 'Tendencia'
@@ -594,10 +619,10 @@ export function projectionChart(canvas, proj) {
     })
   }
 
-  if (forecastData.some(v => v !== null)) {
+  if (forecastPoints.some(v => v.y !== null)) {
     datasets.push({
       label: 'Proyección',
-      data: forecastData,
+      data: forecastPoints,
       borderColor: '#dc2626',
       borderDash: [6, 5],
       borderWidth: 2,
