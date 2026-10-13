@@ -549,29 +549,31 @@ export function projectionChart(canvas, proj) {
   // Solo 2025, 2026, 2027 tienen valores; resto null
   let forecastData = labels.map(() => null)
 
-  // Encontrar el último valor de tendencia/histórico válido (empalme en 2025)
-  const lastTrendIdx = trendData.lastIndexOf(trendData.find(v => v !== null))
+  // Índices fijos para 2025, 2026, 2027
   const year2025Idx = labels.indexOf(2025)
   const year2026Idx = labels.indexOf(2026)
   const year2027Idx = labels.indexOf(2027)
 
-  if (lastTrendIdx >= 0 && year2025Idx >= 0) {
-    // Punto 2025: empalme con último valor de tendencia/histórico
-    forecastData[year2025Idx] = trendData[lastTrendIdx]
-    // 2026 y 2027: valores proyectados del modelo (fc)
-    const f2026 = fc.find((p) => p.year === 2026)
-    const f2027 = fc.find((p) => p.year === 2027)
-    if (year2026Idx >= 0) forecastData[year2026Idx] = f2026 ? f2026.value : null
-    if (year2027Idx >= 0) forecastData[year2027Idx] = f2027 ? f2027.value : null
-  } else {
-    // Fallback: usar solo forecast si no hay tendencia
-    const f2025 = fc.find((p) => p.year === 2025)
-    const f2026 = fc.find((p) => p.year === 2026)
-    const f2027 = fc.find((p) => p.year === 2027)
-    if (year2025Idx >= 0) forecastData[year2025Idx] = f2025 ? f2025.value : null
-    if (year2026Idx >= 0) forecastData[year2026Idx] = f2026 ? f2026.value : null
-    if (year2027Idx >= 0) forecastData[year2027Idx] = f2027 ? f2027.value : null
+  // EMPALME 2025: Usar el ÚLTIMO VALOR HISTÓRICO REAL (hist) en 2025
+  // Buscar en hist (datos reales) el valor de 2025
+  const hist2025 = hist.find((p) => p.year === 2025)
+  const empalme2025 = hist2025 ? hist2025.value : null
+
+  // Si no hay hist 2025, buscar en trend (media móvil) como fallback
+  const trend2025 = trend.find((p) => p.year === 2025)
+  const empalmeFinal = (hist2025 && hist2025.value !== null) ? hist2025.value 
+                        : (trend2025 && trend2025.value !== null ? trend2025.value : null)
+
+  if (year2025Idx >= 0 && empalmeFinal !== null) {
+    forecastData[year2025Idx] = empalmeFinal
   }
+  
+  // 2026 y 2027: SIEMPRE usar valores proyectados del modelo (fc)
+  // Si fc tiene los valores, usarlos; si no, null
+  const f2026 = fc.find((p) => p.year === 2026)
+  const f2027 = fc.find((p) => p.year === 2027)
+  if (year2026Idx >= 0) forecastData[year2026Idx] = f2026 ? f2026.value : null
+  if (year2027Idx >= 0) forecastData[year2027Idx] = f2027 ? f2027.value : null
 
   // forecastData ya está alineado con labels (2016-2027), solo 2025-2027 tienen valores
 
@@ -624,7 +626,7 @@ export function projectionChart(canvas, proj) {
     datasets.push({
       label: 'Proyección',
       data: forecastData,
-      borderColor: '#dc2626',
+      borderColor: '#f97316',
       borderDash: [6, 5],
       borderWidth: 2,
       pointRadius: 3,
