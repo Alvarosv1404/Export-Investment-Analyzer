@@ -565,14 +565,7 @@ export function projectionChart(canvas, proj) {
   let projValue2026 = null
   let projValue2027 = null
 
-  if (isMovingAverage) {
-    // MEDIA MÓVIL: Proyectar la última media móvil hacia adelante (línea plana)
-    const trend2025 = trend.find((p) => p.year === 2025)
-    const lastMovingAvg = trend2025 ? trend2025.value : null
-    projValue2025 = lastMovingAvg
-    projValue2026 = lastMovingAvg
-    projValue2027 = lastMovingAvg
-  } else if (isTrend) {
+  if (isTrend) {
     // TENDENCIA LINEAL/CUADRÁTICA: Usar valores de la tendencia ajustada
     const trend2025 = trend.find((p) => p.year === 2025)
     const trend2026 = trend.find((p) => p.year === 2026)
@@ -623,16 +616,12 @@ export function projectionChart(canvas, proj) {
   let titleText = 'Proyección FOB'
   let subtitleText = ''
 
-  if (isMovingAverage) {
-    trendLabel = `Media móvil (${proj.window} años)`
-    titleText = `Proyección FOB por media móvil de ${proj.window} años`
-    subtitleText = `Promedio de ${proj.window_years?.join(', ') ?? ''}`
-  } else if (isTrend) {
+  if (isTrend) {
     const degreeLabel = proj.degree === 1 ? 'lineal' : 'cuadrática'
     trendLabel = `Tendencia ${degreeLabel} (R² = ${proj.r_squared ?? 'n/d'})`
     titleText = `Proyección FOB por tendencia ${degreeLabel}`
     if (proj.equation) subtitleText = `Ecuación: ${proj.equation}`
-  } else if (isCagr) {
+  } else } else if (isCagr) {
     trendLabel = `CAGR ${proj.cagr_pct ? proj.cagr_pct + '%' : 'histórico'}`
     titleText = `Proyección FOB por CAGR histórico`
     subtitleText = `Basado en últimos años disponibles`
