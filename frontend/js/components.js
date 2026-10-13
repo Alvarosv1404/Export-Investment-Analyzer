@@ -187,6 +187,8 @@ export function projection(proj, state) {
   note += ` La línea <b>punteada</b> muestra los años siguientes (${proj.forecast_years?.join(', ') ?? ''}); es una proyección, no un dato observado.`
 
   const fc = proj.forecast?.map((f) => fullUSD(f.value)).join(' → ') || ''
+  const showProjectionChart =
+    proj.method !== 'moving_average' && proj.method !== 'media móvil simple'
 
   return `
     <section class="card">
@@ -202,7 +204,7 @@ export function projection(proj, state) {
         </span>
       </h2>
       <p class="note">${note}</p>
-      <div class="chart chart-tall"><canvas id="chartProjection" height="280"></canvas></div>
+      ${showProjectionChart ? '<div class="chart chart-tall"><canvas id="chartProjection" height="280"></canvas></div>' : ''}
       <p class="note">Proyección anual FOB: <b>${fc}</b>. ${avgValue}</p>
     </section>`
 }

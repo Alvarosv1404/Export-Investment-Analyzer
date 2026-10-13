@@ -518,7 +518,12 @@ export function shareDonut(canvas, yearData) {
  * Soporta metodos: moving_average, linear, quadratic, cagr
  */
 export function projectionChart(canvas, proj) {
-  if (!canvas || !proj?.available) return
+  if (
+    !canvas ||
+    !proj?.available ||
+    proj.method === 'moving_average' ||
+    proj.method === 'media móvil simple'
+  ) return
 
   const isTrend = proj.method === 'linear' || proj.method === 'quadratic'
   const isCagr = proj.method === 'cagr'
@@ -637,7 +642,7 @@ export function projectionChart(canvas, proj) {
     },
   ]
 
-  if (trendData.some(v => v !== null)) {
+  if (isTrend && trendData.some(v => v !== null)) {
     datasets.push({
       label: trendLabel,
       data: trendData,
