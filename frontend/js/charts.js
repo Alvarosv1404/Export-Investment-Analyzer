@@ -621,7 +621,7 @@ export function projectionChart(canvas, proj) {
     trendLabel = `Tendencia ${degreeLabel} (R² = ${proj.r_squared ?? 'n/d'})`
     titleText = `Proyección FOB por tendencia ${degreeLabel}`
     if (proj.equation) subtitleText = `Ecuación: ${proj.equation}`
-  } else } else if (isCagr) {
+  } else if (isCagr) {
     trendLabel = `CAGR ${proj.cagr_pct ? proj.cagr_pct + '%' : 'histórico'}`
     titleText = `Proyección FOB por CAGR histórico`
     subtitleText = `Basado en últimos años disponibles`
