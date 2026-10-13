@@ -39,6 +39,10 @@ class ProjectInputs:
     opex_fixed_usd_year: float
     working_capital_usd: float
 
+    # Parámetros de volumen ingresados por usuario (usados para construir rampa)
+    year1_volume_kg: float | None = None
+    annual_volume_growth_pct: float | None = None
+
     project_years: int = 5
     discount_rate: float = 0.12
     tax_rate: float = 0.30

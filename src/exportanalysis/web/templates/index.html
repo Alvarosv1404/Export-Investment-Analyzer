@@ -17,7 +17,7 @@
   {% for p in products %}
     <a class="chip {% if p.slug == selected %}active{% endif %}"
        href="/?slug={{ p.slug }}{% if target_share %}&target_share={{ target_share }}{% endif %}">
-      {{ p.name }} <span class="hs6">HS {{ p.hs6 }}</span>
+      {{ p.name }}
     </a>
   {% endfor %}
 </nav>

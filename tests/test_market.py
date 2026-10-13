@@ -1,4 +1,6 @@
-from exportanalysis.pipeline.market import moving_average_projection
+import pytest
+
+from exportanalysis.pipeline.market import moving_average_projection, trend_projection
 
 
 def test_moving_average_projection_forecasts_two_years_from_last_three_values():
@@ -29,3 +31,22 @@ def test_moving_average_projection_requires_consecutive_recent_years():
     )
 
     assert result["available"] is False
+
+
+def test_trend_projection_uses_entire_historical_window_for_linear_fit():
+    result = trend_projection(
+        [
+            {"year": 2020, "fob_usd": 10.0},
+            {"year": 2021, "fob_usd": 20.0},
+            {"year": 2022, "fob_usd": 30.0},
+            {"year": 2023, "fob_usd": 40.0},
+            {"year": 2024, "fob_usd": 50.0},
+        ],
+        degree=1,
+        forecast_years=2,
+    )
+
+    assert result["available"] is True
+    assert result["forecast_years"] == [2025, 2026]
+    assert result["forecast"][0]["value"] == pytest.approx(60.0)
+    assert result["forecast"][1]["value"] == pytest.approx(70.0)

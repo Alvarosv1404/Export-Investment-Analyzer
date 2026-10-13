@@ -161,21 +161,21 @@ async function refreshComparison() {
 /** Genera las opciones para el custom select (con role="option" y atributos necesarios). */
 function productOptionsForCustomSelect() {
   const option = (p, idx) =>
-    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</div>`
+    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)}</div>`
   return state.products.map(option).join('')
 }
 
 /** Genera las opciones para el select nativo (fallback/form submission). */
 function productOptionsForNativeSelect() {
   const option = (p) =>
-    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</option>`
+    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)}</option>`
   return state.products.map(option).join('')
 }
 
 /** Genera el HTML del custom select para la vista de análisis. */
 function renderCustomSelect() {
   const selected = state.products.find(p => p.slug === state.slug) || state.products[0]
-  const selectedLabel = selected ? `${selected.name} (HS ${selected.hs6})` : 'Seleccionar producto'
+  const selectedLabel = selected ? selected.name : 'Seleccionar producto'
   const customOptionsHtml = productOptionsForCustomSelect()
   const nativeOptionsHtml = productOptionsForNativeSelect()
 
@@ -210,32 +210,20 @@ function renderControls() {
       </button>
     </nav>`
   if (state.view === 'compare') {
-    const industries = [...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort()
-    const industryFilter = industries.length
-      ? `
-          <div class="filter-chips" id="compareIndustryChips" role="group" aria-label="Filtrar por industria">
-            <button type="button" class="filter-chip active" data-industry="">Todas</button>
-            ${industries.map((name) => `<button type="button" class="filter-chip" data-industry="${escapeHTML(name)}">${escapeHTML(name)}</button>`).join('')}
-          </div>`
-      : ''
     return `${tabs}
       <form class="controls-form comparison-controls" id="comparisonForm">
         <fieldset class="compare-picker">
           <legend>Elige los productos que quieres comparar</legend>
-          <p class="compare-picker-hint">Marca uno o varios. La comparación se actualiza sola; puedes empezar con el producto actual y añadir otros.</p>
-          <div class="compare-filters">
-            ${industryFilter}
-          </div>
+          <p class="compare-picker-hint">Marca uno o varios para verlos juntos en la comparación.</p>
           <div class="compare-options">
             ${state.products
               .map(
                 (p) => `
-                  <label class="compare-option" data-product-name="${escapeHTML(`${p.name} ${p.hs6} ${p.industry || ''}`.toLowerCase())}" data-product-industry="${escapeHTML(p.industry || '')}">
+                  <label class="compare-option" data-product-name="${escapeHTML(p.name.toLowerCase())}" data-product-industry="${escapeHTML(p.industry || '')}">
                     <input type="checkbox" name="compareSlugs" value="${escapeHTML(p.slug)}"
                            ${state.compareSlugs.includes(p.slug) ? 'checked' : ''} />
                     <span class="compare-option-copy">
                       <span class="compare-option-name">${escapeHTML(p.name)}</span>
-                      <span class="hs6">HS ${escapeHTML(p.hs6)}</span>
                     </span>
                   </label>`
               )
@@ -252,19 +240,8 @@ function renderControls() {
       </form>`
   }
 
-  // Analysis view: selector + industry filter chips
-  const industries = [...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort()
-  const industryChips = industries.length
-    ? `
-        <div class="filter-chips" id="analysisIndustryChips" role="group" aria-label="Filtrar por industria">
-          <button type="button" class="filter-chip active" data-industry="">Todas</button>
-          ${industries.map((name) => `<button type="button" class="filter-chip" data-industry="${escapeHTML(name)}">${escapeHTML(name)}</button>`).join('')}
-        </div>`
-    : ''
-
   const form = `
     <div class="controls-form" id="controlsForm">
-      ${industryChips}
       ${renderCustomSelect()}
     </div>`
 
@@ -298,31 +275,10 @@ function bindControls(onChange) {
     }
     checkboxes.forEach((input) => input.addEventListener('change', scheduleReload))
 
-    const industryChips = comparisonForm.querySelectorAll('#compareIndustryChips .filter-chip')
-    const applyProductFilter = () => {
-      const activeChip = comparisonForm.querySelector('#compareIndustryChips .filter-chip.active')
-      const industry = activeChip ? activeChip.dataset.industry : ''
-      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
-        const matchesIndustry = !industry || option.dataset.productIndustry === industry
-        option.hidden = !matchesIndustry
-      })
-    }
-    industryChips.forEach((chip) => {
-      chip.addEventListener('click', () => {
-        industryChips.forEach((c) => c.classList.remove('active'))
-        chip.classList.add('active')
-        applyProductFilter()
-      })
-    })
-
     document.getElementById('selectAllProducts').addEventListener('click', () => {
       checkboxes.forEach((input) => {
         input.checked = true
       })
-      const allChip = comparisonForm.querySelector('#compareIndustryChips .filter-chip[data-industry=""]')
-      industryChips.forEach((c) => c.classList.remove('active'))
-      if (allChip) allChip.classList.add('active')
-      applyProductFilter()
       scheduleReload()
     })
     document.getElementById('clearProducts').addEventListener('click', () => {
@@ -347,47 +303,6 @@ function bindControls(onChange) {
   // --- Custom Select binding (Analysis view) ---
   bindCustomSelect(form, onChange)
 
-  // Analysis view: industry filter chips (sync with custom select)
-  const analysisChips = form.querySelectorAll('#analysisIndustryChips .filter-chip')
-  if (analysisChips.length) {
-    analysisChips.forEach((chip) => {
-      chip.addEventListener('click', () => {
-        analysisChips.forEach((c) => c.classList.remove('active'))
-        chip.classList.add('active')
-        const industry = chip.dataset.industry
-        // Filter custom select options
-        filterCustomSelectOptions(form, industry)
-        // Sync native select for form submission
-        syncNativeSelect(form, industry)
-        // Select first visible option
-        selectFirstVisibleCustomOption(form)
-      })
-    })
-  }
-}
-
-function filterCustomSelectOptions(form, industry) {
-  const options = form.querySelectorAll('#customSelectOptions [role="option"]')
-  options.forEach((option) => {
-    const optionIndustry = option.dataset.industry || ''
-    option.hidden = Boolean(industry && optionIndustry !== industry)
-  })
-}
-
-function syncNativeSelect(form, industry) {
-  const nativeSelect = form.querySelector('#productSelect')
-  Array.from(nativeSelect.options).forEach((option) => {
-    const optionIndustry = option.dataset.industry || ''
-    option.hidden = Boolean(industry && optionIndustry !== industry)
-  })
-  const firstVisible = Array.from(nativeSelect.options).find((option) => !option.hidden)
-  if (firstVisible) nativeSelect.value = firstVisible.value
-}
-
-function selectFirstVisibleCustomOption(form) {
-  const optionsContainer = form.querySelector('#customSelectOptions')
-  const firstVisible = optionsContainer.querySelector('[role="option"]:not([hidden])')
-  if (firstVisible) firstVisible.click()
 }
 
 /** Vincula el comportamiento del custom select (abrir/cerrar, teclado, búsqueda, selección). */

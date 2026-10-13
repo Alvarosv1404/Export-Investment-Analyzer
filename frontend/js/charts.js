@@ -545,17 +545,9 @@ export function projectionChart(canvas, proj) {
     return f ? f.value : null
   })
 
-  // Conectar el último dato histórico con la primera proyección para línea continua
-  // Esto hace que la proyección (roja punteada) salga visualmente desde el último punto real
-  if (histData.length && forecastData.length) {
-    const lastHistIdx = histData.lastIndexOf(histData.find(v => v !== null))
-    const firstForecastIdx = forecastData.findIndex(v => v !== null)
-    if (lastHistIdx >= 0 && firstForecastIdx >= 0) {
-      // El forecast empieza en el año siguiente al último histórico
-      // Para que se vea continuo, duplicamos el valor histórico en el primer forecast
-      forecastData[firstForecastIdx] = histData[lastHistIdx]
-    }
-  }
+  // Las proyecciones deben respetar el modelo del dato y no anclar el primer
+  // punto futuro al último valor histórico. Ese “pegado” crea una línea falsa y
+  // distorsiona la interpretación de media móvil, tendencia y CAGR.
 
   // Etiquetas y colores segun metodo
   let trendLabel = 'Tendencia'
