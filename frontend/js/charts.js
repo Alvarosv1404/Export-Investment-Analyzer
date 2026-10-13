@@ -554,26 +554,66 @@ export function projectionChart(canvas, proj) {
   const year2026Idx = labels.indexOf(2026)
   const year2027Idx = labels.indexOf(2027)
 
-  // EMPALME 2025: Usar el ÚLTIMO VALOR HISTÓRICO REAL (hist) en 2025
-  // Buscar en hist (datos reales) el valor de 2025
-  const hist2025 = hist.find((p) => p.year === 2025)
-  const empalme2025 = hist2025 ? hist2025.value : null
+  // PROYECCIÓN: Calcular correctamente según el método
+  // ------------------------------------------------------------
+  // Media móvil: proyectar la última media móvil hacia adelante (línea plana)
+  // Tendencia lineal/cuadrática: extender la curva ajustada (trend)
+  // CAGR: crecimiento compuesto hacia adelante
+  // ------------------------------------------------------------
 
-  // Si no hay hist 2025, buscar en trend (media móvil) como fallback
-  const trend2025 = trend.find((p) => p.year === 2025)
-  const empalmeFinal = (hist2025 && hist2025.value !== null) ? hist2025.value 
-                        : (trend2025 && trend2025.value !== null ? trend2025.value : null)
+  let projValue2025 = null
+  let projValue2026 = null
+  let projValue2027 = null
 
-  if (year2025Idx >= 0 && empalmeFinal !== null) {
-    forecastData[year2025Idx] = empalmeFinal
+  if (isMovingAverage) {
+    // MEDIA MÓVIL: Proyectar la última media móvil hacia adelante (línea plana)
+    const trend2025 = trend.find((p) => p.year === 2025)
+    const lastMovingAvg = trend2025 ? trend2025.value : null
+    projValue2025 = lastMovingAvg
+    projValue2026 = lastMovingAvg
+    projValue2027 = lastMovingAvg
+  } else if (isTrend) {
+    // TENDENCIA LINEAL/CUADRÁTICA: Usar valores de la tendencia ajustada
+    const trend2025 = trend.find((p) => p.year === 2025)
+    const trend2026 = trend.find((p) => p.year === 2026)
+    const trend2027 = trend.find((p) => p.year === 2027)
+    projValue2025 = trend2025 ? trend2025.value : null
+    projValue2026 = trend2026 ? trend2026.value : null
+    projValue2027 = trend2027 ? trend2027.value : null
+    // Fallback a fc si no hay trend para 2026/2027
+    if (projValue2026 === null) {
+      const f2026 = fc.find((p) => p.year === 2026)
+      projValue2026 = f2026 ? f2026.value : null
+    }
+    if (projValue2027 === null) {
+      const f2027 = fc.find((p) => p.year === 2027)
+      projValue2027 = f2027 ? f2027.value : null
+    }
+  } else if (isCagr) {
+    // CAGR: Crecer al ritmo del CAGR histórico
+    // Usar el ÚLTIMO VALOR HISTÓRICO REAL (hist) como base, no la tendencia
+    const hist2025 = hist.find((p) => p.year === 2025)
+    const baseValue = hist2025 ? hist2025.value : null
+    const cagr = proj.cagr_pct ? proj.cagr_pct / 100 : 0
+    if (baseValue !== null && cagr > 0) {
+      projValue2025 = baseValue
+      projValue2026 = baseValue * (1 + cagr)
+      projValue2027 = baseValue * Math.pow(1 + cagr, 2)
+    }
+  } else {
+    // Fallback: usar fc (forecast del backend)
+    const f2025 = fc.find((p) => p.year === 2025)
+    const f2026 = fc.find((p) => p.year === 2026)
+    const f2027 = fc.find((p) => p.year === 2027)
+    projValue2025 = f2025 ? f2025.value : null
+    projValue2026 = f2026 ? f2026.value : null
+    projValue2027 = f2027 ? f2027.value : null
   }
-  
-  // 2026 y 2027: SIEMPRE usar valores proyectados del modelo (fc)
-  // Si fc tiene los valores, usarlos; si no, null
-  const f2026 = fc.find((p) => p.year === 2026)
-  const f2027 = fc.find((p) => p.year === 2027)
-  if (year2026Idx >= 0) forecastData[year2026Idx] = f2026 ? f2026.value : null
-  if (year2027Idx >= 0) forecastData[year2027Idx] = f2027 ? f2027.value : null
+
+  // Asignar valores calculados al array forecastData
+  if (year2025Idx >= 0 && projValue2025 !== null) forecastData[year2025Idx] = projValue2025
+  if (year2026Idx >= 0 && projValue2026 !== null) forecastData[year2026Idx] = projValue2026
+  if (year2027Idx >= 0 && projValue2027 !== null) forecastData[year2027Idx] = projValue2027
 
   // forecastData ya está alineado con labels (2016-2027), solo 2025-2027 tienen valores
 
