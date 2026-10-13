@@ -338,8 +338,13 @@ def _analyze_product_uncached(
     elif capacity_kg_year is None:
         overrides["capacity_kg_year"] = 0.0
     missing = assumptions.missing_for(slug, overrides)
+    if year1_volume_kg is None:
+        missing.append("year1_volume_kg")
+    if annual_volume_growth_pct is None:
+        missing.append("annual_volume_growth_pct")
     if fob_price <= 0:
         missing.append("price_usd_per_kg")
+    missing = list(dict.fromkeys(missing))
     if missing:
         return {
             "slug": slug,
@@ -385,8 +390,8 @@ def _analyze_product_uncached(
 
     capex_inputs = assumptions.for_product(slug, overrides)
     capacity = capex_inputs["capacity_kg_year"]
-    year1_volume = capex_inputs["year1_volume_kg"]
-    annual_growth = capex_inputs["annual_volume_growth_pct"]
+    year1_volume = year1_volume_kg if year1_volume_kg is not None else capex_inputs["year1_volume_kg"]
+    annual_growth = annual_volume_growth_pct if annual_volume_growth_pct is not None else capex_inputs["annual_volume_growth_pct"]
     if capacity <= 0:
         raise ValueError("La capacidad anual debe ser mayor que cero.")
     if year1_volume <= 0 or year1_volume > capacity:

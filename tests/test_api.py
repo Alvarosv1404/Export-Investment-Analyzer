@@ -159,6 +159,23 @@ class TestAnalysis:
         assert data["projection"]["method"] == "moving_average"
         assert len(data["projection"]["forecast"]) == 2
 
+    def test_falta_volumen_o_crecimiento_no_rebota(self, client):
+        query = (
+            "capacity_kg_year=100000"
+            "&purchase_cost_usd_per_kg=2"
+            "&variable_cost_usd_per_kg=0.5"
+            "&capex_usd=250000"
+            "&opex_fixed_usd_year=30000"
+            "&working_capital_usd=12000"
+            "&discount_rate=0.12"
+        )
+        response = client.get(f"/api/analysis/cafe_verde?{query}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["investment"] is None
+        assert "year1_volume_kg" in data["assumptions_missing"]
+        assert "annual_volume_growth_pct" in data["assumptions_missing"]
+
     def test_modelo_financiero_solo_se_calcula_con_supuestos_completos(self, client):
         data = client.get(f"/api/analysis/cafe_verde?{FINANCIAL_QUERY}").json()
         assert data["investment"] is not None

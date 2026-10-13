@@ -161,7 +161,7 @@ async function refreshComparison() {
 /** Genera las opciones para el custom select (con role="option" y atributos necesarios). */
 function productOptionsForCustomSelect() {
   const option = (p, idx) =>
-    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})${p.industry ? `<span class="custom-select-option-industry">${escapeHTML(p.industry)}</span>` : ''}</div>`
+    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)} (HS ${escapeHTML(p.hs6)})</div>`
   return state.products.map(option).join('')
 }
 
@@ -187,9 +187,6 @@ function renderCustomSelect() {
         <svg class="custom-select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
       <div class="custom-select-dropdown" id="customSelectDropdown" role="listbox" hidden>
-        <div class="custom-select-search-wrapper">
-          <input type="search" class="custom-select-search" placeholder="Buscar producto o HS..." aria-label="Buscar en la lista" autocomplete="off">
-        </div>
         <div class="custom-select-options" id="customSelectOptions" role="listbox">
           ${customOptionsHtml}
         </div>
@@ -227,10 +224,6 @@ function renderControls() {
           <legend>Elige los productos que quieres comparar</legend>
           <p class="compare-picker-hint">Marca uno o varios. La comparación se actualiza sola; puedes empezar con el producto actual y añadir otros.</p>
           <div class="compare-filters">
-            <div class="compare-filter">
-              <label class="compare-search-label" for="compareSearch">Buscar por nombre o código HS</label>
-              <input type="search" id="compareSearch" class="compare-search" placeholder="Ej.: café o 090111" />
-            </div>
             ${industryFilter}
           </div>
           <div class="compare-options">
@@ -243,7 +236,6 @@ function renderControls() {
                     <span class="compare-option-copy">
                       <span class="compare-option-name">${escapeHTML(p.name)}</span>
                       <span class="hs6">HS ${escapeHTML(p.hs6)}</span>
-                      ${p.industry ? `<span class="chip chip-industry">${escapeHTML(p.industry)}</span>` : ''}
                     </span>
                   </label>`
               )
@@ -306,20 +298,15 @@ function bindControls(onChange) {
     }
     checkboxes.forEach((input) => input.addEventListener('change', scheduleReload))
 
-    const searchInput = document.getElementById('compareSearch')
     const industryChips = comparisonForm.querySelectorAll('#compareIndustryChips .filter-chip')
-    // Filtra la lista por texto (nombre/HS/industria) y por industria elegida.
     const applyProductFilter = () => {
-      const query = searchInput.value.trim().toLowerCase()
       const activeChip = comparisonForm.querySelector('#compareIndustryChips .filter-chip.active')
       const industry = activeChip ? activeChip.dataset.industry : ''
       comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
-        const matchesQuery = option.dataset.productName.includes(query)
         const matchesIndustry = !industry || option.dataset.productIndustry === industry
-        option.hidden = !(matchesQuery && matchesIndustry)
+        option.hidden = !matchesIndustry
       })
     }
-    searchInput.addEventListener('input', applyProductFilter)
     industryChips.forEach((chip) => {
       chip.addEventListener('click', () => {
         industryChips.forEach((c) => c.classList.remove('active'))
@@ -329,13 +316,9 @@ function bindControls(onChange) {
     })
 
     document.getElementById('selectAllProducts').addEventListener('click', () => {
-      // Marca todos y limpia los filtros: el boton dice "Seleccionar todos", no
-      // "los filtrados". Si no, con una busqueda o industria puesta solo se
-      // comparaban los visibles y parecia que faltaba informacion.
       checkboxes.forEach((input) => {
         input.checked = true
       })
-      searchInput.value = ''
       const allChip = comparisonForm.querySelector('#compareIndustryChips .filter-chip[data-industry=""]')
       industryChips.forEach((c) => c.classList.remove('active'))
       if (allChip) allChip.classList.add('active')
@@ -412,7 +395,6 @@ function bindCustomSelect(form, onChange) {
   const trigger = form.querySelector('#customSelectTrigger')
   const dropdown = form.querySelector('#customSelectDropdown')
   const optionsContainer = form.querySelector('#customSelectOptions')
-  const searchInput = form.querySelector('#customSelectDropdown .custom-select-search')
   const nativeSelect = form.querySelector('#productSelect')
   if (!trigger || !dropdown || !optionsContainer) return
 
@@ -427,11 +409,8 @@ function bindCustomSelect(form, onChange) {
   function openDropdown() {
     dropdown.hidden = false
     trigger.setAttribute('aria-expanded', 'true')
-    searchInput.value = ''
-    filterDropdownOptions('')
     refreshOptionsList()
     highlightOption(0)
-    searchInput.focus()
     document.addEventListener('click', handleOutsideClick)
     document.addEventListener('keydown', handleKeydown)
   }
@@ -440,8 +419,6 @@ function bindCustomSelect(form, onChange) {
   function closeDropdown() {
     dropdown.hidden = true
     trigger.setAttribute('aria-expanded', 'false')
-    searchInput.value = ''
-    filterDropdownOptions('')
     document.removeEventListener('click', handleOutsideClick)
     document.removeEventListener('keydown', handleKeydown)
     trigger.focus()
@@ -547,10 +524,6 @@ function bindCustomSelect(form, onChange) {
       if (dropdown.hidden) openDropdown()
     }
   })
-  searchInput.addEventListener('input', (e) => filterDropdownOptions(e.target.value))
-  searchInput.addEventListener('keydown', (e) => e.stopPropagation()) // Evita que Tab cierre al buscar
-  searchInput.addEventListener('click', (e) => e.stopPropagation())
-
   // Delegación de click en opciones
   optionsContainer.addEventListener('click', (e) => {
     const option = e.target.closest('[role="option"]')
