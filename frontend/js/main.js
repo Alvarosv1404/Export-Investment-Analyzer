@@ -49,7 +49,9 @@ const state = {
   // Año del gráfico circular de participación de mercado. Vive en la URL.
   shareYear: urlParams.get('share_year') ? Number(urlParams.get('share_year')) : null,
   // Método de proyección para el gráfico de exportación. Vive en la URL.
-  projectionMethod: urlParams.get('projection_method') || 'moving_average',
+  projectionMethod: ['linear', 'quadratic', 'cagr'].includes(urlParams.get('projection_method'))
+    ? urlParams.get('projection_method')
+    : 'linear',
   capex: initialFinancialValue('capex'),
   variableCost: initialFinancialValue('variable_cost'),
   year1Volume: initialFinancialValue('year1_volume'),

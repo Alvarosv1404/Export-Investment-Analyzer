@@ -196,7 +196,6 @@ export function projection(proj, state) {
         <span class="projection-method-selector">
           <label for="projectionMethod">Método:</label>
           <select id="projectionMethod" class="sim-select">
-            <option value="moving_average" ${state?.projectionMethod === 'moving_average' ? 'selected' : ''}>Media móvil simple</option>
             <option value="linear" ${state?.projectionMethod === 'linear' ? 'selected' : ''}>Tendencia lineal</option>
             <option value="quadratic" ${state?.projectionMethod === 'quadratic' ? 'selected' : ''}>Tendencia cuadrática</option>
             <option value="cagr" ${state?.projectionMethod === 'cagr' ? 'selected' : ''}>CAGR histórico</option>
