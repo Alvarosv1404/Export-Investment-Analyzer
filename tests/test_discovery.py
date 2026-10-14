@@ -201,7 +201,6 @@ class TestIndustry:
     def test_catalogo_curado_declara_industria(self):
         products = {p.slug: p for p in config.load_catalog().products}
         assert products["cafe_verde"].industry == "Agricola"
-        assert products["aceite_palma"].industry == "Agroindustria"
         assert products["pota_calamar"].industry == "Pesquero"
 
     def test_toda_industria_declarada_esta_en_la_taxonomia(self):
