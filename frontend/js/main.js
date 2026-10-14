@@ -236,6 +236,12 @@ function renderControls() {
         <fieldset class="compare-picker">
           <legend>Elige los productos que quieres comparar</legend>
           <p class="compare-picker-hint">Marca uno o varios para verlos juntos en la comparación.</p>
+          <label class="compare-industry-filter" for="compareIndustryFilter">Filtrar por industria
+            <select id="compareIndustryFilter">
+              <option value="">Todas las industrias</option>
+              ${[...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort().map((ind) => `<option value="${escapeHTML(ind)}">${escapeHTML(ind)}</option>`).join('')}
+            </select>
+          </label>
           <div class="compare-options">
             ${state.products
               .map(
@@ -293,7 +299,13 @@ function bindControls(onChange) {
       window.clearTimeout(reloadTimer)
       reloadTimer = window.setTimeout(refreshComparison, 300)
     }
-    checkboxes.forEach((input) => input.addEventListener('change', scheduleReload))
+    document.getElementById('compareIndustryFilter')?.addEventListener('change', (event) => {
+      const industry = event.target.value
+      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
+        const optionIndustry = option.getAttribute('data-product-industry') || ''
+        option.style.display = !industry || optionIndustry === industry ? '' : 'none'
+      })
+    })
 
     document.getElementById('selectAllProducts').addEventListener('click', () => {
       checkboxes.forEach((input) => {
