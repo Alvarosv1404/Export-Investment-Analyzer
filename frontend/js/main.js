@@ -237,7 +237,7 @@ function renderControls() {
           <legend>Elige los productos que quieres comparar</legend>
           <p class="compare-picker-hint">Marca uno o varios para verlos juntos en la comparación.</p>
           <label class="compare-industry-filter" for="compareIndustryFilter">Filtrar por industria
-            <select id="compareIndustryFilter">
+            <select class="compare-industry-filter-select" id="compareIndustryFilter">
               <option value="">Todas las industrias</option>
               ${[...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort().map((ind) => `<option value="${escapeHTML(ind)}">${escapeHTML(ind)}</option>`).join('')}
             </select>

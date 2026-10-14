@@ -868,3 +868,8 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
   .control-block { min-width: 0; }
   .control-block select { width: 100%; min-width: 0; }
 }
+
+
+/* --- filtro de industria en comparacion --- */
+.compare-industry-filter { display: block; margin: 0.75rem 0 1rem; font-size: 0.85rem; color: var(--ink-soft); }
+.compare-industry-filter-select { margin-left: 0.5rem; padding: 0.35rem 0.6rem; border-radius: 0.5rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
