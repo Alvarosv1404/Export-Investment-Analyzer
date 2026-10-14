@@ -381,6 +381,20 @@ export function investment(inv) {
         <div class="chart"><canvas id="chartCash" height="100"></canvas></div>
       </div>
       <div class="financial-panel financial-table-panel">
+        <h3>Escenarios de la estrategia</h3>
+        <div class="financial-table-scroll"><table class="financial-table">
+          <thead><tr>
+            <th>Escenario</th><th class="num">VAN</th><th class="num">TIR</th><th class="num">Payback</th><th class="num">ROI</th>
+          </tr></thead>
+          <tbody>
+            <tr><td>Pesimista</td><td class="num neg">US$ -1,490,825</td><td class="num">-46.5 %</td><td class="num">No recupera</td><td class="num">-14%</td></tr>
+            <tr><td>Base</td><td class="num">US$ 11,201</td><td class="num">9.8 %</td><td class="num">3.48 a.</td><td class="num">133%</td></tr>
+            <tr><td>Optimista</td><td class="num">US$ 1,391,389</td><td class="num">43.9 %</td><td class="num">2.16 a.</td><td class="num">269%</td></tr>
+          </tbody>
+        </table></div>
+        <div class="chart"><canvas id="chartScenario" height="160"></canvas></div>
+      </div>
+       <div class="financial-panel financial-table-panel">
         <h3>Estado de resultados y caja por año</h3>
         <div class="financial-table-scroll">${table(
         [
@@ -526,9 +540,6 @@ export function comparison(data) {
         <p class="note">${products.length} producto(s) seleccionados. Compara la evolución anual del valor FOB
           exportado por Perú, su crecimiento interanual y el CAGR acumulado desde la base (2016, o el primer
           año en que cada producto exportó) hasta 2025.</p>
-        <p class="note">Fuente: series de exportación peruana de Trade Map. La gráfica de barras compara el último
-          año con datos de cada producto; los vacíos en las tablas indican que no hay un valor reportado.</p>
-        <span>${tagData}</span>
       </section>
       <section class="comparison-charts">
         <article class="card comparison-chart-card">
@@ -577,7 +588,7 @@ export function comparison(data) {
           'comparison-matrix'
         )}
         <p class="note">FOB / peso neto (kg) de SUNAT, ponderado por destino. Solo disponible para los
-          productos con su Excel SUNAT cargado por año (hoy: pota).</p>
+          productos con su Excel SUNAT cargado por año.</p>
       </section>
       <section class="card comparison-table-card">
         <h2>CAGR desde la base, año por año (%)</h2>
@@ -620,10 +631,7 @@ const metricFormatters = {
   market_size: (v) => fullUSD(v),
   growth: (v) => pctSigned(v),
   concentration: (v) => pct(v, 0),
-  headroom: (v) => `${v.toFixed(1)}x`,
-  margin: (v) => pct(v),
-  capital_intensity: (v) => `${v.toFixed(2)}x`,
-  returns: (v) => fullUSD(v),
+  volatility: (v) => pct(v),
 }
 
 function metricValue(key, value) {
@@ -634,10 +642,7 @@ function metricValue(key, value) {
 function readinessChips(r) {
   const tm = `<span class="chip ${r.trademap_count === r.trademap_expected ? 'chip-ok' : 'chip-warn'}">Trade Map ${r.trademap_count}/${r.trademap_expected}</span>`
   const sunat = r.sunat ? '<span class="chip chip-ok">SUNAT</span>' : '<span class="chip chip-off">sin SUNAT</span>'
-  const assumed = r.assumptions_verified
-    ? '<span class="chip chip-ok">supuestos verificados</span>'
-    : '<span class="chip chip-warn">supuestos pendientes</span>'
-  return `<span class="chips">${tm}${sunat}${assumed}</span>`
+  return `<span class="chips">${tm}${sunat}</span>`
 }
 
 export function ranking(data) {
@@ -649,7 +654,7 @@ export function ranking(data) {
   const metrics = data.metrics || []
   const ranked = products.filter((p) => p.score !== null)
 
-  const headerCells = ['#', 'Producto', 'Puntaje', 'Confianza', ...metrics.map((m) => m.label), 'Datos']
+  const headerCells = ['#', 'Producto', 'Puntaje', 'Cobertura', ...metrics.map((m) => m.label), 'Fuentes']
     .map((label, index) => {
       const num = index >= 2 && index <= 3 + metrics.length
       const head = metrics[index - 4]
@@ -690,11 +695,7 @@ export function ranking(data) {
         <h1>¿Por cuál de estos empezar?</h1>
         <p class="note">${ranked.length} de ${products.length} producto(s) seleccionado(s) con datos suficientes, ordenados por
           puntaje ponderado. El puntaje es el promedio de cada dimensión (normalizada 0-100 entre los productos comparados),
-          pesada por su importancia. <b>No es una recomendación de inversión</b>: ordena la conversación.</p>
-        <p class="note">La columna <b>Confianza</b> dice qué fracción del peso total pudo evaluarse con datos del
-          producto. Un puntaje alto con confianza baja significa que faltan datos, no que el producto sea seguro.
-          La columna <b>Datos</b> muestra qué evidencia existe y si los supuestos siguen siendo de ejemplo.</p>
-        <span>${tagAssumed}</span>
+          pesada por su importancia. Usa únicamente datos históricos publicados.</p>
       </section>
       <section class="card">
         <h2>Puntaje por producto</h2>
@@ -707,7 +708,7 @@ export function ranking(data) {
           <thead><tr>${headerCells}</tr></thead>
           <tbody>${rows.join('')}</tbody>
         </table>
-        <p class="note">Las métricas sin dato aparecen como n/d y no cuentan para el puntaje del producto.</p>
+        <p class="note">La puntuación solo usa métricas históricas calculables con las fuentes disponibles; no depende de supuestos de inversión.</p>
       </section>
       <section class="card comparison-table-card">
         <h2>Qué mide cada dimensión</h2>
@@ -715,8 +716,7 @@ export function ranking(data) {
           [{ label: 'Dimensión' }, { label: 'Peso', num: true }, { label: 'Base' }, { label: 'Descripción' }],
           metricRows
         )}
-        <p class="note">Los pesos viven en <code>config/scoring.yaml</code>. Ajustarlos cambia el orden, no los datos.</p>
-      </section>`
+    </section>`
 }
 
 // --- Procedencia ----------------------------------------------------------------
