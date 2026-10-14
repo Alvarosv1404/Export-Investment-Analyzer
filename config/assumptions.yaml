@@ -149,22 +149,6 @@ products:
     opex_fixed_usd_year: 150000
     working_capital_usd: 200000
 
-  aceite_palma:
-    capacity_kg_year: 500000
-    capex_usd: 2200000
-    purchase_cost_usd_per_kg: 0.45
-    variable_cost_usd_per_kg: 0.25
-    opex_fixed_usd_year: 200000
-    working_capital_usd: 300000
-
-  cochinilla_carmin:
-    capacity_kg_year: 10000
-    capex_usd: 900000
-    purchase_cost_usd_per_kg: 35.00
-    variable_cost_usd_per_kg: 5.00
-    opex_fixed_usd_year: 160000
-    working_capital_usd: 220000
-
   pota_calamar:
     # Escenario inicial ilustrativo, NO cotizaciones. Dimensionado para una
     # planta piloto de 500 t/ano, frente al FOB de Trade Map 2025 (~USD 2.89/kg).
