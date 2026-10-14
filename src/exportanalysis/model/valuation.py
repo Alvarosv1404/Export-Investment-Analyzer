@@ -14,12 +14,6 @@ _SENSITIVITY_LABELS = {
     "capex_shift": "Inversión inicial",
     "volume_shift": "Volumen exportado",
     "cost_shift": "Costo variable unitario",
-    "discount_rate": "COK (tasa)",
-    "initial_capex_usd": "Inversión inicial",
-    "variable_cost_usd_per_kg": "Costo variable unitario",
-    "year1_volume_tons": "Volumen exportado",
-    "volume_growth_pct": "Crecimiento del volumen",
-    "opex_fixed_usd_year": "Costos fijos",
 }
 
 

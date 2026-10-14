@@ -590,10 +590,10 @@ export function projectionChart(canvas, proj) {
 
   if (!hist.length && !trend.length && !fc.length) return
 
-  // Labels para el eje X completo (2016-2027) para todas las series
+  // Labels para el eje X completo (histórico + tendencia + proyección)
   const labels = [...new Set([...hist.map((p) => p.year), ...trend.map((p) => p.year), ...fc.map((p) => p.year)])].sort((a, b) => a - b)
 
-  // Datos históricos: un valor por cada año en labels (2016-2027)
+  // Datos históricos: un valor por cada año en labels (null donde no hay dato)
   let histData = labels.map((year) => {
     const h = hist.find((p) => p.year === year)
     return h ? h.value : null
@@ -605,69 +605,14 @@ export function projectionChart(canvas, proj) {
     return t ? t.value : null
   })
 
-  // PROYECCIÓN: Array alineado con labels (2016-2027)
-  // Solo 2025, 2026, 2027 tienen valores; resto null
-  let forecastData = labels.map(() => null)
-
-  // Índices fijos para 2025, 2026, 2027
-  const year2025Idx = labels.indexOf(2025)
-  const year2026Idx = labels.indexOf(2026)
-  const year2027Idx = labels.indexOf(2027)
-
-  // PROYECCIÓN: Calcular correctamente según el método
-  // ------------------------------------------------------------
-  // Tendencia lineal/cuadrática: extender la curva ajustada (trend)
-  // CAGR: crecimiento compuesto hacia adelante
-  // ------------------------------------------------------------
-
-  let projValue2025 = null
-  let projValue2026 = null
-  let projValue2027 = null
-
-  if (isTrend) {
-    // TENDENCIA LINEAL/CUADRÁTICA: Usar valores de la tendencia ajustada
-    const trend2025 = trend.find((p) => p.year === 2025)
-    const trend2026 = trend.find((p) => p.year === 2026)
-    const trend2027 = trend.find((p) => p.year === 2027)
-    projValue2025 = trend2025 ? trend2025.value : null
-    projValue2026 = trend2026 ? trend2026.value : null
-    projValue2027 = trend2027 ? trend2027.value : null
-    // Fallback a fc si no hay trend para 2026/2027
-    if (projValue2026 === null) {
-      const f2026 = fc.find((p) => p.year === 2026)
-      projValue2026 = f2026 ? f2026.value : null
-    }
-    if (projValue2027 === null) {
-      const f2027 = fc.find((p) => p.year === 2027)
-      projValue2027 = f2027 ? f2027.value : null
-    }
-  } else if (isCagr) {
-    // CAGR: Crecer al ritmo del CAGR histórico
-    // Usar el ÚLTIMO VALOR HISTÓRICO REAL (hist) como base, no la tendencia
-    const hist2025 = hist.find((p) => p.year === 2025)
-    const baseValue = hist2025 ? hist2025.value : null
-    const cagr = proj.cagr_pct ? proj.cagr_pct / 100 : 0
-    if (baseValue !== null && cagr > 0) {
-      projValue2025 = baseValue
-      projValue2026 = baseValue * (1 + cagr)
-      projValue2027 = baseValue * Math.pow(1 + cagr, 2)
-    }
-  } else {
-    // Fallback: usar fc (forecast del backend)
-    const f2025 = fc.find((p) => p.year === 2025)
-    const f2026 = fc.find((p) => p.year === 2026)
-    const f2027 = fc.find((p) => p.year === 2027)
-    projValue2025 = f2025 ? f2025.value : null
-    projValue2026 = f2026 ? f2026.value : null
-    projValue2027 = f2027 ? f2027.value : null
-  }
-
-  // Asignar valores calculados al array forecastData
-  if (year2025Idx >= 0 && projValue2025 !== null) forecastData[year2025Idx] = projValue2025
-  if (year2026Idx >= 0 && projValue2026 !== null) forecastData[year2026Idx] = projValue2026
-  if (year2027Idx >= 0 && projValue2027 !== null) forecastData[year2027Idx] = projValue2027
-
-  // forecastData ya está alineado con labels (2016-2027), solo 2025-2027 tienen valores
+  // PROYECCIÓN: la calcula el backend en `proj.forecast` (años futuros).
+  // Se ancla al último dato histórico real para que la línea punteada empiece ahí.
+  const lastHist = hist.length ? hist.reduce((a, b) => (b.year > a.year ? b : a)) : null
+  const forecastPoints = fc.length ? (lastHist ? [lastHist, ...fc] : fc) : []
+  const forecastData = labels.map((year) => {
+    const point = forecastPoints.find((p) => p.year === year)
+    return point ? point.value : null
+  })
 
   // Etiquetas y colores segun metodo
   let trendLabel = 'Tendencia'

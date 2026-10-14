@@ -255,7 +255,8 @@ function renderControls() {
         <fieldset class="compare-picker">
           <legend>Elige los productos que quieres comparar</legend>
           <p class="compare-picker-hint">Marca uno o varios para verlos juntos en la comparación.</p>
-          <label class="compare-industry-filter" for="compareIndustryFilter">Filtrar por industria
+          <label class="compare-industry-filter" for="compareIndustryFilter">
+            <span>Filtrar por industria</span>
             <select class="compare-industry-filter-select" id="compareIndustryFilter">
               <option value="">Todas las industrias</option>
               ${renderIndustryFilterOptions(state.comparisonIndustry)}
@@ -477,18 +478,6 @@ function bindCustomSelect(form, onChange) {
     if (el) el.scrollIntoView({ block: 'nearest' })
   }
 
-  // Filtra opciones del dropdown por texto de búsqueda
-  function filterDropdownOptions(query) {
-    const q = query.trim().toLowerCase()
-    const optionElements = optionsContainer.querySelectorAll('[role="option"]')
-    optionElements.forEach((opt) => {
-      const text = opt.textContent.toLowerCase()
-      const matches = !q || text.includes(q)
-      opt.hidden = !matches
-    })
-    highlightOption(0)
-  }
-
   // Selecciona una opción
   function selectOption(option) {
     const value = option.dataset.value
@@ -678,14 +667,6 @@ function render(result) {
   }
 
   const product = result.product || {}
-  const hasFinancialInputs = [
-    state.year1Volume,
-    state.annualGrowth,
-    state.variableCost,
-    state.capex,
-    state.opex,
-    state.discountRate,
-  ].every((value) => value !== '')
   const evaluationResults = result.investment
     ? `${investment(result.investment)}${sensitivity(result.investment)}${monteCarloRisk(result.investment)}`
     : `${missingAssumptions(result) || `

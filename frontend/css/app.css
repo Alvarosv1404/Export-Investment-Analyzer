@@ -166,16 +166,11 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
 /* --- Custom Select / Dropdown personalizado --- */
 .custom-select {
   position: relative;
-  width: 100%;
-  max-width: 28rem;
-  font-family: inherit;
 }
 .custom-select-label {
-  display: block;
   font-size: 0.78rem;
-  color: var(--ink-soft);
-  margin-bottom: 0.35rem;
   font-weight: 500;
+  color: var(--ink-soft);
 }
 .custom-select-trigger {
   display: flex;
@@ -199,9 +194,9 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   background: #fafafa;
 }
 .custom-select-trigger:focus-visible {
-  outline: 2px solid var(--data);
-  outline-offset: 2px;
+  outline: none;
   border-color: var(--data);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 .custom-select-trigger[aria-expanded="true"] {
   border-color: var(--data);
@@ -513,7 +508,14 @@ a.btn { display: inline-flex; align-items: center; gap: 0.4rem; text-decoration:
   font-weight: 500;
   color: var(--ink-soft);
 }
-.share-year-filter .sim-select { flex: 0 0 auto; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+.share-year-filter .sim-select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  padding: 0.35rem 2.1rem 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  background-position: right 0.6rem center;
+}
 
 /* --- selector de método de proyección --- */
 .projection-method-selector {
@@ -525,7 +527,14 @@ a.btn { display: inline-flex; align-items: center; gap: 0.4rem; text-decoration:
   font-weight: 500;
   color: var(--ink-soft);
 }
-.projection-method-selector .sim-select { flex: 0 0 auto; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+.projection-method-selector .sim-select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  padding: 0.35rem 2.1rem 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  background-position: right 0.6rem center;
+}
 .share-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
@@ -870,44 +879,74 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
 }
 
 
-/* --- filtro de industria en comparacion --- */
-.industry-filter {
+/* --- filtros y selectores: un solo estilo propio, no el nativo del navegador --- */
+/* Todos los filtros comparten el mismo contenedor (etiqueta arriba, control abajo)
+   para que "Producto para analizar" y "Filtrar por industria" se vean iguales. */
+.industry-filter,
+.compare-industry-filter,
+.custom-select {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  color: var(--ink-soft);
-  font-size: 0.8rem;
-}
-.industry-filter-select,
-.compare-industry-filter-select {
+  gap: 0.35rem;
+  flex: 1 1 auto;
   min-width: 15rem;
-  padding: 0.42rem 2rem 0.42rem 0.55rem;
+  max-width: 24rem;
+  color: var(--ink-soft);
+}
+.industry-filter > span,
+.compare-industry-filter > span,
+.controls-form .custom-select-label,
+.custom-select .custom-select-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.compare-industry-filter { margin: 0.75rem 0 1rem; }
+
+/* Select nativo reestilizado: se oculta la flecha del sistema y se dibuja una
+   propia, para que no se vea como el select por defecto del navegador. */
+.industry-filter-select,
+.compare-industry-filter-select,
+.control-block select,
+.sim-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 15rem;
+  padding: 0.6rem 2.5rem 0.6rem 0.85rem;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--card);
+  border-radius: 10px;
+  background-color: var(--card);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 1rem 1rem;
   color: var(--ink);
   font: inherit;
   font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
-.industry-filter-select:focus,
-.compare-industry-filter-select:focus {
-  outline: 2px solid var(--data);
-  outline-offset: -1px;
+.industry-filter-select:hover,
+.compare-industry-filter-select:hover,
+.control-block select:hover,
+.sim-select:hover {
+  border-color: var(--data);
+  background-color: #fafafa;
 }
-.compare-industry-filter {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.65rem;
-  margin: 0.75rem 0 1rem;
-  color: var(--ink-soft);
-  font-size: 0.8rem;
+.industry-filter-select:focus-visible,
+.compare-industry-filter-select:focus-visible,
+.control-block select:focus-visible,
+.sim-select:focus-visible {
+  outline: none;
+  border-color: var(--data);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
-.compare-industry-filter-select { min-width: 12rem; }
 
 @media (max-width: 640px) {
   .industry-filter,
-  .industry-filter-select,
   .compare-industry-filter,
-  .compare-industry-filter-select { width: 100%; min-width: 0; }
+  .custom-select,
+  .industry-filter-select,
+  .compare-industry-filter-select { width: 100%; min-width: 0; max-width: 100%; }
 }

@@ -25,9 +25,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
-    # El TestClient de starlette lo requiere. Se llama httpx2 porque es lo que
-    # pide starlette en esta version; no es un error de tipeo.
-    "httpx2>=0.1",
+    # El TestClient de starlette lo requiere (ya es dependencia de ejecucion,
+    # aqui se repite para que el entorno de pruebas quede completo).
+    "httpx>=0.27",
 ]
 
 [tool.setuptools.packages.find]

@@ -14,18 +14,24 @@
     th,td{border:1px solid #eef2f7;padding:6px;text-align:right;font-size:13px}
     th:first-child,td:first-child{text-align:left}
     small{color:#6b7280}
+    .error{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:10px 12px;margin:12px 0}
   </style>
 </head>
 <body>
   <h1>Export Investment Analyzer</h1>
   <small>Datos cargados directamente desde archivos Excel en data/</small>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
   <div class="grid">
     <div class="card">
-      <h3>Destinos Perú ({{ hs6 }}) - 2024</h3>
+      <h3>Destinos Perú ({{ hs6 }}) - {{ year }}</h3>
       <canvas id="barChart" height="180"></canvas>
     </div>
     <div class="card">
-      <h3>Top destinos 2024</h3>
+      <h3>Exportaciones FOB por año ({{ hs6 }})</h3>
+      <canvas id="trendChart" height="180"></canvas>
+    </div>
+    <div class="card">
+      <h3>Top destinos {{ year }}</h3>
       <table>
         <thead><tr><th>Destino</th><th>FOB USD</th><th>%</th></tr></thead>
         <tbody>
@@ -37,10 +43,16 @@
     </div>
   </div>
   <script>
-    const ctx=document.getElementById('barChart').getContext('2d');
-    new Chart(ctx,{type:'bar',data:{
+    const barCtx=document.getElementById('barChart').getContext('2d');
+    new Chart(barCtx,{type:'bar',data:{
       labels:{{ labels|tojson }},
-      datasets:[{label:'FOB USD (2024)',data:{{ values|tojson }},borderRadius:4}]
+      datasets:[{label:'FOB USD ({{ year }})',data:{{ values|tojson }},borderRadius:4}]
+    },options:{plugins:{legend:{display:false}},responsive:true,scales:{y:{ticks:{callback:v=>v.toLocaleString()}}}}});
+
+    const trendCtx=document.getElementById('trendChart').getContext('2d');
+    new Chart(trendCtx,{type:'line',data:{
+      labels:{{ trend_labels|tojson }},
+      datasets:[{label:'FOB USD',data:{{ trend_vals|tojson }},borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.08)',fill:true,tension:.25}]
     },options:{plugins:{legend:{display:false}},responsive:true,scales:{y:{ticks:{callback:v=>v.toLocaleString()}}}}});
   </script>
 </body>
