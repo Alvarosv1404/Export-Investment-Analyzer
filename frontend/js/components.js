@@ -24,7 +24,6 @@ export function escapeHTML(value) {
     .replace(/'/g, '&#39;')
 }
 
-const tagAssumed = '<span class="tag tag-assumed">supuesto</span>'
 
 function kpi(label, value, note = '', extraClass = '') {
   return `
@@ -191,7 +190,7 @@ export function projection(proj, state) {
 
   return `
     <section class="card">
-      <h2>2d. Proyección de exportación ${tagAssumed}
+      <h2>2d. Proyección de exportación
         <span class="projection-method-selector">
           <label for="projectionMethod">Método:</label>
           <select id="projectionMethod" class="sim-select">
@@ -423,7 +422,7 @@ export function sensitivity(inv) {
       <div class="financial-result-header">
         <div>
           <span class="evaluation-eyebrow">ESCENARIOS DETERMINÍSTICOS</span>
-          <h2>Análisis de sensibilidad del VAN ${tagAssumed}</h2>
+          <h2>Análisis de sensibilidad del VAN</h2>
         </div>
       </div>
       <p class="note">Cada supuesto varía por separado según los rangos de estrés configurados. Se utiliza el método de análisis unidimensional (tornado) para identificar las variables más críticas.</p>
@@ -728,7 +727,7 @@ export function sources(result) {
         <li><b>Mercado y competencia:</b> ${escapeHTML(q.market_data_source)}. Años con data: ${escapeHTML(JSON.stringify(q.years_with_data))}.</li>
         <li><b>Supuestos financieros:</b> ${escapeHTML(q.assumptions_source)}. No provienen de ninguna API.</li>
       </ul>
-      <p class="note">Lo marcado viene de una fuente oficial. Lo marcado ${tagAssumed} lo defines tú.
+      <p class="note">Lo marcado viene de una fuente oficial. Lo marcado lo defines tú.
         La distinción es deliberada: confundir ambos es el error más común en este tipo de análisis.</p>
     </section>`
 }
@@ -750,7 +749,7 @@ export function scaleProfiles(scales, currentProfile = 'mediana') {
   )
   return `
     <section class="card">
-      <h2>7b. Perfiles de Escala de Inversión ${tagAssumed}</h2>
+      <h2>7b. Perfiles de Escala de Inversión</h2>
       <p class="note">Compara la viabilidad según el tamaño del inversionista (desde maquila / piloto hasta planta industrial completa).</p>
       ${table(
         [
