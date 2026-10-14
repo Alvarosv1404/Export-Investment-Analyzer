@@ -268,12 +268,6 @@ function renderControls() {
 
   const form = `
     <div class="controls-form" id="controlsForm">
-      <label class="compare-industry-filter" for="analysisIndustryFilter">Filtrar por industria
-        <select class="compare-industry-filter-select" id="analysisIndustryFilter">
-          <option value="">Todas las industrias</option>
-          ${[...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort().map((ind) => `<option value="${escapeHTML(ind)}">${escapeHTML(ind)}</option>`).join('')}
-        </select>
-      </label>
       ${renderCustomSelect()}
     </div>`
 
