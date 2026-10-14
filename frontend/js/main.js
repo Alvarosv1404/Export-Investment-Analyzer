@@ -294,7 +294,7 @@ function bindControls(onChange) {
     const industry = event.target.value
     document.querySelectorAll('#customSelectOptions > [role="option"]').forEach((option) => {
       const optionIndustry = option.getAttribute('data-industry') || ''
-      option.style.display = !industry || optionIndustry === industry ? '' : 'none'
+      option.hidden = !!industry && optionIndustry !== industry
     })
   })
   if (comparisonForm) {
