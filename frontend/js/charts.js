@@ -776,18 +776,22 @@ export function renderAll(result) {
   projectionChart(get('chartProjection'), result.projection)
 }
 
-export function scenarioChart(canvas) {
+const SCENARIO_COLORS = { pessimistic: '#dc2626', base: '#0284c7', optimistic: '#059669' }
+
+export function scenarioChart(canvas, investment) {
   if (!canvas) return
   Chart.getChart(canvas)?.destroy()
+  const items = investment?.scenarios?.items
+  if (!items || !items.length) return
   new Chart(canvas, {
     type: 'bar',
     data: {
-      labels: ['Pesimista', 'Base', 'Optimista'],
+      labels: items.map((item) => item.label),
       datasets: [
         {
           label: 'VAN (US$)',
-          data: [-1490825, 11201, 1391389],
-          backgroundColor: ['#dc2626', '#0284c7', '#059669'],
+          data: items.map((item) => item.npv_usd),
+          backgroundColor: items.map((item) => SCENARIO_COLORS[item.key] || '#64748b'),
         },
       ],
     },
@@ -814,5 +818,5 @@ export function renderFinancialCharts(investment) {
   cashflows(cashCanvas, investment)
   tornado(sensitivityCanvas, investment?.sensitivity)
   monteCarloChart(monteCarloCanvas, investment?.monte_carlo)
-  scenarioChart(scenarioCanvas)
+  scenarioChart(scenarioCanvas, investment)
 }

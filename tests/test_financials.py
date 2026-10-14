@@ -21,6 +21,7 @@ from exportanalysis.model.valuation import (
     _bisect,
     _with,
     breakeven,
+    run_scenarios,
     run_sensitivity,
     summarize,
 )
@@ -261,3 +262,36 @@ class TestBreakeven:
         below = build_cashflows(_with(inputs, fob_price_usd_per_kg=floor * 0.97)).npv
         above = build_cashflows(_with(inputs, fob_price_usd_per_kg=floor * 1.03)).npv
         assert below < 0 < above
+
+
+class TestScenarios:
+    """Los escenarios combinados reemplazan la tabla que antes venia escrita a
+    mano en el frontend. Lo importante es que salgan del modelo y que el orden
+    pesimista < base < optimista se sostenga."""
+
+    def test_devuelve_los_tres_escenarios_en_orden(self):
+        sc = run_scenarios(base_inputs())
+        assert [item["key"] for item in sc["items"]] == ["pessimistic", "base", "optimistic"]
+        assert sc["shift_pct"] == pytest.approx(15.0)
+
+    def test_base_coincide_con_el_modelo_sin_tocar_nada(self):
+        inputs = base_inputs()
+        base = next(item for item in run_scenarios(inputs)["items"] if item["key"] == "base")
+        assert base["npv_usd"] == pytest.approx(build_cashflows(inputs).npv, abs=0.01)
+
+    def test_pesimista_peor_que_optimista(self):
+        items = {item["key"]: item for item in run_scenarios(base_inputs())["items"]}
+        assert (
+            items["pessimistic"]["npv_usd"]
+            < items["base"]["npv_usd"]
+            < items["optimistic"]["npv_usd"]
+        )
+
+    def test_el_pesimista_mueve_todas_las_palancas(self):
+        """No es solo el precio: costos, CAPEX y volumen tambien se estresan."""
+        inputs = base_inputs()
+        pes = next(item for item in run_scenarios(inputs)["items"] if item["key"] == "pessimistic")
+        solo_precio = build_cashflows(
+            _with(inputs, fob_price_usd_per_kg=inputs.fob_price_usd_per_kg * 0.85)
+        )
+        assert pes["npv_usd"] < solo_precio.npv

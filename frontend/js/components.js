@@ -325,6 +325,23 @@ export function headroom(h) {
 }
 
 // --- Bloque 7: inversion ---------------------------------------------------------
+export function scenarioRow(item) {
+  const irr = item.irr_pct !== null && item.irr_pct !== undefined ? `${item.irr_pct}%` : 'no existe'
+  const payback =
+    item.payback_years !== null && item.payback_years !== undefined
+      ? years(item.payback_years)
+      : 'no se recupera'
+  const roi = item.roi_pct !== null && item.roi_pct !== undefined ? `${item.roi_pct}%` : 'n/d'
+  return `
+      <tr>
+        <td>${escapeHTML(item.label)}</td>
+        <td class="num ${item.npv_usd < 0 ? 'neg' : ''}">${fullUSD(item.npv_usd)}</td>
+        <td class="num">${irr}</td>
+        <td class="num">${payback}</td>
+        <td class="num">${roi}</td>
+      </tr>`
+}
+
 export function investment(inv) {
   if (!inv) return `
     <section class="card financial-result-card">
@@ -348,6 +365,7 @@ export function investment(inv) {
       </tr>`
   )
   const be = inv.breakeven || {}
+  const sc = inv.scenarios
   return `
     <section class="card financial-result-card">
       <div class="financial-result-header">
@@ -378,20 +396,21 @@ export function investment(inv) {
         <h3>Flujo de caja libre por año</h3>
         <div class="chart"><canvas id="chartCash" height="100"></canvas></div>
       </div>
-      <div class="financial-panel financial-table-panel">
+      ${
+        sc && sc.items
+          ? `<div class="financial-panel financial-table-panel">
         <h3>Escenarios de la estrategia</h3>
         <div class="financial-table-scroll"><table class="financial-table">
           <thead><tr>
             <th>Escenario</th><th class="num">VAN</th><th class="num">TIR</th><th class="num">Payback</th><th class="num">ROI</th>
           </tr></thead>
-          <tbody>
-            <tr><td>Pesimista</td><td class="num neg">US$ -1,490,825</td><td class="num">-46.5 %</td><td class="num">No recupera</td><td class="num">-14%</td></tr>
-            <tr><td>Base</td><td class="num">US$ 11,201</td><td class="num">9.8 %</td><td class="num">3.48 a.</td><td class="num">133%</td></tr>
-            <tr><td>Optimista</td><td class="num">US$ 1,391,389</td><td class="num">43.9 %</td><td class="num">2.16 a.</td><td class="num">269%</td></tr>
-          </tbody>
+          <tbody>${sc.items.map(scenarioRow).join('')}</tbody>
         </table></div>
+        <p class="note">${escapeHTML(sc.note)}</p>
         <div class="chart"><canvas id="chartScenario" height="160"></canvas></div>
-      </div>
+      </div>`
+          : ''
+      }
        <div class="financial-panel financial-table-panel">
         <h3>Estado de resultados y caja por año</h3>
         <div class="financial-table-scroll">${table(

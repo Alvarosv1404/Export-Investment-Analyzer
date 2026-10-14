@@ -211,6 +211,80 @@ def breakeven(inputs: ProjectInputs) -> dict:
     }
 
 
+# Amplitud del estres de los escenarios combinados. No es un supuesto del
+# negocio (esos viven en config/), sino cuanto se mueven todas las palancas a
+# la vez: el tornado mueve una variable por vez, esto las mueve todas juntas
+# para poder leer tres bandas.
+_SCENARIO_SHIFT = 0.15
+
+
+def _scenario_inputs(inputs: ProjectInputs, sign: int, shift: float) -> ProjectInputs | None:
+    """Caso base (sign=0), pesimista (sign=-1) u optimista (sign=+1).
+
+    El pesimista baja precio y volumen y sube costos y CAPEX; el optimista hace
+    lo contrario. Base no toca nada.
+    """
+    if sign == 0:
+        return inputs
+
+    price = inputs.fob_price_usd_per_kg * (1 + sign * shift)
+    if price <= 0:
+        return None
+    return _with(
+        inputs,
+        fob_price_usd_per_kg=price,
+        purchase_cost_usd_per_kg=inputs.purchase_cost_usd_per_kg * (1 - sign * shift),
+        variable_cost_usd_per_kg=inputs.variable_cost_usd_per_kg * (1 - sign * shift),
+        capex_usd=inputs.capex_usd * (1 - sign * shift),
+        working_capital_usd=inputs.working_capital_usd * (1 - sign * shift),
+        utilization_ramp=[
+            min(1.0, max(0.0, utilization * (1 + sign * shift)))
+            for utilization in inputs.utilization_ramp
+        ],
+    )
+
+
+def run_scenarios(inputs: ProjectInputs, shift: float = _SCENARIO_SHIFT) -> dict:
+    """Tres escenarios combinados (pesimista, base, optimista) con cifras reales.
+
+    Cada numero sale de `build_cashflows`, igual que el resto del reporte: no hay
+    valores escritos a mano. El frontend solo formatea lo que devuelve esto.
+    """
+    items: list[dict] = []
+    for sign in (-1, 0, 1):
+        scenario_inputs = _scenario_inputs(inputs, sign, shift)
+        if scenario_inputs is None:
+            continue
+        output = build_cashflows(scenario_inputs)
+        items.append(
+            {
+                "key": {-1: "pessimistic", 0: "base", 1: "optimistic"}[sign],
+                "label": {-1: "Pesimista", 0: "Base", 1: "Optimista"}[sign],
+                "npv_usd": round(output.npv, 2),
+                "irr_pct": _percent(output.irr),
+                "payback_years": (
+                    round(output.payback_years, 2)
+                    if output.payback_years is not None
+                    else None
+                ),
+                "roi_pct": (
+                    round(sum(output.annual_fcf) / scenario_inputs.capex_usd * 100, 2)
+                    if scenario_inputs.capex_usd
+                    else None
+                ),
+            }
+        )
+    return {
+        "shift_pct": round(shift * 100, 2),
+        "note": (
+            "Escenarios combinados: \u00b1%.0f%% en precio FOB, costo de compra, "
+            "costo variable, CAPEX y volumen al mismo tiempo. El tornado de arriba "
+            "mueve una variable por vez; esto las mueve juntas." % (shift * 100)
+        ),
+        "items": items,
+    }
+
+
 def run_monte_carlo(
     inputs: ProjectInputs,
     price_volatility: float,

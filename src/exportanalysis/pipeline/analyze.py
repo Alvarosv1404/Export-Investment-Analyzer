@@ -19,7 +19,13 @@ from ..model.financials import (
     build_cashflows,
 )
 from ..model.unit_economics import analyze_unit_economics
-from ..model.valuation import breakeven, run_monte_carlo, run_sensitivity, summarize
+from ..model.valuation import (
+    breakeven,
+    run_monte_carlo,
+    run_scenarios,
+    run_sensitivity,
+    summarize,
+)
 from ..pipeline import competitors, market
 from ..sources import manual_tariffs
 from . import excel_analysis, pricing
@@ -510,6 +516,7 @@ def _analyze_product_uncached(
             "cashflows": outputs.cashflows,
             "sensitivity": run_sensitivity(assumed, load_assumptions().sensitivity),
             "breakeven": breakeven(assumed),
+            "scenarios": run_scenarios(assumed),
             "monte_carlo": monte_carlo,
             "monte_carlo_missing": monte_carlo_missing,
         },
