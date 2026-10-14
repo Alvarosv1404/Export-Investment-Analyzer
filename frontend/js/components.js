@@ -598,7 +598,7 @@ export function comparison(data) {
           'comparison-matrix'
         )}
         <p class="note">La base es 2016 para los productos que ya exportaban ese año. Si el producto aún no
-          exportaba en 2016 (su valor es 0, como la pota), la base se corre al primer año con exportaciones
+          exportaba en 2016, la base se corre al primer año con exportaciones
           registradas. Cada columna es el CAGR acumulado desde esa base hasta el año de la columna.</p>
       </section>
       <section class="card comparison-table-card">
