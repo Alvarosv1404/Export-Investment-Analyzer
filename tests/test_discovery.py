@@ -220,3 +220,12 @@ class TestAssumptions:
     def test_for_producto_incompleto_falla_explicito(self):
         with pytest.raises(ValueError, match="Faltan supuestos"):
             config.load_assumptions().for_product("producto_que_no_existe")
+
+    def test_for_producto_acepta_supuestos_completos_ingresados_por_usuario(self):
+        assumptions = config.load_assumptions()
+        overrides = {key: 1.0 for key in config.REQUIRED_ASSUMPTIONS}
+
+        assert assumptions.for_product("producto_que_no_existe", overrides) == {
+            **assumptions.effective("producto_que_no_existe"),
+            **overrides,
+        }

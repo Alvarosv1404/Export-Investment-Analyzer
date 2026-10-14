@@ -871,5 +871,43 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
 
 
 /* --- filtro de industria en comparacion --- */
-.compare-industry-filter { display: block; margin: 0.75rem 0 1rem; font-size: 0.85rem; color: var(--ink-soft); }
-.compare-industry-filter-select { margin-left: 0.5rem; padding: 0.35rem 0.6rem; border-radius: 0.5rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
+.industry-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+.industry-filter-select,
+.compare-industry-filter-select {
+  min-width: 15rem;
+  padding: 0.42rem 2rem 0.42rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+.industry-filter-select:focus,
+.compare-industry-filter-select:focus {
+  outline: 2px solid var(--data);
+  outline-offset: -1px;
+}
+.compare-industry-filter {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  margin: 0.75rem 0 1rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+.compare-industry-filter-select { min-width: 12rem; }
+
+@media (max-width: 640px) {
+  .industry-filter,
+  .industry-filter-select,
+  .compare-industry-filter,
+  .compare-industry-filter-select { width: 100%; min-width: 0; }
+}

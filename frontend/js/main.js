@@ -61,6 +61,8 @@ const state = {
   discountRate: initialFinancialValue('wacc') || '7',
   view: urlParams.get('view') === 'compare' || urlParams.get('compare') === '1' ? 'compare' : 'analysis',
   compareSlugs: (urlParams.get('compare_slugs') || '').split(',').filter(Boolean),
+  analysisIndustry: '',
+  comparisonIndustry: '',
   products: [],
   comparisonData: null,
   rankingData: null,
@@ -170,7 +172,7 @@ function productOptionsForCustomSelect() {
   const groups = Object.keys(byIndustry).sort()
   let html = ''
   groups.forEach((ind) => {
-    html += `<div class="custom-select-group">${escapeHTML(ind)}</div>`
+    html += `<div class="custom-select-group" data-industry="${escapeHTML(ind)}">${escapeHTML(ind)}</div>`
     byIndustry[ind].forEach(({ p, idx }) => {
       html += `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)}</div>`
     })
@@ -193,6 +195,16 @@ function productOptionsForNativeSelect() {
   ).join('')
 }
 
+function productIndustries() {
+  return [...new Set(state.products.map((product) => product.industry || 'Otros'))].sort()
+}
+
+function renderIndustryFilterOptions(selectedIndustry = '') {
+  return productIndustries().map((industry) =>
+    `<option value="${escapeHTML(industry)}" ${industry === selectedIndustry ? 'selected' : ''}>${escapeHTML(industry)}</option>`
+  ).join('')
+}
+
 /** Genera el HTML del custom select para la vista de análisis. */
 function renderCustomSelect() {
   const selected = state.products.find(p => p.slug === state.slug) || state.products[0]
@@ -201,6 +213,13 @@ function renderCustomSelect() {
   const nativeOptionsHtml = productOptionsForNativeSelect()
 
   return `
+    <label class="industry-filter" for="analysisIndustryFilter">
+      <span>Filtrar por industria</span>
+      <select class="industry-filter-select" id="analysisIndustryFilter">
+        <option value="">Todas las industrias</option>
+        ${renderIndustryFilterOptions(state.analysisIndustry)}
+      </select>
+    </label>
     <div class="custom-select" id="customSelect" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-label="Producto para analizar">
       <label class="custom-select-label" for="customSelectTrigger">Producto para analizar</label>
       <div class="custom-select-trigger" id="customSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" aria-expanded="false">
@@ -239,7 +258,7 @@ function renderControls() {
           <label class="compare-industry-filter" for="compareIndustryFilter">Filtrar por industria
             <select class="compare-industry-filter-select" id="compareIndustryFilter">
               <option value="">Todas las industrias</option>
-              ${[...new Set(state.products.map((p) => p.industry).filter(Boolean))].sort().map((ind) => `<option value="${escapeHTML(ind)}">${escapeHTML(ind)}</option>`).join('')}
+              ${renderIndustryFilterOptions(state.comparisonIndustry)}
             </select>
           </label>
           <div class="compare-options">
@@ -259,7 +278,7 @@ function renderControls() {
           <div class="compare-picker-footer">
             <span class="compare-selection-count" aria-live="polite"></span>
             <div class="compare-picker-actions">
-              <button type="button" class="text-btn" id="selectAllProducts">Seleccionar todos</button>
+              <button type="button" class="text-btn" id="selectAllProducts">Seleccionar visibles</button>
             </div>
           </div>
         </fieldset>
@@ -276,6 +295,8 @@ function renderControls() {
 
 /** Inserta los controles que disparan una recarga suave. */
 function bindControls(onChange) {
+  const comparisonForm = document.getElementById('comparisonForm')
+
   document.querySelectorAll('.view-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       state.view = tab.dataset.view
@@ -284,13 +305,20 @@ function bindControls(onChange) {
     })
   })
 
-  document.getElementById('analysisIndustryFilter')?.addEventListener('change', (event) => {
-    const industry = event.target.value
-    document.querySelectorAll('#customSelectOptions > [role="option"]').forEach((option) => {
-      const optionIndustry = option.getAttribute('data-industry') || ''
-      option.hidden = !!industry && optionIndustry !== industry
+  const analysisIndustryFilter = document.getElementById('analysisIndustryFilter')
+  const filterAnalysisProducts = () => {
+    const industry = analysisIndustryFilter.value
+    state.analysisIndustry = industry
+    const options = document.querySelectorAll('#customSelectOptions > [role="option"]')
+    options.forEach((option) => {
+      option.hidden = !!industry && (option.getAttribute('data-industry') || 'Otros') !== industry
     })
-  })
+    document.querySelectorAll('#customSelectOptions > .custom-select-group').forEach((group) => {
+      group.hidden = !!industry && (group.getAttribute('data-industry') || 'Otros') !== industry
+    })
+  }
+  analysisIndustryFilter?.addEventListener('change', filterAnalysisProducts)
+  if (analysisIndustryFilter) filterAnalysisProducts()
   if (comparisonForm) {
     const checkboxes = Array.from(comparisonForm.querySelectorAll('input[name="compareSlugs"]'))
     const updateSelectionCount = () => {
@@ -305,17 +333,24 @@ function bindControls(onChange) {
       window.clearTimeout(reloadTimer)
       reloadTimer = window.setTimeout(refreshComparison, 300)
     }
-    document.getElementById('compareIndustryFilter')?.addEventListener('change', (event) => {
-      const industry = event.target.value
-      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
-        const optionIndustry = option.getAttribute('data-product-industry') || ''
-        option.style.display = !industry || optionIndustry === industry ? '' : 'none'
-      })
+    checkboxes.forEach((input) => {
+      input.addEventListener('change', scheduleReload)
     })
+    const compareIndustryFilter = document.getElementById('compareIndustryFilter')
+    const filterComparisonProducts = () => {
+      const industry = compareIndustryFilter.value
+      state.comparisonIndustry = industry
+      comparisonForm.querySelectorAll('.compare-option').forEach((option) => {
+        const optionIndustry = option.getAttribute('data-product-industry') || 'Otros'
+        option.hidden = !!industry && optionIndustry !== industry
+      })
+    }
+    compareIndustryFilter?.addEventListener('change', filterComparisonProducts)
+    if (compareIndustryFilter) filterComparisonProducts()
 
     document.getElementById('selectAllProducts').addEventListener('click', () => {
       checkboxes.forEach((input) => {
-        input.checked = true
+        if (!input.closest('.compare-option').hidden) input.checked = true
       })
       scheduleReload()
     })

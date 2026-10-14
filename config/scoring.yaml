@@ -1,22 +1,11 @@
-# Pesos del screener de productos ("¿por cual empiezo?").
-#
-# Cada metrica se normaliza a 0-100 comparando los productos entre si (min-max)
-# y luego se pondera y se promedia SOLO sobre las metricas que el producto
-# tiene. Un peso de 0 apaga la metrica sin borrarla del reporte.
-#
-# `basis` es honestidad, no decoracion:
-#   - "dato publicado": sale de los Excel de Trade Map.
-#   - "supuesto": depende de lo que escribiste en config/assumptions.yaml.
-#   - "mixto": combina un dato publicado con un supuesto.
-# El frontend lo usa para no mezclar peras con manzanas: un ranking armado con
-# supuestos de ejemplo NO es una recomendacion de inversion.
-#
+# Pesos del ranking de productos. Todas las metricas salen de exportaciones
+# historicas observadas en Trade Map, sin supuestos de inversion.
 # `lower_is_better: true` invierte la normalizacion (a menor valor, mejor).
 
 metrics:
   market_size:
     label: "Tamaño de mercado"
-    weight: 0.8
+    weight: 1.0
     lower_is_better: false
     basis: "dato publicado"
     description: "Exportaciones FOB de Perú del último año con data."
@@ -35,30 +24,9 @@ metrics:
     basis: "dato publicado"
     description: "Menor concentración top 5 destinos = menor riesgo comercial."
 
-  headroom:
-    label: "Espacio de mercado"
-    weight: 1.2
-    lower_is_better: false
-    basis: "mixto"
-    description: "Veces que el headroom de mercado cubre la capacidad de la planta."
-
-  margin:
-    label: "Margen unitario"
-    weight: 1.5
-    lower_is_better: false
-    basis: "mixto"
-    description: "Margen bruto por kilo sobre el precio FOB de mercado."
-
-  capital_intensity:
-    label: "Intensidad de capital"
-    weight: 1.0
+  volatility:
+    label: "Estabilidad exportadora"
+    weight: 0.8
     lower_is_better: true
-    basis: "supuesto"
-    description: "CAPEX sobre la facturación potencial a plena capacidad."
-
-  returns:
-    label: "Retorno (VAN)"
-    weight: 1.5
-    lower_is_better: false
-    basis: "supuesto"
-    description: "VAN del proyecto con tus supuestos. Solo vale si están verificados."
+    basis: "dato publicado"
+    description: "Menor variación interanual del valor FOB histórico significa exportaciones más estables."

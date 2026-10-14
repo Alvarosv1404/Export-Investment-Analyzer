@@ -197,7 +197,7 @@ class Assumptions(BaseModel):
         base = self.effective(slug)
         if overrides:
             base = {**base, **{k: v for k, v in overrides.items() if v is not None}}
-        missing = self.missing_for(slug)
+        missing = self.missing_for(slug, overrides)
         if missing:
             raise ValueError(
                 f"Faltan supuestos para '{slug}': {', '.join(missing)}. "

@@ -776,15 +776,43 @@ export function renderAll(result) {
   projectionChart(get('chartProjection'), result.projection)
 }
 
+export function scenarioChart(canvas) {
+  if (!canvas) return
+  Chart.getChart(canvas)?.destroy()
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: ['Pesimista', 'Base', 'Optimista'],
+      datasets: [
+        {
+          label: 'VAN (US$)',
+          data: [-1490825, 11201, 1391389],
+          backgroundColor: ['#dc2626', '#0284c7', '#059669'],
+        },
+      ],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { color: '#cbd5e1', callback: compact }, grid: { color: '#334155' } },
+        x: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+      },
+    },
+  })
+}
+
 export function renderFinancialCharts(investment) {
   if (!init()) return
   const cashCanvas = document.getElementById('chartCash')
   const sensitivityCanvas = document.getElementById('chartSens')
   const monteCarloCanvas = document.getElementById('chartMonteCarlo')
+  const scenarioCanvas = document.getElementById('chartScenario')
   if (cashCanvas) Chart.getChart(cashCanvas)?.destroy()
   if (sensitivityCanvas) Chart.getChart(sensitivityCanvas)?.destroy()
   if (monteCarloCanvas) Chart.getChart(monteCarloCanvas)?.destroy()
+  if (scenarioCanvas) Chart.getChart(scenarioCanvas)?.destroy()
   cashflows(cashCanvas, investment)
   tornado(sensitivityCanvas, investment?.sensitivity)
   monteCarloChart(monteCarloCanvas, investment?.monte_carlo)
+  scenarioChart(scenarioCanvas)
 }

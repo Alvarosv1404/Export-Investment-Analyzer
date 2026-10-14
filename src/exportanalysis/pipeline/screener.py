@@ -9,16 +9,8 @@ arma una tabla comparable: normaliza cada metrica a 0-100 entre los productos,
 la pondera con los pesos de config/scoring.yaml y produce un puntaje. Todo
 offline, desde los Excel locales.
 
-Honestidad por diseno
-=====================
-Un ranking es peligroso si esconde de donde sale cada numero. Por eso:
-
-  - Cada metrica declara su `basis` (dato publicado / supuesto / mixto).
-  - Cada producto trae `readiness`: que archivos tiene y si sus supuestos
-    siguen siendo de ejemplo (`assumptions_verified`).
-  - El puntaje se calcula SOLO sobre las metricas disponibles del producto, y
-    se publica `score_confidence` para que un producto con pocos datos no
-    aparente ser mejor de lo que la evidencia sostiene.
+El ranking usa solo metricas derivadas de las series historicas publicadas. No
+necesita supuestos financieros de costos, capacidad ni inversion.
 
 Este screener no recomienda invertir. Ordena la conversacion.
 """
@@ -26,8 +18,9 @@ Este screener no recomienda invertir. Ordena la conversacion.
 from __future__ import annotations
 
 import functools
+from statistics import stdev
 
-from ..config import get_product, load_assumptions, load_catalog, load_scoring
+from ..config import get_product, load_catalog, load_scoring
 from ..sources import manual_tariffs
 from . import excel_analysis
 from .analyze import analyze_product
@@ -38,7 +31,7 @@ from .analyze import analyze_product
 DEFAULT_METRICS: dict[str, dict] = {
     "market_size": {
         "label": "Tamaño de mercado",
-        "weight": 0.8,
+        "weight": 1.0,
         "lower_is_better": False,
         "basis": "dato publicado",
         "description": "Exportaciones FOB de Perú del último año con data.",
@@ -57,33 +50,12 @@ DEFAULT_METRICS: dict[str, dict] = {
         "basis": "dato publicado",
         "description": "Menor concentración top 5 destinos = menor riesgo comercial.",
     },
-    "headroom": {
-        "label": "Espacio de mercado",
-        "weight": 1.2,
-        "lower_is_better": False,
-        "basis": "mixto",
-        "description": "Veces que el headroom de mercado cubre la capacidad de la planta.",
-    },
-    "margin": {
-        "label": "Margen unitario",
-        "weight": 1.5,
-        "lower_is_better": False,
-        "basis": "mixto",
-        "description": "Margen bruto por kilo sobre el precio FOB de mercado.",
-    },
-    "capital_intensity": {
-        "label": "Intensidad de capital",
-        "weight": 1.0,
+    "volatility": {
+        "label": "Estabilidad exportadora",
+        "weight": 0.8,
         "lower_is_better": True,
-        "basis": "supuesto",
-        "description": "CAPEX sobre la facturación potencial a plena capacidad.",
-    },
-    "returns": {
-        "label": "Retorno (VAN)",
-        "weight": 1.5,
-        "lower_is_better": False,
-        "basis": "supuesto",
-        "description": "VAN del proyecto con tus supuestos. Solo vale si están verificados.",
+        "basis": "dato publicado",
+        "description": "Menor variación interanual del valor FOB histórico significa exportaciones más estables.",
     },
 }
 
@@ -97,12 +69,11 @@ def _metric_specs() -> dict[str, dict]:
     return specs
 
 
-def _readiness(product, assumptions) -> dict:
+def _readiness(product) -> dict:
     """Que evidencia existe realmente para este producto."""
     files = excel_analysis.data_files_status(product.hs6, product.nandina)
     tariff_rows = manual_tariffs.load_tariffs(product.hs6)
     tariff_known = int(tariff_rows["duty_pct"].notna().sum()) if not tariff_rows.empty else 0
-    entry = assumptions.products.get(product.slug)
     return {
         "trademap": files["trademap"],
         "trademap_count": files["trademap_count"],
@@ -110,40 +81,47 @@ def _readiness(product, assumptions) -> dict:
         "sunat": files["sunat"],
         "tariffs_known": tariff_known,
         "tariffs_total": int(len(tariff_rows)),
-        "assumptions_present": entry is not None,
-        "assumptions_verified": bool(entry.verified) if entry is not None else False,
     }
 
 
 def _extract(result: dict) -> dict[str, float | None]:
-    """Las 7 metricas crudas de un producto ya analizado."""
+    """Metricas de exportacion calculadas solo con observaciones publicadas."""
     market = result.get("market") or {}
-    unit = result.get("unit_economics") or {}
-    inv = result.get("investment") or {}
-    inputs = inv.get("inputs") or {}
-    summary = inv.get("summary") or {}
-    implied = result.get("implied_volume") or {}
-    pricing = result.get("pricing") or {}
+    observations = sorted(
+        (
+            (row.get("year"), row.get("fob_usd"))
+            for row in market.get("series", [])
+            if row.get("year") is not None and row.get("fob_usd") is not None
+        ),
+        key=lambda row: row[0],
+    )
+    positive_observations = [
+        (year, float(value))
+        for year, value in observations
+        if float(value) > 0
+    ]
+    growth = None
+    if len(positive_observations) >= 2:
+        first_year, first_value = positive_observations[0]
+        last_year, last_value = positive_observations[-1]
+        periods = last_year - first_year
+        if periods > 0:
+            growth = (last_value / first_value) ** (1 / periods) - 1
 
-    capacity = inputs.get("capacity_kg_year")
-    capex = inputs.get("capex_usd")
-    fob = pricing.get("price_usd_per_kg") or inputs.get("fob_price_usd_per_kg")
-
-    implied_kg = implied.get("implied_volume_kg")
-    installed = implied.get("installed_capacity_kg") or capacity
-    headroom = (implied_kg / installed) if (implied_kg is not None and installed) else None
-
-    revenue_potential = (capacity * fob) if (capacity and fob) else None
-    capital_intensity = (capex / revenue_potential) if (capex and revenue_potential) else None
+    annual_changes = [
+        current / previous - 1
+        for (previous_year, previous), (current_year, current) in zip(
+            observations, observations[1:], strict=False
+        )
+        if current_year == previous_year + 1 and previous > 0 and current >= 0
+    ]
+    volatility = stdev(annual_changes) if len(annual_changes) >= 2 else None
 
     return {
         "market_size": market.get("latest_fob_usd"),
-        "growth": market.get("cagr_value"),
+        "growth": growth,
         "concentration": market.get("top5_concentration"),
-        "headroom": headroom,
-        "margin": unit.get("gross_margin_pct"),
-        "capital_intensity": capital_intensity,
-        "returns": summary.get("npv_usd"),
+        "volatility": volatility,
     }
 
 
@@ -172,14 +150,13 @@ def _normalize(values: dict[str, float | None], lower_is_better: bool) -> dict[s
 
 def _analyze(slugs: list[str]) -> dict:
     catalog = load_catalog()
-    assumptions = load_assumptions()
     specs = _metric_specs()
 
     products = [get_product(slug) for slug in slugs] if slugs else list(catalog.products)
 
     entries: list[dict] = []
     for product in products:
-        readiness = _readiness(product, assumptions)
+        readiness = _readiness(product)
         try:
             result = analyze_product(product.slug)
         except Exception as exc:  # noqa: BLE001 - un producto roto no debe tumbar el ranking
@@ -201,6 +178,14 @@ def _analyze(slugs: list[str]) -> dict:
                 "values": _extract(result) if available else {key: None for key in specs},
             }
         )
+
+    rankable_entries = [entry for entry in entries if entry["available"]]
+    specs = {
+        key: spec
+        for key, spec in specs.items()
+        if rankable_entries
+        and all(entry["values"].get(key) is not None for entry in rankable_entries)
+    }
 
     # Normaliza cada metrica a lo largo de los productos y reparte el puntaje.
     for key, spec in specs.items():
