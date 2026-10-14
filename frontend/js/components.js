@@ -831,7 +831,8 @@ export function simulatorPanel(result, state) {
   }
 
   const exportUrl = getExportUrl(slug, {
-    year1Volume: year1VolumeVal ? String(Number(year1VolumeVal) * 1000) : year1VolumeVal,
+    // getExportUrl ya convierte toneladas a kg; no multiplicar aqui otra vez.
+    year1Volume: year1VolumeVal,
     annualGrowth: growthVal,
     variableCost: varVal !== '' ? String(Number(varVal) / 1000) : varVal,
     capex: capexVal,
@@ -867,7 +868,7 @@ export function simulatorPanel(result, state) {
           </div>
           <div class="simulator-fields">
             ${field('simCapex', 'Inversión inicial (USD)', capexVal, { min: '1000000', max: '3000000', step: '10000' })}
-            ${field('simVar', 'Costo variable total por kg (USD/kg)', varVal, { min: '4800', max: '7800', step: '10', hint: 'Rango solicitado: 4800 - 7800 USD/kg.' })}
+            ${field('simVar', 'Costo variable total por tonelada (USD/t)', varVal, { min: '4800', max: '7800', step: '10', hint: 'Rango solicitado: 4,800 - 7,800 USD/t (equivale a 4.8 - 7.8 USD/kg).' })}
             ${field('simYear1Volume', 'Volumen del año 1 (toneladas)', year1VolumeVal, { min: '200', max: '800', step: '10', hint: 'Toneladas FOB del primer año (200-800 t).' })}
             ${field('simAnnualGrowth', 'Crecimiento del volumen (%)', growthVal, { min: '10', max: '55', step: '0.5' })}
             ${field('simOpex', 'Costos fijos del año 1 (USD)', opexVal, { min: '200000', max: '600000', step: '5000' })}

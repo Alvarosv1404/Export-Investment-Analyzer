@@ -444,7 +444,7 @@ def _analyze_product_uncached(
         learning_rate=model_defaults.learning_rate,
         sales_commission=model_defaults.sales_commission,
         freight_pct_fob=model_defaults.freight_pct_fob,
-        compliance_pct_fct=model_defaults.compliance_pct_fob,
+        compliance_pct_fob=model_defaults.compliance_pct_fob,
         depreciation_years=model_defaults.depreciation_years,
         capex_schedule=model_defaults.capex_schedule,
         utilization_ramp=ramp,

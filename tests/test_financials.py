@@ -28,7 +28,13 @@ from exportanalysis.model.valuation import (
 
 
 def base_inputs(**overrides) -> ProjectInputs:
-    """Caso de referencia: planta chica, margen sano, todo en el ano 0."""
+    """Caso de referencia: planta chica, margen sano, todo en el ano 0.
+
+    El FOB es el de referencia del cafe (~4.60 USD/kg). Con un capital de trabajo
+    del 20% de las ventas (75 dias netos) el caso queda viable pero ajustado: es
+    justo el punto que expone si el modelo cobra el capital de trabajo una o dos
+    veces.
+    """
     defaults = dict(
         slug="test",
         capacity_kg_year=1_000_000,
@@ -42,11 +48,11 @@ def base_inputs(**overrides) -> ProjectInputs:
         tax_rate=0.30,
         learning_rate=0.0,
         sales_commission=0.0,
-        compliance_pct_fct=0.0,
+        compliance_pct_fob=0.0,
         depreciation_years=10,
         capex_schedule=[1.0],
         utilization_ramp=[1.0] * 5,
-        fob_price_usd_per_kg=3.60,
+        fob_price_usd_per_kg=4.60,
     )
     defaults.update(overrides)
     return ProjectInputs(**defaults)
@@ -103,6 +109,52 @@ class TestCapexNotDoubleCounted:
     def test_total_capex_declarado(self):
         out = build_cashflows(base_inputs())
         assert out.total_capex == pytest.approx(2_000_000)
+
+
+class TestWorkingCapital:
+    """Regresion: el capital de trabajo inicial se descontaba en t=0 y otra vez
+    completo en el ano 1, y los anos siguientes sumaban el incremento como si
+    generara caja."""
+
+    @staticmethod
+    def _wc_ratio(inputs):
+        return (
+            inputs.wc_inventory_days + inputs.wc_receivable_days - inputs.wc_payable_days
+        ) / 365.0
+
+    def test_total_inmovilizado_es_el_saldo_final(self):
+        inputs = base_inputs()
+        out = build_cashflows(inputs)
+        ramp = _ramp(inputs.utilization_ramp, inputs.project_years)
+        wc_ratio = self._wc_ratio(inputs)
+
+        def wc(index):
+            return inputs.capacity_kg_year * ramp[index] * inputs.fob_price_usd_per_kg * wc_ratio
+
+        components = [-inputs.working_capital_usd]
+        prev = inputs.working_capital_usd
+        for index in range(inputs.project_years):
+            components.append(prev - wc(index))
+            prev = wc(index)
+        # La suma del capital de trabajo descontado debe ser el saldo final, no
+        # el doble del inicial.
+        assert sum(components) == pytest.approx(-wc(inputs.project_years - 1))
+        assert out.cashflows[0] == pytest.approx(
+            -(inputs.capex_usd + inputs.working_capital_usd)
+        )
+
+    def test_aumentar_capital_de_trabajo_consume_caja(self):
+        """Con volumen creciente el ano 2 debe restar caja, no sumarla."""
+        inputs = base_inputs(utilization_ramp=[0.5, 0.8, 0.9, 1.0, 1.0])
+        out = build_cashflows(inputs)
+        pnl = annual_pnl(inputs)
+        wc_ratio = self._wc_ratio(inputs)
+        wc1 = pnl.iloc[0]["volume_kg"] * inputs.fob_price_usd_per_kg * wc_ratio
+        wc2 = pnl.iloc[1]["volume_kg"] * inputs.fob_price_usd_per_kg * wc_ratio
+        operativo2 = (
+            pnl.iloc[1]["ebit_usd"] - pnl.iloc[1]["taxes_usd"] + pnl.iloc[1]["depreciation_usd"]
+        )
+        assert out.annual_fcf[1] == pytest.approx(operativo2 - (wc2 - wc1), abs=1.0)
 
 
 class TestCashflowShape:
@@ -174,14 +226,13 @@ class TestPnlConsistency:
             inputs.wc_inventory_days + inputs.wc_receivable_days - inputs.wc_payable_days
         ) / 365.0
         capex_por_ano = _capex_schedule(inputs.capex_schedule, inputs.project_years)
-        prev_wc = None
+        # El capital de trabajo arranca en el monto del config (ano 0) y cada ano
+        # aporta solo la variacion contra el saldo previo.
+        prev_wc = inputs.working_capital_usd
 
         for i, row in enumerate(pnl.itertuples()):
             wc = row.volume_kg * inputs.fob_price_usd_per_kg * wc_ratio
-            # El ano 0 financia el capital de trabajo que dice el config. De ahi
-            # en adelante el modelo se mueve con el delta contra el ano previo,
-            # calculado con los dias de inventario/cobro/pago.
-            delta_wc = -inputs.working_capital_usd if i == 0 else wc - prev_wc
+            delta_wc = prev_wc - wc
             prev_wc = wc
             expected = (
                 row.ebit_usd

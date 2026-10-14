@@ -49,7 +49,7 @@ class ProjectInputs:
     learning_rate: float = 0.03
     sales_commission: float = 0.05
     freight_pct_fob: float = 0.05
-    compliance_pct_fct: float = 0.02
+    compliance_pct_fob: float = 0.02
     wc_inventory_days: int = 60
     wc_receivable_days: int = 45
     wc_payable_days: int = 30
@@ -131,6 +131,10 @@ def build_cashflows(inputs: ProjectInputs) -> ProjectOutputs:
         )
 
     annual_fcf: list[float] = []
+    # Saldo de capital de trabajo al cierre del ano anterior. En el ano 0 se
+    # financia el monto del config; de ahi en adelante el saldo sigue el volumen
+    # con la formula de dias (inventario + por cobrar - por pagar).
+    previous_wc = inputs.working_capital_usd
     for index in range(years):
         volume = inputs.capacity_kg_year * utilization[index]
 
@@ -140,7 +144,7 @@ def build_cashflows(inputs: ProjectInputs) -> ProjectOutputs:
 
         revenue = volume * inputs.fob_price_usd_per_kg
         commission = revenue * inputs.sales_commission
-        compliance = revenue * inputs.compliance_pct_fct
+        compliance = revenue * inputs.compliance_pct_fob
 
         variable_costs = volume * (unit_purchase + unit_variable)
         fixed_costs = inputs.opex_fixed_usd_year
@@ -163,14 +167,14 @@ def build_cashflows(inputs: ProjectInputs) -> ProjectOutputs:
         ) / 365.0
         working_capital = volume * inputs.fob_price_usd_per_kg * wc_ratio
 
-        # El capital de trabajo inicial es una salida del ano 0. Despues se
-        # mueve con el volumen: cada delta es la variacion contra el ano previo.
-        if index == 0:
-            delta_wc = -inputs.working_capital_usd
-        else:
-            prev_volume = inputs.capacity_kg_year * utilization[index - 1]
-            prev_wc = prev_volume * inputs.fob_price_usd_per_kg * wc_ratio
-            delta_wc = working_capital - prev_wc
+        # Cada ano aporta solo la VARIACION del capital de trabajo contra el
+        # saldo del ano previo. Aumentar el capital de trabajo consume caja y
+        # liberarlo la devuelve, por eso el flujo es el delta con signo. Antes
+        # el ano 1 volvia a restar el capital inicial completo (se contaba dos
+        # veces) y los anos siguientes sumaban el incremento como si generara
+        # caja.
+        delta_wc = previous_wc - working_capital
+        previous_wc = working_capital
 
         fcf = ebit - taxes + depreciation - capex + delta_wc
         annual_fcf.append(fcf)
@@ -238,7 +242,7 @@ def annual_pnl(inputs: ProjectInputs) -> pd.DataFrame:
         revenue = volume * inputs.fob_price_usd_per_kg
         variable_costs = volume * (inputs.purchase_cost_usd_per_kg + inputs.variable_cost_usd_per_kg) * learning
         commission = revenue * inputs.sales_commission
-        compliance = revenue * inputs.compliance_pct_fct
+        compliance = revenue * inputs.compliance_pct_fob
         depreciation = (
             inputs.capex_usd / inputs.depreciation_years if index < inputs.depreciation_years else 0.0
         )
