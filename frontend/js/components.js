@@ -501,7 +501,7 @@ export function comparison(data) {
     const seriesByYear = new Map((p.series || []).map((row) => [row.year, row]))
     return `<tr>
       <th scope="row">${escapeHTML(p.name || p.slug)}</th>
-      ${years.map((year) => `<td class="num">${pctSigned(seriesByYear.get(year)?.value_yoy)}</td>`).join('')}
+      ${years.map((year) => `<td class="num">${(() => { const v = seriesByYear.get(year)?.value_yoy; return (v === null || v === undefined || Number.isNaN(v)) ? '' : pctSigned(v) })()}</td>`).join('')}
     </tr>`
   })
   const priceRows = products.map((p) => {
