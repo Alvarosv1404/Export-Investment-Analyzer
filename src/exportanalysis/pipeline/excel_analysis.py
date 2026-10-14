@@ -285,7 +285,8 @@ def peru_exports_indicators_2025(hs6: str, *, include_world: bool = False) -> pd
     out["quantity"] = pd.to_numeric(out["Quantity"], errors="coerce")
     out["unit_value_usd_per_unit"] = pd.to_numeric(out["Unit Value"], errors="coerce")
     unit = out["Quantity Unit"].astype(str).str.lower()
-    out["quantity_kg"] = out["quantity"] * unit.str.contains("ton").map({True: 1000.0, False: 1.0})
+    is_ton = unit.str.contains(r"ton|tne|mt\b", regex=True)
+    out["quantity_kg"] = out["quantity"] * is_ton.map({True: 1000.0, False: 1.0})
     out["fob_usd"] = out["fob_usd_thousand"] * 1000.0
     out["year"] = 2025
     return out

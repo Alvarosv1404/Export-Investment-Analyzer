@@ -270,12 +270,12 @@ def _analyze_product_uncached(
     if price_usd_per_kg is not None:
         fob_price = float(price_usd_per_kg)
         price_origin = pricing.PRICE_ORIGIN_USER
-    elif sunat_calc.get("price_usd_per_kg") is not None:
-        fob_price = float(sunat_calc["price_usd_per_kg"])
-        price_origin = pricing.PRICE_ORIGIN_SUNAT
     elif price_calc.get("price_usd_per_kg") is not None:
         fob_price = float(price_calc["price_usd_per_kg"])
         price_origin = pricing.PRICE_ORIGIN_CALCULATED
+    elif sunat_calc.get("price_usd_per_kg") is not None:
+        fob_price = float(sunat_calc["price_usd_per_kg"])
+        price_origin = pricing.PRICE_ORIGIN_SUNAT
     else:
         excel_price = market_summary.get("latest_unit_value_usd")
         fob_price = float(excel_price) if excel_price else 0.0

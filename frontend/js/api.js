@@ -35,7 +35,11 @@ export const getAnalysis = (slug, targetShareOrOpts, priceArg) => {
     if (opts.targetShare !== undefined && opts.targetShare !== '') params.set('target_share', opts.targetShare)
     if (opts.price !== undefined && opts.price !== '') params.set('price_usd_per_kg', opts.price)
     if (opts.capacity !== undefined && opts.capacity !== '') params.set('capacity_kg_year', opts.capacity)
-    if (opts.year1Volume !== undefined && opts.year1Volume !== '') params.set('year1_volume_kg', opts.year1Volume)
+    if (opts.year1Volume !== undefined && opts.year1Volume !== '') {
+      const volTons = parseFloat(opts.year1Volume)
+      const volKg = !isNaN(volTons) && volTons > 0 ? volTons * 1000 : opts.year1Volume
+      params.set('year1_volume_kg', volKg)
+    }
     if (opts.annualGrowth !== undefined && opts.annualGrowth !== '') params.set('annual_volume_growth_pct', opts.annualGrowth)
     if (opts.purchaseCost !== undefined && opts.purchaseCost !== '') params.set('purchase_cost_usd_per_kg', opts.purchaseCost)
     if (opts.variableCost !== undefined && opts.variableCost !== '') params.set('variable_cost_usd_per_kg', opts.variableCost)
@@ -67,7 +71,11 @@ export const getExportUrl = (slug, opts = {}) => {
   set('target_share', opts.targetShare)
   set('price_usd_per_kg', opts.price)
   set('capacity_kg_year', opts.capacity)
-  set('year1_volume_kg', opts.year1Volume)
+  if (opts.year1Volume !== undefined && opts.year1Volume !== '') {
+    const volTons = parseFloat(opts.year1Volume)
+    const volKg = !isNaN(volTons) && volTons > 0 ? volTons * 1000 : opts.year1Volume
+    set('year1_volume_kg', volKg)
+  }
   set('annual_volume_growth_pct', opts.annualGrowth)
   set('purchase_cost_usd_per_kg', opts.purchaseCost)
   set('variable_cost_usd_per_kg', opts.variableCost)

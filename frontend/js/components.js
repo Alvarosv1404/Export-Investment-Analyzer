@@ -51,7 +51,7 @@ export function unitEconomics(pricing) {
     <section class="card">
       <h2>Precio FOB de referencia ${tagData}</h2>
       <div class="kpis">
-        ${kpi('Precio FOB calculado', usd(pricing.price_usd_per_kg), 'USD/kg')}
+        ${kpi('Precio FOB calculado', usd(pricing.price_usd_per_kg * 1000), 'USD/t')}
       </div>
       <p class="note">Calculado desde los Excel locales: ${escapeHTML(pricing.origin || 'fuente Excel')}.</p>
     </section>`
@@ -328,7 +328,13 @@ export function headroom(h) {
 
 // --- Bloque 7: inversion ---------------------------------------------------------
 export function investment(inv) {
-  if (!inv) return ''
+  if (!inv) return `
+    <section class="card financial-result-card">
+      <div class="financial-panel">
+        <h3>Flujo de caja libre por año</h3>
+        <div class="chart"><canvas id="chartCash" height="100"></canvas></div>
+      </div>
+    </section>`
   const s = inv.summary
   const v = s.verdict || {}
   const rows = (inv.pnl || []).map(
@@ -395,18 +401,21 @@ export function investment(inv) {
 
 // --- Bloque 8: sensibilidad ------------------------------------------------------
 export function sensitivity(inv) {
-  if (!inv || !inv.sensitivity) return ''
+  if (!inv || !inv.sensitivity) return `
+    <section class="card financial-sensitivity-card">
+      <div class="chart chart-tall"><canvas id="chartSens" height="200"></canvas></div>
+    </section>`
   return `
     <section class="card financial-sensitivity-card">
       <div class="financial-result-header">
         <div>
           <span class="evaluation-eyebrow">ESCENARIOS DETERMINÍSTICOS</span>
-          <h2>Sensibilidad del VAN ${tagAssumed}</h2>
+          <h2>Análisis de sensibilidad del VAN ${tagAssumed}</h2>
         </div>
       </div>
-      <p class="note">Cada supuesto varía por separado según los rangos de estrés configurados. No son probabilidades ni pronósticos.</p>
-      <div class="chart chart-tall"><canvas id="chartSens" height="200"></canvas></div>
-      <p class="note">VAN base: <b>${fullUSD(inv.sensitivity.base_npv_usd)}</b>.</p>
+      <p class="note">Cada supuesto varía por separado según los rangos de estrés configurados. Se utiliza el método de análisis unidimensional (tornado) para identificar las variables más críticas.</p>
+      <div class="chart chart-tall"><canvas id="chartSens" height="280"></canvas></div>
+      <p class="note">VAN base: <b>${fullUSD(inv.sensitivity.base_npv_usd)}</b> | TIR base: <b>${inv.sensitivity.base_irr_pct != null ? inv.sensitivity.base_irr_pct + '%' : 'n/d'}</b> | Variable más sensible: <b>${inv.sensitivity.most_sensitive_label || inv.sensitivity.most_sensitive || 'n/d'}</b></p>
     </section>`
 }
 
@@ -426,6 +435,7 @@ export function monteCarloRisk(inv) {
           <span class="tag tag-assumed">pendiente</span>
         </div>
         <p class="note">${escapeHTML(message)}</p>
+        <div class="chart"><canvas id="chartMonteCarlo" height="200"></canvas></div>
       </section>`
   }
   const assumptions = mc.assumptions
@@ -436,7 +446,7 @@ export function monteCarloRisk(inv) {
       <div class="financial-result-header">
         <div>
           <span class="evaluation-eyebrow">INCERTIDUMBRE EXPLÍCITA</span>
-          <h2>Distribución de riesgo (Monte Carlo)</h2>
+          <h2>Análisis de riesgo - Monte Carlo</h2>
         </div>
         <span class="tag ${riskClass}">${escapeHTML(mc.verdict)}</span>
       </div>
@@ -445,11 +455,13 @@ export function monteCarloRisk(inv) {
         ${kpi('Probabilidad de VAN negativo', `${lossPct}%`, 'en las simulaciones', lossPct > 40 ? 'neg' : '')}
         ${kpi('Probabilidad de VAN positivo', `${mc.prob_profit_pct}%`, 'en las simulaciones')}
         ${kpi('VAN medio simulado', fullUSD(mc.npv_mean_usd))}
+        ${kpi('VAN mediano', fullUSD(mc.npv_median_usd))}
         ${kpi('VAN P10', fullUSD(mc.npv_p10_usd), 'percentil 10')}
         ${kpi('VAN P90', fullUSD(mc.npv_p90_usd), 'percentil 90')}
+        ${kpi('Desviación estándar', fullUSD(mc.npv_std_usd))}
       </div>
       <p class="sim-hint">Volatilidad precio: ${assumptions.price_volatility_pct}% · costo variable total: ${assumptions.variable_cost_volatility_pct}% · volumen: ${assumptions.volume_volatility_pct}% · sin correlación asumida.</p>
-      <div class="chart"><canvas id="chartMonteCarlo" height="100"></canvas></div>
+      <div class="chart"><canvas id="chartMonteCarlo" height="200"></canvas></div>
     </section>`
 }
 
@@ -781,8 +793,9 @@ export function simulatorPanel(result, state) {
   const waccFraction = waccVal === '' ? '' : Number(waccVal) / 100
   const field = (id, label, fieldValue, { min = '0', step = '0.01', max = '', hint = '' } = {}) => {
     const current = Number(fieldValue)
+    const clamped = max ? Math.min(Math.max(current || 0, Number(min)), Number(max)) : current
     const rangeMax = max
-      ? String(Math.max(Number(max), current || 0))
+      ? String(Number(max))
       : String(Math.max(current * 2, current + 100, Number(min) + 100))
     const formattedValue = fieldValue === ''
       ? 'Por definir'
@@ -795,15 +808,15 @@ export function simulatorPanel(result, state) {
           <label for="${id}">${label}</label>
           <output class="sim-value" id="${id}Value" for="${id}" aria-live="polite">${escapeHTML(formattedValue)}</output>
         </div>
-        <input type="range" id="${id}" data-configured="${fieldValue !== ''}" aria-label="${label}" min="${min}" max="${rangeMax}" step="${step}" value="${escapeHTML(fieldValue || 0)}" class="sim-range" />
+        <input type="range" id="${id}" data-configured="${fieldValue !== ''}" aria-label="${label}" min="${min}" max="${rangeMax}" step="${step}" value="${escapeHTML(clamped || 0)}" class="sim-range" />
         ${hint ? `<span class="sim-hint">${hint}</span>` : ''}
       </div>`
   }
 
   const exportUrl = getExportUrl(slug, {
-    year1Volume: year1VolumeVal,
+    year1Volume: year1VolumeVal ? String(Number(year1VolumeVal) * 1000) : year1VolumeVal,
     annualGrowth: growthVal,
-    variableCost: varVal,
+    variableCost: varVal !== '' ? String(Number(varVal) / 1000) : varVal,
     capex: capexVal,
     opex: opexVal,
     discountRate: waccFraction,
@@ -814,8 +827,8 @@ export function simulatorPanel(result, state) {
       <div class="simulator-header">
         <div>
           <span class="evaluation-eyebrow">EVALUACIÓN DEL PROYECTO</span>
-          <h2>Evaluación financiera del proyecto</h2>
-          <p class="note">El precio FOB se calcula desde los Excel disponibles. Los demás valores se dejan pendientes hasta que los definas con información de tu operación; no se precargan cifras ilustrativas.</p>
+          <h2>Evaluación financiera del proyecto - Flash Cards</h2>
+          <p class="note">El precio FOB se calcula desde los Excel disponibles (TradeMap). Configura los supuestos con los rangos especificados para obtener los indicadores financieros, análisis de sensibilidad y distribución Monte Carlo.</p>
         </div>
         <div class="simulator-actions">
           <a href="${exportUrl}" class="btn btn-export" target="_blank" download>
@@ -832,22 +845,21 @@ export function simulatorPanel(result, state) {
           <h3>Supuestos de operación e inversión</h3>
           <div class="simulator-price-reference">
             <span class="kpi-label">Precio FOB calculado desde Excel</span>
-            <strong>${pricing.price_usd_per_kg ? `${usd(pricing.price_usd_per_kg)} / kg` : 'Sin dato disponible'}</strong>
+            <strong>${pricing.price_usd_per_kg ? `${usd(pricing.price_usd_per_kg * 1000)} / t` : 'Sin dato disponible'}</strong>
             <span class="kpi-note">${escapeHTML(pricing.origin || 'Se necesita un Excel con valor y cantidad.')}</span>
           </div>
           <div class="simulator-fields">
-            ${field('simCapex', 'Inversión inicial (USD)', capexVal, { max: '2500000', step: '1000' })}
-            ${field('simVar', 'Costo variable total por kg (compra + proceso)', varVal, { max: '100', step: '0.01' })}
-            ${field('simYear1Volume', 'Volumen del año 1 (kg)', year1VolumeVal, { max: '1000000', step: '100' })}
-            ${field('simAnnualGrowth', 'Crecimiento del volumen (%)', growthVal, { min: '-100', max: '100', step: '0.1' })}
-            ${field('simOpex', 'Costos fijos del año 1 (USD)', opexVal, { max: '300000', step: '100' })}
-            ${field('simWacc', 'COK / tasa de descuento (%)', waccVal, { max: '100', step: '0.1' })}
+            ${field('simCapex', 'Inversión inicial (USD)', capexVal, { min: '1000000', max: '3000000', step: '10000' })}
+            ${field('simVar', 'Costo variable total por kg (USD/kg)', varVal, { min: '4800', max: '7800', step: '10', hint: 'Rango solicitado: 4800 - 7800 USD/kg.' })}
+            ${field('simYear1Volume', 'Volumen del año 1 (toneladas)', year1VolumeVal, { min: '200', max: '800', step: '10', hint: 'Toneladas FOB del primer año (200-800 t).' })}
+            ${field('simAnnualGrowth', 'Crecimiento del volumen (%)', growthVal, { min: '10', max: '55', step: '0.5' })}
+            ${field('simOpex', 'Costos fijos del año 1 (USD)', opexVal, { min: '200000', max: '600000', step: '5000' })}
+            ${field('simWacc', 'COK / tasa de descuento (%)', waccVal, { min: '7', max: '16', step: '0.1' })}
           </div>
         </div>
 
         <div class="sim-footer">
           <span class="evaluation-status" id="evaluationStatus" aria-live="polite">${hasInputs ? 'Supuestos cargados.' : 'Selecciona los supuestos de operación para calcular VAN, TIR y flujos.'}</span>
-          <button type="button" id="simReset" class="text-btn">Limpiar supuestos</button>
         </div>
       </form>
     </section>`

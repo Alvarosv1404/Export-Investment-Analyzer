@@ -1,86 +1,121 @@
-"""VAN, TIR, payback y analisis de sensibilidad.
-
-Lo que hace un buen analisis de sensibilidad y casi nadie hace bien: no prueba
-"el escenario optimista" y "el pesimista" con dos números inventados, sino que
-mueve UNA variable a la vez y mide cuanto se mueve el VAN. Eso produce un
-tornado, que si ordena las variables te dice en que supuesto conviene invertir
-el esfuerzo de negociacion.
-"""
+"""Indicadores de inversion, analisis de sensibilidad y riesgo."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 
 import numpy as np
 
 from .financials import ProjectInputs, ProjectOutputs, build_cashflows
 
+_SENSITIVITY_LABELS = {
+    "fob_price_shift": "Precio FOB",
+    "capex_shift": "Inversión inicial",
+    "volume_shift": "Volumen exportado",
+    "cost_shift": "Costo variable unitario",
+    "discount_rate": "COK (tasa)",
+    "initial_capex_usd": "Inversión inicial",
+    "variable_cost_usd_per_kg": "Costo variable unitario",
+    "year1_volume_tons": "Volumen exportado",
+    "volume_growth_pct": "Crecimiento del volumen",
+    "opex_fixed_usd_year": "Costos fijos",
+}
+
 
 def summarize(outputs: ProjectOutputs, inputs: ProjectInputs) -> dict:
-    """Indicadores de retorno de la decision de inversion."""
-    def pct(value: float | None) -> float | None:
-        return round(value * 100, 2) if value is not None else None
-
+    """Resume los indicadores financieros y su lectura para la decision."""
+    irr_pct = _percent(outputs.irr)
     return {
         "npv_usd": round(outputs.npv, 2),
-        "irr_pct": pct(outputs.irr),
+        "irr_pct": irr_pct,
         "payback_years": (
             round(outputs.payback_years, 2) if outputs.payback_years is not None else None
         ),
-        "discount_rate_pct": pct(inputs.discount_rate),
+        "discount_rate_pct": round(inputs.discount_rate * 100, 2),
         "initial_outflow_usd": round(outputs.cashflows[0], 2),
         "total_fcf_usd": round(sum(outputs.annual_fcf), 2),
         "roi_unlevered_pct": (
-            round(sum(outputs.annual_fcf) / inputs.capex_usd * 100, 2) if inputs.capex_usd else None
+            round(sum(outputs.annual_fcf) / inputs.capex_usd * 100, 2)
+            if inputs.capex_usd
+            else None
         ),
         "verdict": _verdict(outputs, inputs),
     }
 
 
-def _verdict(outputs: ProjectOutputs, inputs: ProjectInputs) -> dict:
-    """Lectura del resultado, en el lenguaje de una comision de inversion."""
-    if outputs.npv > 0 and outputs.irr and outputs.irr > inputs.discount_rate:
+def _percent(value: float | None) -> float | None:
+    return round(value * 100, 2) if value is not None else None
+
+
+def _verdict(outputs: ProjectOutputs, inputs: ProjectInputs) -> dict[str, str]:
+    if outputs.npv > 0 and outputs.irr is not None and outputs.irr > inputs.discount_rate:
         return {
             "label": "Favorable",
-            "detail": "El proyecto crea valor sobre el costo de capital con estos supuestos.",
+            "detail": "El proyecto crea valor por encima del costo de capital con estos supuestos.",
         }
     if outputs.npv > 0:
         return {
             "label": "Marginal",
-            "detail": (
-                "El VAN es positivo pero la TIR no supera el costo de capital. "
-                "Revisar supuestos de precio, volumen o CAPEX antes de decidir."
-            ),
+            "detail": "El VAN es positivo, pero la TIR no supera el costo de capital.",
         }
     if outputs.payback_years is None:
         return {
             "label": "No se recupera",
-            "detail": (
-                "El flujo no vuelve a positivo dentro del horizonte. Con estos "
-                "supuestos no hay caso; el problema es el negocio, no la tasa."
-            ),
+            "detail": "El flujo no recupera la inversión dentro del horizonte del proyecto.",
         }
     return {
         "label": "No favorable",
-        "detail": "VAN negativo. El proyecto destruye valor con estos supuestos.",
+        "detail": "El VAN es negativo: el proyecto destruye valor con estos supuestos.",
     }
 
 
-def _with(inputs: ProjectInputs, **changes) -> ProjectInputs:
+def _with(inputs: ProjectInputs, **changes: object) -> ProjectInputs:
+    """Crea un escenario sin modificar los supuestos del caso base."""
     return replace(inputs, **changes)
 
 
+def _apply(inputs: ProjectInputs, variable: str, value: float) -> ProjectInputs | None:
+    """Aplica al modelo un escenario de sensibilidad configurado."""
+    if variable == "fob_price_shift":
+        price = inputs.fob_price_usd_per_kg * (1 + value)
+        return _with(inputs, fob_price_usd_per_kg=price) if price > 0 else None
+
+    if variable == "capex_shift":
+        factor = 1 + value
+        if factor <= 0:
+            return None
+        return _with(
+            inputs,
+            capex_usd=inputs.capex_usd * factor,
+            working_capital_usd=inputs.working_capital_usd * factor,
+        )
+
+    if variable == "volume_shift":
+        factor = 1 + value
+        if factor <= 0:
+            return None
+        ramp = [min(1.0, max(0.0, utilization * factor)) for utilization in inputs.utilization_ramp]
+        return _with(inputs, utilization_ramp=ramp) if any(ramp) else None
+
+    if variable == "cost_shift":
+        factor = 1 + value
+        if factor <= 0:
+            return None
+        return _with(
+            inputs,
+            purchase_cost_usd_per_kg=inputs.purchase_cost_usd_per_kg * factor,
+            variable_cost_usd_per_kg=inputs.variable_cost_usd_per_kg * factor,
+        )
+
+    return None
+
+
 def run_sensitivity(inputs: ProjectInputs, grid: dict[str, list[float]]) -> dict:
-    """Tornado: mueve una variable a la vez y mide el efecto en el VAN.
-
-    grid viene de config/assumptions.yaml (seccion `sensitivity`).
-    Cada valor es un CAMBIO RELATIVO o un valor absoluto segun la variable;
-    ver _apply. El escenario base se incluye siempre.
-    """
+    """Calcula extremos de VAN al variar cada supuesto por separado."""
     base = build_cashflows(inputs)
-    base_npv = base.npv
-
     results: dict[str, list[dict]] = {}
+    tornado = []
 
     for variable, values in grid.items():
         rows = []
@@ -88,125 +123,92 @@ def run_sensitivity(inputs: ProjectInputs, grid: dict[str, list[float]]) -> dict
             scenario = _apply(inputs, variable, value)
             if scenario is None:
                 continue
-            out = build_cashflows(scenario)
+            output = build_cashflows(scenario)
             rows.append(
                 {
                     "value": value,
-                    "npv_usd": round(out.npv, 2),
-                    "delta_npv_usd": round(out.npv - base_npv, 2),
-                    "irr_pct": round(out.irr * 100, 2) if out.irr is not None else None,
+                    "npv_usd": round(output.npv, 2),
+                    "delta_npv_usd": round(output.npv - base.npv, 2),
+                    "irr_pct": _percent(output.irr),
                 }
             )
-        if rows:
-            results[variable] = rows
+        if not rows:
+            continue
 
-    # Tornado:variables ordenadas por cuanto mueven el VAN en el peor caso.
-    impact = [
-        {
-            "variable": variable,
-            "swing_usd": round(
-                max(abs(r["delta_npv_usd"]) for r in rows)
-                - min(abs(r["delta_npv_usd"]) for r in rows),
-                2,
-            ),
-        }
-        for variable, rows in results.items()
-    ]
-    impact.sort(key=lambda x: x["swing_usd"], reverse=True)
+        results[variable] = rows
+        low = min(rows, key=lambda row: row["npv_usd"])
+        high = max(rows, key=lambda row: row["npv_usd"])
+        tornado.append(
+            {
+                "variable": variable,
+                "label": _SENSITIVITY_LABELS.get(variable, variable.replace("_", " ").capitalize()),
+                "low_npv_usd": low["npv_usd"],
+                "high_npv_usd": high["npv_usd"],
+                "low_delta_npv_usd": round(low["npv_usd"] - base.npv, 2),
+                "high_delta_npv_usd": round(high["npv_usd"] - base.npv, 2),
+                "swing_usd": round(high["npv_usd"] - low["npv_usd"], 2),
+            }
+        )
 
+    tornado.sort(key=lambda row: row["swing_usd"], reverse=True)
     return {
-        "base_npv_usd": round(base_npv, 2),
-        "base_irr_pct": round(base.irr * 100, 2) if base.irr is not None else None,
+        "base_npv_usd": round(base.npv, 2),
+        "base_irr_pct": _percent(base.irr),
         "by_variable": results,
-        "tornado": impact,
-        "most_sensitive": impact[0]["variable"] if impact else None,
+        "tornado": tornado,
+        "most_sensitive": tornado[0]["variable"] if tornado else None,
+        "most_sensitive_label": tornado[0]["label"] if tornado else None,
     }
 
 
-def _apply(inputs: ProjectInputs, variable: str, value: float) -> ProjectInputs | None:
-    """Aplica un valor de sensibilidad. Devuelve None si la variable no existe."""
-    if variable == "discount_rate":
-        return _with(inputs, discount_rate=value)
-    if variable == "fob_price_shift":
-        price = inputs.fob_price_usd_per_kg * (1 + value)
-        if price <= 0:
-            return None
-        return _with(inputs, fob_price_usd_per_kg=price)
-    if variable == "fx_shift":
-        return _with(inputs, fob_price_usd_per_kg=inputs.fob_price_usd_per_kg * (1 + value))
-    if variable == "capex_shift":
-        return _with(
-            inputs,
-            capex_usd=inputs.capex_usd * (1 + value),
-            working_capital_usd=inputs.working_capital_usd * (1 + value),
-        )
-    if variable == "volume_shift":
-        # Mueve la rampa de ocupacion proporcionalmente.
-        ramp = [min(1.0, max(0.0, u * (1 + value))) for u in inputs.utilization_ramp]
-        if max(ramp) <= 0:
-            return None
-        return _with(inputs, utilization_ramp=ramp)
-    if variable == "cost_shift":
-        return _with(
-            inputs,
-            variable_cost_usd_per_kg=inputs.variable_cost_usd_per_kg * (1 + value),
-            purchase_cost_usd_per_kg=inputs.purchase_cost_usd_per_kg * (1 + value),
-        )
-    return None
+def _bisect(
+    func: Callable[[float], float],
+    low: float,
+    high: float,
+    tolerance: float = 0.001,
+    iterations: int = 60,
+) -> float:
+    """Busca una raiz de una funcion creciente acotada."""
+    low_value = func(low)
+    high_value = func(high)
+    if low_value >= 0:
+        return low
+    if high_value <= 0:
+        return high
+
+    for _ in range(iterations):
+        middle = (low + high) / 2
+        if func(middle) >= 0:
+            high = middle
+        else:
+            low = middle
+        if high - low < tolerance:
+            break
+    return (low + high) / 2
 
 
 def breakeven(inputs: ProjectInputs) -> dict:
-    """Punto de equilibrio de las dos variables que casi siempre deciden el caso.
-
-    1. VAN = 0 -> que precio FOB minimo hace viable el proyecto.
-    2. VAN = 0 -> que ocupacion de planta minima hace viable el proyecto.
-    """
+    """Encuentra precio FOB y utilizacion que llevan el VAN aproximadamente a cero."""
     base = build_cashflows(inputs)
     if base.npv <= 0:
-        return {
-            "available": False,
-            "reason": "El escenario base ya tiene VAN negativo: no hay un precio mínimo que lo salve.",
-        }
+        return {"available": False}
 
     def npv_at_price(price: float) -> float:
         return build_cashflows(_with(inputs, fob_price_usd_per_kg=price)).npv
 
+    base_utilization = inputs.utilization_ramp[0] if inputs.utilization_ramp else 1.0
+
     def npv_at_utilization(scale: float) -> float:
-        ramp = [min(1.0, u * scale) for u in inputs.utilization_ramp]
+        ramp = [min(1.0, utilization * scale) for utilization in inputs.utilization_ramp]
         return build_cashflows(_with(inputs, utilization_ramp=ramp)).npv
 
+    price_floor = _bisect(npv_at_price, 0.01, max(inputs.fob_price_usd_per_kg * 4, 1.0))
+    utilization_scale = _bisect(npv_at_utilization, 0.0, 1.5)
     return {
         "available": True,
-        "fob_price_floor_usd_per_kg": _bisect(npv_at_price, 0.01, inputs.fob_price_usd_per_kg * 4),
-        "utilization_floor_pct": _bisect(npv_at_utilization, 0.05, 1.5) * 100,
-        "current_fob_price_usd_per_kg": inputs.fob_price_usd_per_kg,
-        "note": "Valores por debajo de estos umbrales hacen el VAN negativo.",
+        "fob_price_floor_usd_per_kg": round(price_floor, 4),
+        "utilization_floor_pct": round(min(1.0, base_utilization * utilization_scale) * 100, 2),
     }
-
-
-def _bisect(func, low: float, high: float, tolerance: float = 0.001, iterations: int = 60) -> float:
-    """Busqueda por biseccion de la raiz de func ( VAN = 0 ).
-
-    Espera una funcion CRECIENTE, que es el caso de los dos umbrales que se
-    calculan: subir el precio FOB sube el VAN, y subir la ocupacion tambien.
-    Con esa convencion, si f(mid) > 0 la raiz esta POR DEBAJO de mid, asi que
-    el extremo que se mueve es `high`. Invertirlo devuelve el techo del rango
-    de busqueda en vez del umbral, que es un numero plausible y por lo tanto
-    peligroso.
-    """
-    if func(low) > 0:
-        return low
-    if func(high) < 0:
-        return high
-    for _ in range(iterations):
-        mid = (low + high) / 2
-        if func(mid) > 0:
-            high = mid
-        else:
-            low = mid
-        if high - low < tolerance:
-            break
-    return (low + high) / 2
 
 
 def run_monte_carlo(
@@ -217,17 +219,12 @@ def run_monte_carlo(
     n_simulations: int = 2_000,
     seed: int = 42,
 ) -> dict:
-    """Simulación estocástica Monte Carlo de riesgo de inversión.
-
-    Las volatilidades son coeficientes de variación (fracciones entre 0 y 1)
-    ingresados por el usuario. Se muestrean variaciones independientes y
-    constantes para todo el horizonte; no se asume correlación entre variables.
-    """
+    """Simula VAN con variaciones lognormales e independientes de precio, costo y volumen."""
     volatilities = (price_volatility, variable_cost_volatility, volume_volatility)
     if n_simulations <= 0:
         raise ValueError("El número de simulaciones debe ser mayor que cero.")
-    if any(not 0 <= volatility <= 1 for volatility in volatilities):
-        raise ValueError("Las volatilidades deben estar entre 0 y 1.")
+    if any(not np.isfinite(value) or value < 0 for value in volatilities):
+        raise ValueError("Las volatilidades deben ser números finitos no negativos.")
 
     rng = np.random.default_rng(seed)
 
@@ -238,68 +235,55 @@ def run_monte_carlo(
         return rng.lognormal(-0.5 * sigma**2, sigma, n_simulations)
 
     price_factors = factors(price_volatility)
-    variable_cost_factors = factors(variable_cost_volatility)
+    cost_factors = factors(variable_cost_volatility)
     volume_factors = factors(volume_volatility)
+    npvs = []
 
-    npvs: list[float] = []
-    for i in range(n_simulations):
-        ramp = [min(1.0, max(0.0, u * volume_factors[i])) for u in inputs.utilization_ramp]
-        sim_input = _with(
+    for price_factor, cost_factor, volume_factor in zip(
+        price_factors, cost_factors, volume_factors, strict=True
+    ):
+        scenario = _with(
             inputs,
-            fob_price_usd_per_kg=inputs.fob_price_usd_per_kg * float(price_factors[i]),
-            purchase_cost_usd_per_kg=(
-                inputs.purchase_cost_usd_per_kg * float(variable_cost_factors[i])
-            ),
-            variable_cost_usd_per_kg=(
-                inputs.variable_cost_usd_per_kg * float(variable_cost_factors[i])
-            ),
-            utilization_ramp=ramp,
+            fob_price_usd_per_kg=inputs.fob_price_usd_per_kg * float(price_factor),
+            purchase_cost_usd_per_kg=inputs.purchase_cost_usd_per_kg * float(cost_factor),
+            variable_cost_usd_per_kg=inputs.variable_cost_usd_per_kg * float(cost_factor),
+            utilization_ramp=[
+                min(1.0, utilization * float(volume_factor))
+                for utilization in inputs.utilization_ramp
+            ],
         )
-        out = build_cashflows(sim_input)
-        npvs.append(out.npv)
+        npvs.append(build_cashflows(scenario).npv)
 
-    arr = np.array(npvs)
-    loss_count = int(np.sum(arr < 0))
-    prob_loss = round((loss_count / n_simulations) * 100, 1)
-
-    counts, bin_edges = np.histogram(arr, bins=12)
-    histogram = []
-    for i in range(len(counts)):
-        b_start = round(float(bin_edges[i]), 1)
-        b_end = round(float(bin_edges[i + 1]), 1)
-        histogram.append(
-            {
-                "bin_start": b_start,
-                "bin_end": b_end,
-                "label": f"${b_start:,.0f} a ${b_end:,.0f}",
-                "count": int(counts[i]),
-                "is_negative": b_start < 0,
-            }
-        )
+    values = np.asarray(npvs)
+    counts, edges = np.histogram(values, bins=12)
+    histogram = [
+        {
+            "bin_start": round(float(edges[index]), 1),
+            "bin_end": round(float(edges[index + 1]), 1),
+            "label": f"${edges[index]:,.0f} a ${edges[index + 1]:,.0f}",
+            "count": int(counts[index]),
+            "is_negative": bool(edges[index] < 0),
+        }
+        for index in range(len(counts))
+    ]
+    prob_loss = round(float(np.mean(values < 0)) * 100, 1)
 
     return {
         "n_simulations": n_simulations,
         "assumptions": {
             "price_volatility_pct": round(price_volatility * 100, 2),
             "variable_cost_volatility_pct": round(variable_cost_volatility * 100, 2),
-            "purchase_cost_volatility_pct": round(variable_cost_volatility * 100, 2),
             "volume_volatility_pct": round(volume_volatility * 100, 2),
             "distribution": "lognormal",
             "independent_variables": True,
         },
         "prob_loss_pct": prob_loss,
-        "prob_profit_pct": round(100.0 - prob_loss, 1),
-        "npv_mean_usd": round(float(np.mean(arr)), 2),
-        "npv_median_usd": round(float(np.median(arr)), 2),
-        "npv_std_usd": round(float(np.std(arr)), 2),
-        "npv_p10_usd": round(float(np.percentile(arr, 10)), 2),
-        "npv_p90_usd": round(float(np.percentile(arr, 90)), 2),
+        "prob_profit_pct": round(100 - prob_loss, 1),
+        "npv_mean_usd": round(float(np.mean(values)), 2),
+        "npv_median_usd": round(float(np.median(values)), 2),
+        "npv_std_usd": round(float(np.std(values)), 2),
+        "npv_p10_usd": round(float(np.percentile(values, 10)), 2),
+        "npv_p90_usd": round(float(np.percentile(values, 90)), 2),
         "histogram": histogram,
-        "verdict": (
-            "Riesgo bajo"
-            if prob_loss < 15.0
-            else "Riesgo moderado"
-            if prob_loss < 35.0
-            else "Riesgo alto"
-        ),
+        "verdict": "Riesgo bajo" if prob_loss < 20 else "Riesgo medio" if prob_loss < 50 else "Riesgo alto",
     }

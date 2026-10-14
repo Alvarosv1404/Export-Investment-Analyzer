@@ -105,9 +105,9 @@ def analysis(
     opex_fixed_usd_year: float | None = Query(default=None, ge=0.0),
     working_capital_usd: float | None = Query(default=None, ge=0.0),
     discount_rate: float | None = Query(default=None, ge=0.0, le=1.0),
-    price_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
-    purchase_cost_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
-    volume_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    price_volatility_pct: float | None = Query(default=15.0, ge=0.0, le=100.0),
+    purchase_cost_volatility_pct: float | None = Query(default=15.0, ge=0.0, le=100.0),
+    volume_volatility_pct: float | None = Query(default=20.0, ge=0.0, le=100.0),
     projection_method: str = Query(default="moving_average", pattern="^(moving_average|linear|quadratic|cagr)$"),
 ) -> JSONResponse:
     """Análisis de mercado y evaluación financiera con supuestos ingresados."""
@@ -152,9 +152,9 @@ def export_excel(
     opex_fixed_usd_year: float | None = Query(default=None, ge=0.0),
     working_capital_usd: float | None = Query(default=None, ge=0.0),
     discount_rate: float | None = Query(default=None, ge=0.0, le=1.0),
-    price_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
-    purchase_cost_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
-    volume_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    price_volatility_pct: float | None = Query(default=15.0, ge=0.0, le=100.0),
+    purchase_cost_volatility_pct: float | None = Query(default=15.0, ge=0.0, le=100.0),
+    volume_volatility_pct: float | None = Query(default=20.0, ge=0.0, le=100.0),
     projection_method: str = Query(default="moving_average", pattern="^(moving_average|linear|quadratic|cagr)$"),
 ) -> Response:
     """Descarga el Dossier Ejecutivo completo en formato Excel (.xlsx)."""
@@ -205,9 +205,9 @@ def index(
     opex_fixed_usd_year: float | None = Query(default=None, ge=0.0),
     working_capital_usd: float | None = Query(default=None, ge=0.0),
     discount_rate: float | None = Query(default=None, ge=0.0, le=1.0),
-    price_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
-    purchase_cost_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
-    volume_volatility_pct: float | None = Query(default=None, ge=0.0, le=100.0),
+    price_volatility_pct: float | None = Query(default=15.0, ge=0.0, le=100.0),
+    purchase_cost_volatility_pct: float | None = Query(default=15.0, ge=0.0, le=100.0),
+    volume_volatility_pct: float | None = Query(default=20.0, ge=0.0, le=100.0),
     projection_method: str = Query(default="moving_average", pattern="^(moving_average|linear|quadratic|cagr)$"),
 ):
     """Sirve el frontend.

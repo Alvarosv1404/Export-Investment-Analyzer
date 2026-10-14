@@ -210,6 +210,17 @@ class TestSensitivity:
         rows = out["by_variable"]["capex_shift"]
         assert rows[0]["npv_usd"] > rows[1]["npv_usd"]  # menos capex -> mejor VAN
 
+    def test_tornado_conserva_extremos_favorables_y_desfavorables(self):
+        inputs = base_inputs()
+        out = run_sensitivity(inputs, {"fob_price_shift": [-0.15, 0.0, 0.15]})
+
+        row = out["tornado"][0]
+        assert row["low_delta_npv_usd"] < 0 < row["high_delta_npv_usd"]
+        assert row["low_npv_usd"] < out["base_npv_usd"] < row["high_npv_usd"]
+        assert row["swing_usd"] == pytest.approx(row["high_npv_usd"] - row["low_npv_usd"])
+        assert row["label"] == "Precio FOB"
+        assert out["most_sensitive_label"] == "Precio FOB"
+
 
 class TestBisect:
     """El bisection se usa para los umbrales, asi que un error de signo aqui

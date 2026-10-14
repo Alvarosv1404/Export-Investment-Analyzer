@@ -104,7 +104,7 @@ function analysisOpts() {
   return {
     year1Volume: state.year1Volume,
     annualGrowth: state.annualGrowth,
-    variableCost: state.variableCost,
+    variableCost: state.variableCost !== '' ? (Number(state.variableCost) / 1000).toFixed(4) : '',
     capex: state.capex,
     opex: state.opex,
     discountRate: waccFraction,
@@ -235,7 +235,6 @@ function renderControls() {
             <span class="compare-selection-count" aria-live="polite"></span>
             <div class="compare-picker-actions">
               <button type="button" class="text-btn" id="selectAllProducts">Seleccionar todos</button>
-              <button type="button" class="text-btn" id="clearProducts">Limpiar</button>
             </div>
           </div>
         </fieldset>
@@ -509,10 +508,11 @@ function bindSimulator() {
   }
 
   const complete = () => {
-    const year1Volume = document.getElementById('simYear1Volume')
-    year1Volume.setCustomValidity(
-      Number(year1Volume.value) <= 0
-        ? 'El volumen del año 1 debe ser mayor que cero.'
+    const year1VolumeEl = document.getElementById('simYear1Volume')
+    const vol = Number(year1VolumeEl.value)
+    year1VolumeEl.setCustomValidity(
+      vol < 200 || vol > 800
+        ? 'El volumen del año 1 debe estar entre 200 y 800 toneladas.'
         : ''
     )
     return numbers.every(({ range }) => range.dataset.configured === 'true') && form.checkValidity()
@@ -522,7 +522,7 @@ function bindSimulator() {
     syncState()
     if (!complete()) {
       requestId += 1
-      showPending('Selecciona todos los supuestos con los sliders. El volumen del año 1 debe ser mayor que cero.')
+      showPending('Selecciona todos los supuestos con los sliders. El volumen del año 1 debe estar entre 200 y 800 toneladas.')
       return
     }
 
@@ -559,7 +559,7 @@ function bindSimulator() {
     requestId += 1
     if (!complete()) {
       window.clearTimeout(timer)
-      showPending('Selecciona todos los supuestos con los sliders. El volumen del año 1 debe ser mayor que cero.')
+      showPending('Selecciona todos los supuestos con los sliders. El volumen del año 1 debe estar entre 200 y 800 toneladas.')
       return
     }
     const status = document.getElementById('evaluationStatus')
@@ -611,13 +611,14 @@ function render(result) {
     state.opex,
     state.discountRate,
   ].every((value) => value !== '')
-  const evaluationResults = hasFinancialInputs && result.investment
+  const evaluationResults = result.investment
     ? `${investment(result.investment)}${sensitivity(result.investment)}${monteCarloRisk(result.investment)}`
     : `${missingAssumptions(result) || `
         <section class="card evaluation-pending">
           <h2>Resultados de la evaluación</h2>
           <p class="note">No hay suficientes datos para calcular VAN, TIR, recuperación y flujos de caja.</p>
-        </section>`}${monteCarloRisk(result.investment)}`
+        </section>`}`
+
   const meta = `
     <section class="card">
       <h2>${escapeHTML(product.name || '')}</h2>
@@ -643,10 +644,12 @@ function render(result) {
     `<section class="project-evaluation" id="projectEvaluation">
       ${simulatorPanel(result, state)}
       <div id="evaluationResults">${evaluationResults}</div>
-    </section>`,
+    </section>
+`,
   ].join('')
 
   renderAll(result)
+  if (result.investment) renderFinancialCharts(result.investment)
   bindSimulator()
   bindShareYear(result)
   bindProjectionMethod()
@@ -699,7 +702,7 @@ function renderComparisonView() {
   const app = document.getElementById('app')
   const detail = state.comparisonData ? comparison(state.comparisonData) : EMPTY_COMPARISON
   app.innerHTML = `<section class="comparison-page">${ranking(state.rankingData)}${detail}</section>`
-  renderRankingChart(state.rankingData)
+  if (state.rankingData) renderRankingChart(state.rankingData)
   if (state.comparisonData) renderComparisonCharts(state.comparisonData)
 }
 

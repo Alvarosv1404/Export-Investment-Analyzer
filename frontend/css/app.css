@@ -629,7 +629,7 @@ tr.muted td { color: var(--ink-faint); }
 
 /* --- notas, charts, fuentes --- */
 .note { font-size: 0.85rem; color: var(--ink-soft); margin: 0.75rem 0 0; }
-.chart { margin-top: 1.25rem; }
+.chart { margin-top: 1.25rem; min-height: 200px; }
 .chart-tall { margin-top: 0.75rem; }
 .comparison-page { max-width: 1600px; margin: 0 auto; }
 .comparison-intro h1 { margin: 0; font-size: 1.35rem; }
@@ -700,11 +700,13 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
 }
 .project-evaluation .card,
 .project-evaluation .simulator-card {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   border-color: var(--line);
   background: var(--card);
   color: var(--ink);
-  box-shadow: 0 4px 14px rgba(30, 64, 175, 0.06);
+  box-shadow: 0 4px 18px rgba(30, 64, 175, 0.08);
+  border-radius: 12px;
+  padding: 1.5rem;
 }
 .project-evaluation .simulator-card { padding: clamp(1rem, 2vw, 1.75rem); }
 .project-evaluation h2 { color: var(--ink); font-size: clamp(1.1rem, 1.7vw, 1.4rem); }
@@ -794,31 +796,43 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
 .project-evaluation .financial-result-header h2 { margin: 0; }
 .project-evaluation .verdict { margin: 0 0 1rem; }
 .project-evaluation .financial-kpis {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr));
-  gap: 0.65rem;
-  margin: 1rem 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 0.85rem;
+  margin: 1.25rem 0;
   border: 0;
   background: transparent;
   overflow: visible;
 }
 .project-evaluation .financial-kpis .kpi {
   min-width: 0;
-  padding: 0.85rem 0.95rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  padding: 1.25rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
-.project-evaluation .kpi-label { color: var(--ink-soft); }
-.project-evaluation .kpi-value { color: var(--ink); font-size: clamp(1rem, 1.6vw, 1.3rem); overflow-wrap: anywhere; }
+.project-evaluation .financial-kpis .kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+.project-evaluation .kpi-label { color: var(--ink-soft); font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.project-evaluation .kpi-value { color: var(--ink); font-size: clamp(1.25rem, 2vw, 1.75rem); font-weight: 700; overflow-wrap: anywhere; line-height: 1.2; }
 .project-evaluation .kpi-value.neg { color: var(--bad); }
-.project-evaluation .kpi-note { color: var(--ink-faint); }
+.project-evaluation .kpi-note { color: var(--ink-faint); font-size: 0.75rem; margin-top: 0.25rem; }
 .project-evaluation .financial-panel {
   min-width: 0;
   margin-top: 1rem;
-  padding: 1rem;
+  padding: 1.25rem;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
 .project-evaluation .financial-panel h3 { margin: 0 0 0.4rem; }
 .project-evaluation .financial-panel .chart { height: clamp(250px, 30vw, 350px); margin-top: 0.5rem; position: relative; }
@@ -828,8 +842,8 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
 .project-evaluation .financial-table th { color: var(--ink-soft); }
 .project-evaluation .financial-table td { border-color: var(--line); color: var(--ink); }
 .project-evaluation .financial-table tr.hl { background: #eff6ff; }
-.project-evaluation .financial-sensitivity-card .chart { height: clamp(280px, 32vw, 410px); position: relative; }
-.project-evaluation .financial-monte-carlo-card .chart { height: clamp(260px, 30vw, 360px); position: relative; }
+.project-evaluation .financial-sensitivity-card .chart { height: clamp(320px, 38vw, 480px); position: relative; }
+.project-evaluation .financial-monte-carlo-card .chart { height: clamp(320px, 38vw, 460px); position: relative; }
 .project-evaluation code {
   background: #f1f5f9;
   color: #1e40af;

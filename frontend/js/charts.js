@@ -135,7 +135,10 @@ export function headroom(canvas, h) {
 
 /** Flujo de caja libre por anio, verde positivo / rojo negativo. */
 export function cashflows(canvas, inv) {
-  if (!canvas || !inv?.cashflows) return
+  if (!canvas || !inv?.cashflows) {
+    if (canvas) new Chart(canvas, { type: 'line', data: { labels: [], datasets: [] }, options: { plugins: { legend: { display: false } } } })
+    return
+  }
   const flows = inv.cashflows
   new Chart(canvas, {
     type: 'bar',
@@ -169,34 +172,76 @@ export function cashflows(canvas, inv) {
 
 /** Tornado: que variable mueve mas el VAN. */
 export function tornado(canvas, sens) {
-  if (!canvas || !sens?.tornado) return
+  if (!canvas || !sens?.tornado) {
+    if (canvas) new Chart(canvas, { type: 'line', data: { labels: [], datasets: [] }, options: { plugins: { legend: { display: false } } } })
+    return
+  }
   const t = sens.tornado
+  const span = Math.max(
+    1,
+    ...t.flatMap((row) => [
+      Math.abs(row.low_delta_npv_usd),
+      Math.abs(row.high_delta_npv_usd),
+    ]),
+  )
+  const zeroGap = span * 0.008
   new Chart(canvas, {
     type: 'bar',
     data: {
-      labels: t.map((x) => x.variable),
+      labels: t.map((row) => row.label || row.variable.replaceAll('_', ' ')),
       datasets: [
         {
-          label: 'Impacto en VAN',
-          data: t.map((x) => x.swing_usd),
-          backgroundColor: t.map((x) => (x.swing_usd > 0 ? '#f59e0b' : '#64748b')),
+          label: 'Impacto negativo',
+          data: t.map((row) =>
+            row.low_delta_npv_usd < -zeroGap ? [row.low_delta_npv_usd, -zeroGap] : null,
+          ),
+          backgroundColor: '#ef4444',
+          borderRadius: 4,
+          barThickness: 12,
+        },
+        {
+          label: 'Impacto positivo',
+          data: t.map((row) =>
+            row.high_delta_npv_usd > zeroGap ? [zeroGap, row.high_delta_npv_usd] : null,
+          ),
+          backgroundColor: '#10b981',
+          borderRadius: 4,
+          barThickness: 12,
         },
       ],
     },
     options: {
       indexAxis: 'y',
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
           backgroundColor: '#0f172a',
           titleColor: '#f8fafc',
           bodyColor: '#e2e8f0',
-          callbacks: { label: (c) => `swing ${money(c.parsed.x)}` },
+          callbacks: {
+            label: (context) => {
+              const row = t[context.dataIndex]
+              return [
+                `VAN bajo: ${money(row.low_npv_usd)} (${money(row.low_delta_npv_usd)} vs. base)`,
+                `VAN alto: ${money(row.high_npv_usd)} (${money(row.high_delta_npv_usd)} vs. base)`,
+              ]
+            },
+          },
         },
       },
       scales: {
-        x: { ticks: { color: '#cbd5e1', callback: compact }, grid: { color: '#334155' } },
-        y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+        x: {
+          min: -span,
+          max: span,
+          ticks: { color: '#cbd5e1', callback: compact },
+          grid: {
+            color: (context) => (context.tick.value === 0 ? '#f8fafc' : '#334155'),
+            lineWidth: (context) => (context.tick.value === 0 ? 2 : 1),
+          },
+          title: { display: true, text: 'Cambio del VAN frente al caso base (USD)' },
+        },
+        y: { ticks: { color: '#cbd5e1' }, grid: { display: false } },
       },
     },
   })
@@ -428,7 +473,10 @@ function sunatPriceChart(canvas, s) {
 
 /** Histograma de distribución de probabilidades de Monte Carlo. */
 export function monteCarloChart(canvas, mc) {
-  if (!canvas || !mc?.histogram?.length) return
+  if (!canvas || !mc?.histogram?.length) {
+    if (canvas) new Chart(canvas, { type: 'line', data: { labels: [], datasets: [] }, options: { plugins: { legend: { display: false } } } })
+    return
+  }
   const labels = mc.histogram.map((b) => b.label)
   const data = mc.histogram.map((b) => b.count)
   const colors = mc.histogram.map((b) => (b.is_negative ? 'rgba(239, 68, 68, 0.7)' : 'rgba(16, 185, 129, 0.7)'))
@@ -441,24 +489,32 @@ export function monteCarloChart(canvas, mc) {
           label: 'Frecuencia de simulaciones',
           data,
           backgroundColor: colors,
-          borderRadius: 4,
+          borderRadius: 6,
+          borderWidth: 1,
+          borderColor: '#e2e8f0',
         },
       ],
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
+        title: {
+          display: true,
+          text: `Distribución de VAN - ${mc.n_simulations?.toLocaleString('es-PE') || ''} simulaciones`,
+          font: { size: 13, weight: '600' },
+        },
         tooltip: {
           callbacks: {
             label: (c) =>
-              `${c.parsed.y} iteraciones (${((c.parsed.y / (mc.n_simulations || 500)) * 100).toFixed(1)}%)`,
+              `${c.parsed.y} simulaciones (${((c.parsed.y / (mc.n_simulations || 1)) * 100).toFixed(1)}%) - ${c.label}`,
           },
         },
       },
       scales: {
-        x: { ticks: { color: '#cbd5e1', maxRotation: 35, minRotation: 35, font: { size: 9 } }, grid: { color: '#334155' } },
-        y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, title: { display: true, text: 'N° Simulaciones', color: '#cbd5e1' } },
+        x: { ticks: { maxRotation: 35, minRotation: 35, font: { size: 10 } }, title: { display: true, text: 'VAN (USD)' } },
+        y: { ticks: { }, title: { display: true, text: 'Frecuencia de simulaciones' } },
       },
     },
   })

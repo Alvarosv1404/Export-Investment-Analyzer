@@ -189,11 +189,12 @@ products:
 # El reporte genera un tornado: cuanto se mueve el VAN ante la variacion de
 # cada variable, manteniendo las demas constantes.
 sensitivity:
-  discount_rate:   [0.10, 0.12, 0.14, 0.16]
-  volume_shift:    [-0.30, -0.15, 0.0, 0.15, 0.30]   # desviacion sobre la participacion de mercado capturable
-  fob_price_shift: [-0.20, -0.10, 0.0, 0.10, 0.20]
-  fx_shift:        [-0.10, -0.05, 0.0, 0.05, 0.10]    # PEN/USD
-  capex_shift:     [-0.20, -0.10, 0.0, 0.10, 0.30]
+  # Tornado +/-15% sobre el caso base: cada variable se mueve -15%,
+  # base y +15% manteniendo las demas constantes.
+  fob_price_shift: [-0.15, 0.0, 0.15]
+  capex_shift: [-0.15, 0.0, 0.15]
+  volume_shift: [-0.15, 0.0, 0.15]
+  cost_shift: [-0.15, 0.0, 0.15]
 
 # Tipo de cambio referencial (informativo, no se usa en el calculo en USD).
 fx:
