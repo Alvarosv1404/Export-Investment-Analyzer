@@ -151,7 +151,7 @@ def headroom_ladder(
 
     market_value = sum(r["value_usd"] for r in trends["rankings"])
     current = trends["origin_share"] or 0.0
-    targets = targets or [0.05, 0.075, 0.10, 0.125, 0.15]
+    targets = targets or [0.5, 0.6, 0.7, 0.8, 0.9]
 
     rows = []
     for target in targets:
