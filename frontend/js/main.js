@@ -52,13 +52,13 @@ const state = {
   projectionMethod: ['linear', 'quadratic', 'cagr'].includes(urlParams.get('projection_method'))
     ? urlParams.get('projection_method')
     : 'linear',
-  capex: initialFinancialValue('capex'),
-  variableCost: initialFinancialValue('variable_cost'),
-  year1Volume: initialFinancialValue('year1_volume'),
-  annualGrowth: initialFinancialValue('annual_growth'),
-  opex: initialFinancialValue('opex'),
+  capex: initialFinancialValue('capex') || '1000000',
+  variableCost: initialFinancialValue('variable_cost') || '4800',
+  year1Volume: initialFinancialValue('year1_volume') || '200',
+  annualGrowth: initialFinancialValue('annual_growth') || '10',
+  opex: initialFinancialValue('opex') || '200000',
   // COK se maneja en porcentaje (12); la API espera fracción (0.12).
-  discountRate: initialFinancialValue('wacc'),
+  discountRate: initialFinancialValue('wacc') || '7',
   view: urlParams.get('view') === 'compare' || urlParams.get('compare') === '1' ? 'compare' : 'analysis',
   compareSlugs: (urlParams.get('compare_slugs') || '').split(',').filter(Boolean),
   products: [],
@@ -282,12 +282,15 @@ function bindControls(onChange) {
       })
       scheduleReload()
     })
-    document.getElementById('clearProducts').addEventListener('click', () => {
-      checkboxes.forEach((input) => {
-        input.checked = false
+    const clearProductsButton = document.getElementById('clearProducts')
+    if (clearProductsButton) {
+      clearProductsButton.addEventListener('click', () => {
+        checkboxes.forEach((input) => {
+          input.checked = false
+        })
+        scheduleReload()
       })
-      scheduleReload()
-    })
+    }
     updateSelectionCount()
 
     comparisonForm.addEventListener('submit', (event) => {
@@ -733,6 +736,10 @@ async function load() {
   bindControls(load)
 
   if (state.view === 'compare') {
+    document.getElementById('app').innerHTML = `
+      <section class="comparison-page">
+        <div class="card"><p class="note">Cargando la comparación de productos…</p></div>
+      </section>`
     // El ranking y la comparacion van juntos y sobre la MISMA seleccion: marcar
     // productos es la pregunta "de estos, por cual empezar" y la comparacion es
     // el detalle. Por eso el ranking ya no abarca el catalogo completo.
