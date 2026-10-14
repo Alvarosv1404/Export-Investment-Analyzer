@@ -160,18 +160,37 @@ async function refreshComparison() {
   }
 }
 
-/** Genera las opciones para el custom select (con role="option" y atributos necesarios). */
 function productOptionsForCustomSelect() {
-  const option = (p, idx) =>
-    `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)}</div>`
-  return state.products.map(option).join('')
+  const byIndustry = {}
+  state.products.forEach((p, idx) => {
+    const ind = p.industry || 'Otros'
+    if (!byIndustry[ind]) byIndustry[ind] = []
+    byIndustry[ind].push({ p, idx })
+  })
+  const groups = Object.keys(byIndustry).sort()
+  let html = ''
+  groups.forEach((ind) => {
+    html += `<div class="custom-select-group">${escapeHTML(ind)}</div>`
+    byIndustry[ind].forEach(({ p, idx }) => {
+      html += `<div role="option" id="opt-${idx}" data-value="${escapeHTML(p.slug)}" data-industry="${escapeHTML(p.industry || '')}" aria-selected="${p.slug === state.slug}">${escapeHTML(p.name)}</div>`
+    })
+  })
+  return html
 }
 
 /** Genera las opciones para el select nativo (fallback/form submission). */
 function productOptionsForNativeSelect() {
-  const option = (p) =>
-    `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)}</option>`
-  return state.products.map(option).join('')
+  const byIndustry = {}
+  state.products.forEach((p) => {
+    const ind = p.industry || 'Otros'
+    if (!byIndustry[ind]) byIndustry[ind] = []
+    byIndustry[ind].push(p)
+  })
+  return Object.keys(byIndustry).sort().map((ind) =>
+    `<optgroup label="${escapeHTML(ind)}">${byIndustry[ind].map((p) =>
+      `<option value="${escapeHTML(p.slug)}" ${p.slug === state.slug ? 'selected' : ''} data-industry="${escapeHTML(p.industry || '')}">${escapeHTML(p.name)}</option>`
+    ).join('')}</optgroup>`
+  ).join('')
 }
 
 /** Genera el HTML del custom select para la vista de análisis. */
