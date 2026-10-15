@@ -19,6 +19,7 @@ from openpyxl import load_workbook
 from exportanalysis.api.dossier import generate_excel_dossier
 from exportanalysis.api.main import DIST_DIR, _json_safe, app
 from exportanalysis.config import load_catalog
+from exportanalysis.pipeline.analyze import analyze_product
 
 fastapi_testclient = pytest.importorskip("fastapi.testclient")
 TestClient = fastapi_testclient.TestClient
@@ -180,17 +181,45 @@ class TestAnalysis:
         data = client.get(f"/api/analysis/cafe_verde?{FINANCIAL_QUERY}").json()
         assert data["investment"] is not None
         assert data["assumptions_missing"] == []
+        # El API completa las volatilidades con defaults (15/15/20), asi que el
+        # Monte Carlo se calcula aunque el frontend no las pida explicitamente.
+        monte_carlo = data["investment"]["monte_carlo"]
+        assert data["investment"]["monte_carlo_missing"] == []
+        assert monte_carlo is not None
+        assert monte_carlo["assumptions"]["price_volatility_pct"] == 15.0
+        assert monte_carlo["assumptions"]["variable_cost_volatility_pct"] == 15.0
+        assert monte_carlo["assumptions"]["volume_volatility_pct"] == 20.0
+        assert data["investment"]["inputs"]["year1_volume_kg"] == 50000
+        assert data["investment"]["inputs"]["annual_volume_growth_pct"] == 5
+        ramp_source = data["investment"]["ramp_source"]
+        assert ramp_source["source"] == "usuario"
+        assert ramp_source["reason"]
+
+    def test_monte_carlo_se_omite_sin_volatilidades(self):
+        """Sin volatilidades el Monte Carlo se omite y se listan las faltantes.
+
+        El API las completa con defaults (test de arriba), pero el pipeline debe
+        seguir avisando cuando de verdad no hay con que simular.
+        """
+        data = analyze_product(
+            "cafe_verde",
+            capacity_kg_year=100000,
+            year1_volume_kg=50000,
+            annual_volume_growth_pct=5,
+            purchase_cost_usd_per_kg=2,
+            variable_cost_usd_per_kg=0.5,
+            capex_usd=250000,
+            opex_fixed_usd_year=30000,
+            working_capital_usd=12000,
+            discount_rate=0.12,
+        )
+        assert data["investment"] is not None
         assert data["investment"]["monte_carlo"] is None
         assert data["investment"]["monte_carlo_missing"] == [
             "price_volatility_pct",
             "variable_cost_volatility_pct",
             "volume_volatility_pct",
         ]
-        assert data["investment"]["inputs"]["year1_volume_kg"] == 50000
-        assert data["investment"]["inputs"]["annual_volume_growth_pct"] == 5
-        ramp_source = data["investment"]["ramp_source"]
-        assert ramp_source["source"] == "usuario"
-        assert ramp_source["reason"]
 
     def test_monte_carlo_usa_volatilidades_ingresadas(self, client):
         query = (
@@ -399,18 +428,38 @@ class TestHtml:
         assert "assets/index" in response.text
 
     def test_ssr_fallback_renderiza_el_producto(self, client, monkeypatch):
-        """Con FORCE_SSR=1 el HTML llega completo desde el servidor."""
+        """Con FORCE_SSR=1 el HTML llega completo desde el servidor.
+
+        El render del lado del servidor es un reporte imprimible de solo lectura:
+        no lleva formularios de supuestos (eso lo arma el JS del navegador), pero
+        si todas las secciones —incluida la parte financiera— ya resueltas.
+        """
         monkeypatch.setenv("FORCE_SSR", "1")
-        response = client.get("/?slug=cafe_verde")
+        response = client.get(f"/?slug=cafe_verde&{FINANCIAL_QUERY}")
         assert response.status_code == 200
         assert "Café verde" in response.text
-        assert "Proyección de exportación" in response.text
-        assert "Demanda importadora por destino" in response.text
-        assert 'type="range"' in response.text
-        assert 'type="number"' not in response.text
-        assert "Aranceles en Destino" not in response.text
-        assert "Margen bruto" not in response.text
-        assert "Precio de equilibrio" not in response.text
+        for heading in (
+            "1. Economía unitaria",
+            "2. Mercado",
+            "3. Principales destinos",
+            "4. Competencia regional",
+            "5. Espacio de mercado",
+            "6. Aranceles y costo puesto en destino",
+            "7. Decisión de inversión",
+            "8. Sensibilidad",
+            "Procedencia de los datos",
+        ):
+            assert heading in response.text
+        # Las cifras financieras se resuelven en el servidor, no con JS.
+        assert "Margen bruto" in response.text
+        assert "Precio de equilibrio" in response.text
+        assert "TIR" in response.text
+        # Los graficos se dibujan sobre <canvas> con la data embebida para Chart.js.
+        assert "<canvas" in response.text
+        assert "const R = " in response.text
+        # Sin JS no hay formularios: los supuestos se editan en el navegador.
+        assert "<input" not in response.text
+        assert "<select" not in response.text
 
     def test_ssr_fallback_toma_el_primer_producto(self, client, monkeypatch):
         monkeypatch.setenv("FORCE_SSR", "1")
