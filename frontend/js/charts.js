@@ -606,9 +606,11 @@ export function projectionChart(canvas, proj) {
   })
 
   // PROYECCIÓN: la calcula el backend en `proj.forecast` (años futuros).
-  // Se ancla al último dato histórico real para que la línea punteada empiece ahí.
-  const lastHist = hist.length ? hist.reduce((a, b) => (b.year > a.year ? b : a)) : null
-  const forecastPoints = fc.length ? (lastHist ? [lastHist, ...fc] : fc) : []
+  // Para que la línea punteada sea continua se ancla al último punto de la
+  // tendencia ajustada (lineal/cuadrática) o al último dato real (CAGR).
+  const lastOf = (points) => (points.length ? points.reduce((a, b) => (b.year > a.year ? b : a)) : null)
+  const anchor = isTrend ? lastOf(trend) : lastOf(hist)
+  const forecastPoints = fc.length ? (anchor ? [anchor, ...fc] : fc) : []
   const forecastData = labels.map((year) => {
     const point = forecastPoints.find((p) => p.year === year)
     return point ? point.value : null
