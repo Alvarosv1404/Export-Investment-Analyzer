@@ -167,13 +167,11 @@ correrlo en un cron y comparar contra el run anterior.
 ## Produccion
 
 `npm run build` emite `dist/` con rutas relativas, y FastAPI lo sirve
-automaticamente si el directorio existe. El mismo build funciona servido por
-FastAPI, por nginx o por un CDN sin reconfiguracion.
+automaticamente. El mismo build funciona servido por FastAPI, por nginx o por
+un CDN sin reconfiguracion.
 
-Hay un segundo modo: sin `dist/`, FastAPI cae a los templates de Jinja y
-renderiza todo en el servidor. Sirve para que la API sea util sola, sin Node
-instalado, y para poder imprimir el reporte con el JS deshabilitado. Se fuerza
-con `FORCE_SSR=1`.
+Sin `dist/` no hay interfaz: la raiz (`/`) responde **503** con un mensaje que
+pide correr `npm run build`. La API JSON (`/api/...`) funciona igual sin build.
 
 ---
 
@@ -364,8 +362,7 @@ src/exportanalysis/
   sources/         trademap_excel.py, manual_tariffs.py, sunat.py (offline)
   pipeline/        market.py, competitors.py, excel_analysis.py, analyze.py
   model/           financials.py, valuation.py, unit_economics.py
-  api/main.py      FastAPI; sirve dist/ si existe, si no cae a Jinja
-  web/templates/   render en servidor (fallback sin Node)
+  api/main.py      FastAPI; sirve el build de Vite y expone la API JSON
 
 scripts/
   setup.mjs        instala dependencias y crea la plantilla
@@ -449,7 +446,7 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
 | La web carga pero `/api` da 404 | El proxy apunta a un puerto que no coincide. Verifica que `dev.config.json` tenga el puerto que corre `npm run check:ports`. |
 | `ModuleNotFoundError: exportanalysis` | Falta `pip install -e .` o falta `PYTHONPATH=src`. `npm run setup` lo resuelve. |
 | El grafico no aparece | Chart.js se carga por CDN: sin conexion a internet el `<script>` falla. Ver la nota de Chart.js arriba. |
-| La pagina sale sin estilos | Falta `npm install`, o estas viendo `/` sin haber corrido `npm run build` y sin el fallback. Revisa que `frontend/css/app.css` exista. |
+| La pagina sale sin estilos | Falta `npm install` o `npm run build` (la raiz responde 503 sin build). Revisa que `frontend/css/app.css` exista. |
 | El backend tarda en el primer request | Normal la primera vez: lee y normaliza los Excel de Trade Map. Despues el sistema operativo los tiene en cache. |
 | `Sin datos de comercio para este producto` | Falta el Excel del producto o el HS-6 no coincide con la carpeta. Verifica los nombres en `data/<hs6> <nombre>/`. |
 

@@ -408,11 +408,14 @@ class TestComparison:
 
 
 class TestHtml:
-    def test_raiz_renderiza(self, client):
-        """Sirve el build de Vite si existe; si no, el HTML de Jinja."""
+    def test_raiz_sirve_el_build_de_vite(self, client):
+        """La raiz sirve dist/index.html; sin build avisa con 503."""
         response = client.get("/")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        if (DIST_DIR / "index.html").exists():
+            assert response.status_code == 200
+            assert "text/html" in response.headers["content-type"]
+        else:
+            assert response.status_code == 503
 
     def test_build_de_vite_devuelve_el_shell(self, client):
         """Con dist/ presente, / devuelve el shell y los datos los pide el JS.
@@ -427,54 +430,13 @@ class TestHtml:
         assert 'id="app"' in response.text
         assert "assets/index" in response.text
 
-    def test_ssr_fallback_renderiza_el_producto(self, client, monkeypatch):
-        """Con FORCE_SSR=1 el HTML llega completo desde el servidor.
-
-        El render del lado del servidor es un reporte imprimible de solo lectura:
-        no lleva formularios de supuestos (eso lo arma el JS del navegador), pero
-        si todas las secciones —incluida la parte financiera— ya resueltas.
-        """
-        monkeypatch.setenv("FORCE_SSR", "1")
-        response = client.get(f"/?slug=cafe_verde&{FINANCIAL_QUERY}")
-        assert response.status_code == 200
-        assert "Café verde" in response.text
-        for heading in (
-            "1. Economía unitaria",
-            "2. Mercado",
-            "3. Principales destinos",
-            "4. Competencia regional",
-            "5. Espacio de mercado",
-            "6. Aranceles y costo puesto en destino",
-            "7. Decisión de inversión",
-            "8. Sensibilidad",
-            "Procedencia de los datos",
-        ):
-            assert heading in response.text
-        # Las cifras financieras se resuelven en el servidor, no con JS.
-        assert "Margen bruto" in response.text
-        assert "Precio de equilibrio" in response.text
-        assert "TIR" in response.text
-        # Los graficos se dibujan sobre <canvas> con la data embebida para Chart.js.
-        assert "<canvas" in response.text
-        assert "const R = " in response.text
-        # Sin JS no hay formularios: los supuestos se editan en el navegador.
-        assert "<input" not in response.text
-        assert "<select" not in response.text
-
-    def test_ssr_fallback_toma_el_primer_producto(self, client, monkeypatch):
-        monkeypatch.setenv("FORCE_SSR", "1")
-        response = client.get("/")
-        assert response.status_code == 200
-        assert "Café verde" in response.text
-
-    def test_ssr_fallback_avisa_si_el_producto_no_existe(self, client, monkeypatch):
-        """Un slug malo no debe ser un 500: es un mensaje en la pagina."""
-        monkeypatch.setenv("FORCE_SSR", "1")
-        response = client.get("/?slug=no_existe")
-        assert response.status_code == 200
+    def test_sin_build_la_raiz_da_503(self, client, monkeypatch, tmp_path):
+        """Sin dist/ no hay UI, pero la API sigue viva y lo dice."""
+        monkeypatch.setattr("exportanalysis.api.main.DIST_DIR", tmp_path)
+        assert client.get("/").status_code == 503
 
     def test_sirve_alguna_hoja_de_estilos(self, client):
-        """Con build hay /assets/index.css; sin build, /static/app.css."""
-        built = client.get("/assets/index.css")
-        legacy = client.get("/static/app.css")
-        assert built.status_code == 200 or legacy.status_code == 200
+        """El build de Vite emite /assets/index.css."""
+        if not (DIST_DIR / "assets").exists():
+            pytest.skip("sin build de Vite; corre `npm run build`")
+        assert client.get("/assets/index.css").status_code == 200

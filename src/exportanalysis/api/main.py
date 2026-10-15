@@ -1,36 +1,28 @@
-"""API HTTP: expone el analisis como JSON y como HTML.
+"""API HTTP: expone el analisis como JSON y sirve el frontend compilado.
 
 Se eligio FastAPI sobre Streamlit por el requisito de publicar: esto es una app
 ASGI normal, corre en Docker, Render, Railway, Fly.io o un VPS sin adaptaciones.
-El frontend es Jinja2 + Chart.js servido desde el mismo proceso, asi que no hay
-build step ni node_modules que mantener.
+El frontend es una SPA (Vite): `npm run build` genera `dist/` y FastAPI lo sirve
+desde el mismo origen, asi que en produccion no hay CORS. Sin build no hay UI,
+solo API.
 """
 
 from __future__ import annotations
 
-import logging
-import os
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from ..config import load_catalog
 from ..pipeline import comparison, screener
 from ..pipeline.analyze import analyze_product
 from .dossier import generate_excel_dossier
 
-log = logging.getLogger(__name__)
-
 SRC_DIR = Path(__file__).resolve().parent.parent.parent.parent
 DIST_DIR = SRC_DIR / "dist"
-# Fallback para cuando se corre sin `npm run build`: sirve los templates de
-# Jinja del repo. El build de Vite tiene prioridad cuando existe.
-LEGACY_TEMPLATES = Path(__file__).resolve().parent.parent / "web" / "templates"
-LEGACY_STATIC = Path(__file__).resolve().parent.parent / "web" / "static"
 
 app = FastAPI(
     title="Export Investment Analyzer",
@@ -38,12 +30,11 @@ app = FastAPI(
     version="0.1.0",
 )
 
-if DIST_DIR.exists():
-    app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
-else:
-    app.mount("/static", StaticFiles(directory=LEGACY_STATIC), name="static")
-
-templates = Jinja2Templates(directory=LEGACY_TEMPLATES)
+# El build de Vite emite dist/assets/. Si no existe (aun no corriste
+# `npm run build`), la API igual arranca: solo la raiz devuelve 503.
+ASSETS_DIR = DIST_DIR / "assets"
+if ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 
 
 @app.get("/health")
@@ -97,7 +88,7 @@ class AnalysisAssumptions:
 
     FastAPI los declara una sola vez como dependencia y los inyecta en cada
     endpoint, de modo que los parametros de query (y su validacion) no se
-    copien en /api/analysis, /api/analysis/{slug}/export/excel y /.
+    copien en /api/analysis y /api/analysis/{slug}/export/excel.
     """
 
     def __init__(
@@ -199,55 +190,21 @@ def export_excel(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@app.get("/", response_class=HTMLResponse)
-def index(
-    request: Request,
-    assumptions: AnalysisAssumptionsDep,
-    slug: str | None = None,
-):
-    """Sirve el frontend.
+@app.get("/")
+def index() -> Response:
+    """Sirve el frontend compilado (dist/index.html).
 
-    Hay dos modos, y se eligen solos:
-
-    - Si existe dist/ (o sea, corriste `npm run build`), se sirve el build de
-      Vite. El JS pide los datos a /api/analysis/... y el navegador ve un solo
-      origen, sin CORS.
-    - Si no existe, se cae al HTML de Jinja, que renderiza todo en el servidor.
-      Sirve para que la API sea util sola, sin Node instalado.
-
-    El render del lado del servidor se mantiene ademas porque la pagina tiene
-    que poder imprimirse aunque el JS este deshabilitado. FORCE_SSR=1 lo fuerza.
+    El frontend es una SPA: pide los datos a /api/analysis/... y el navegador ve
+    un solo origen, sin CORS. Requiere `npm run build` (ver README). Sin build la
+    API sigue viva; solo la raiz avisa que falta el frontend.
     """
     index_html = DIST_DIR / "index.html"
-    if index_html.exists() and not os.getenv("FORCE_SSR"):
-        return FileResponse(index_html)
-
-    catalog = load_catalog()
-    products = catalog.products
-    selected_slug = slug or (products[0].slug if products else None)
-
-    analysis_result = None
-    error = None
-    if selected_slug:
-        try:
-            analysis_result = analyze_product(selected_slug, **assumptions.as_kwargs())
-        except (KeyError, ValueError) as exc:
-            error = str(exc)
-            log.warning("No se pudo analizar %s: %s", selected_slug, exc)
-
-    return templates.TemplateResponse(
-        request,
-        "index.html",
-        {
-            "products": products,
-            "selected": selected_slug,
-            # tojson() tampoco acepta NaN, asi que el HTML usa el mismo filtro.
-            "result": _json_safe(analysis_result) if analysis_result else None,
-            "error": error,
-            "target_share": assumptions.target_share,
-            "price_usd_per_kg": assumptions.price_usd_per_kg,
-        },
-    )
+    if not index_html.exists():
+        raise HTTPException(
+            status_code=503,
+            detail="Falta el build del frontend. Corre `npm run build`.",
+        )
+    return FileResponse(index_html)
 
 
 @app.get("/api/comparison")
@@ -272,61 +229,3 @@ def ranking(slugs: str = Query(default="", description="slugs separados por coma
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.get("/simple", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/explorar", response_class=HTMLResponse)
-def explore(request: Request, hs6: str = "081040", year: int | None = None):
-    """Destinos y serie anual de exportaciones para un HS6, desde los Excel.
-
-    `/simple` se conserva como alias historico de `/explorar`.
-    """
-    import pandas as pd
-
-    from ..pipeline import excel_analysis
-
-    ts = excel_analysis.peru_exports_ts(hs6)
-    if ts.empty:
-        return templates.TemplateResponse(
-            request,
-            "simple.html",
-            {
-                "hs6": hs6,
-                "year": year,
-                "top": [],
-                "labels": [],
-                "values": [],
-                "trend_labels": [],
-                "trend_vals": [],
-                "error": "Sin datos de comercio para este HS6.",
-            },
-        )
-
-    # Año pedido (2024 por defecto); si no existe, se usa el mas reciente.
-    requested = year if year is not None else 2024
-    if requested not in set(ts["year"]):
-        requested = int(ts["year"].max())
-
-    snapshot = ts[ts["year"] == requested].copy()
-    total = snapshot["fob_usd"].sum() if not snapshot.empty else 0
-    if not snapshot.empty:
-        snapshot = snapshot.assign(share=snapshot["fob_usd"] / total if total else 0.0)
-        snapshot = snapshot.sort_values("fob_usd", ascending=False).head(20)
-    snapshot_safe = snapshot.where(pd.notna(snapshot), None)
-
-    trend = ts.groupby("year", dropna=True)["fob_usd"].sum().sort_index()
-    trend_safe = trend.where(pd.notna(trend), None)
-
-    return templates.TemplateResponse(
-        request,
-        "simple.html",
-        {
-            "hs6": hs6,
-            "year": requested,
-            "top": snapshot_safe.to_dict("records"),
-            "labels": [v for v in snapshot_safe["partnerLabel"].tolist()],
-            "values": [v for v in snapshot_safe["fob_usd"].tolist()],
-            "trend_labels": [str(x) for x in trend_safe.index.tolist()],
-            "trend_vals": [v for v in trend_safe.tolist()],
-        },
-    )
