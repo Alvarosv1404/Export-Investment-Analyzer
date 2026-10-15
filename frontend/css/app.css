@@ -40,7 +40,7 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
 
 /* --- control de participacion de mercado objetivo --- */
 #controls { width: 100%; max-width: 1600px; margin: 0 auto 1.5rem; }
-.share-form, .controls-form {
+.controls-form {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -51,19 +51,7 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   border-radius: 8px;
   margin-bottom: 1rem;
 }
-.share-form label, .controls-form label { font-size: 0.8rem; color: var(--ink-soft); }
-.control-block { display: flex; flex-direction: column; gap: 0.3rem; }
-.control-block select {
-  min-width: 15rem;
-  padding: 0.42rem 2rem 0.42rem 0.55rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--card);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.9rem;
-}
-.control-block select:focus { outline: 2px solid var(--data); outline-offset: -1px; }
+.controls-form label { font-size: 0.8rem; color: var(--ink-soft); }
 .view-tabs {
   display: flex;
   gap: 0.35rem;
@@ -115,53 +103,6 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
 }
 .compare-filter { display: flex; flex-direction: column; }
 .compare-filter .compare-search { margin-bottom: 0; }
-.compare-industry {
-  min-width: 12rem;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--card);
-  color: var(--ink);
-  font: inherit;
-}
-.compare-industry:focus { outline: 2px solid var(--data); outline-offset: -1px; border-color: transparent; }
-
-/* --- Filtros tipo chips/pills (estilo propio, no nativo del navegador) --- */
-.filter-chips {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-.filter-chip {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--ink-soft);
-  padding: 0.4rem 0.85rem;
-  border-radius: 999px;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-.filter-chip:hover {
-  border-color: var(--data);
-  color: var(--data);
-  background: #eff6ff;
-}
-.filter-chip.active {
-  border-color: var(--data);
-  background: var(--data);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
-}
-.filter-chip:focus-visible {
-  outline: 2px solid var(--data);
-  outline-offset: 2px;
-}
 
 /* --- Custom Select / Dropdown personalizado --- */
 .custom-select {
@@ -234,26 +175,6 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.custom-select-search-wrapper {
-  padding: 0.6rem;
-  border-bottom: 1px solid var(--line);
-  background: #fafafa;
-}
-.custom-select-search {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.85rem;
-}
-.custom-select-search:focus {
-  outline: 2px solid var(--data);
-  outline-offset: -1px;
-  border-color: transparent;
-}
 .custom-select-options {
   max-height: 280px;
   overflow-y: auto;
@@ -306,7 +227,6 @@ header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
 @media (max-width: 640px) {
   .custom-select { max-width: 100%; }
 }
-.compare-industry { display: none; }
 .compare-filter { display: flex; flex-direction: column; }
 .compare-filter .compare-search { margin-bottom: 0; }
 
@@ -874,8 +794,6 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
   .project-evaluation .financial-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .project-evaluation .financial-panel { padding: 0.7rem; }
   .project-evaluation .financial-panel .chart { height: 250px; }
-  .control-block { min-width: 0; }
-  .control-block select { width: 100%; min-width: 0; }
 }
 
 
@@ -907,7 +825,6 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
    propia, para que no se vea como el select por defecto del navegador. */
 .industry-filter-select,
 .compare-industry-filter-select,
-.control-block select,
 .sim-select {
   appearance: none;
   -webkit-appearance: none;
@@ -929,14 +846,12 @@ footer p { font-size: 0.8rem; color: var(--ink-faint); }
 }
 .industry-filter-select:hover,
 .compare-industry-filter-select:hover,
-.control-block select:hover,
 .sim-select:hover {
   border-color: var(--data);
   background-color: #fafafa;
 }
 .industry-filter-select:focus-visible,
 .compare-industry-filter-select:focus-visible,
-.control-block select:focus-visible,
 .sim-select:focus-visible {
   outline: none;
   border-color: var(--data);

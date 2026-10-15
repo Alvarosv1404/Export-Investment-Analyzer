@@ -9,6 +9,6 @@ No hay cliente de UN Comtrade ni de WITS: el proyecto corre 100% offline con
 los Excel locales.
 """
 
-from . import manual_tariffs, sunat, trademap_excel
+from . import manual_tariffs, trademap_excel
 
-__all__ = ["manual_tariffs", "sunat", "trademap_excel"]
+__all__ = ["manual_tariffs", "trademap_excel"]
