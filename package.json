@@ -12,6 +12,7 @@
     "dev:api": "node scripts/run-api.mjs",
     "dev:web": "vite",
     "build": "vite build",
+    "build:netlify": "npm run build && node scripts/netlify-redirects.mjs",
     "preview": "vite preview",
     "test": "npm run test:api && npm run test:py",
     "test:py": "python -m pytest",

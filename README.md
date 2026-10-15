@@ -173,6 +173,38 @@ un CDN sin reconfiguracion.
 Sin `dist/` no hay interfaz: la raiz (`/`) responde **503** con un mensaje que
 pide correr `npm run build`. La API JSON (`/api/...`) funciona igual sin build.
 
+### Desplegar en Netlify (UI) + Render (API)
+
+Netlify sirve solo estaticos y **no puede correr Python**, y todo el analisis
+sale de la API. Por eso el despliegue son dos piezas enlazadas por un proxy.
+
+1. **API en Render.** Crea un *Web Service* desde el repositorio. El
+   `render.yaml` ya lo define todo (`runtime: python`, `plan: free`,
+   `pip install -e .`, `uvicorn`). Al terminar copia su URL
+   (`https://algo.onrender.com`) y comprueba que responde en `/health`.
+   El plan gratis duerme tras ~15 min de inactividad: la primera peticion tarda
+   ~30-60 s en despertarla, asi que visitá la URL antes de entrar a Netlify.
+
+2. **UI en Netlify.** Sitio nuevo conectado al mismo repositorio. Netlify lee
+   `netlify.toml` (build `npm ci && npm run build:netlify`, publica `dist`).
+   En *Site configuration -> Environment variables* define:
+
+   ```
+   API_URL = https://algo.onrender.com
+   ```
+
+   El build genera `dist/_redirects`, que manda `/api/*` y `/health` a esa URL.
+   El navegador ve un solo origen: sin CORS y sin URLs hardcodeadas (si cambias
+   de backend, solo cambia la variable).
+
+3. Despliega. La UI queda en `https://algo.netlify.app` y los datos los sirve
+   la API de Render a traves del proxy.
+
+Sin Netlify tambien funciona en un solo servicio: si el host corre FastAPI sobre
+un `dist/` ya construido, `main.py` sirve UI y API con la misma URL. En ese caso
+el build necesita Node (Vite), asi que en Render iria un `Dockerfile` con Node +
+Python, en vez del runtime nativo de Python.
+
 ---
 
 ## Agregar un producto

@@ -1,0 +1,18 @@
+# Render Blueprint: la API (Python). La interfaz vive en Netlify.
+#
+# La API lee config/ y data/ del propio repositorio (config.py los ubica
+# relativos al paquete), asi que no necesita disco ni base de datos.
+# El plan `free` duerme tras ~15 min de inactividad; la primera peticion tarda
+# en despertar. Usa /health para comprobar que esta viva.
+services:
+  - type: web
+    name: export-investment-analyzer-api
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -e .
+    startCommand: uvicorn exportanalysis.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.4"

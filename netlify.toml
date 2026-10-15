@@ -1,0 +1,12 @@
+# Netlify solo sirve la UI estatica (Vite): no puede correr Python.
+#
+# El build genera dist/ y ademas dist/_redirects (scripts/netlify-redirects.mjs),
+# que reenvia /api y /health a la API para que el navegador vea un solo origen.
+# La URL de la API se pasa por variable de entorno, no se escribe aqui:
+#   Site configuration -> Environment variables -> API_URL = https://<tu-api>
+[build]
+  command = "npm ci && npm run build:netlify"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
