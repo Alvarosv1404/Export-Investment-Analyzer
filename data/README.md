@@ -78,9 +78,7 @@ Opcional para calcular volume y precio unitario de los competidores:
   siempre World (`partnerCd = 0`) y la fila `reporterCd = 0` es el total
   agregado "World", que se excluye de todos los calculos.
 - Los competidores no se declaran a mano: son los mayores exportadores del
-  ultimo anio con data, leidos de `exporting-economies_<hs6>.xlsx`. Si el
-  producto declara su lista en `config/products.yaml` (`competitors: [...]`),
-  esa manda.
+  ultimo anio con data, leidos de `exporting-economies_<hs6>.xlsx`.
 - La busqueda de archivos ignora cualquier carpeta `_cache`.
 
 ## Agregar nuevo producto
@@ -94,8 +92,9 @@ Opcional, para enriquecer el analisis:
 - `kg_exporting-economies_<hs6>.xlsx`: agrega volumen y precio unitario de cada competidor.
 
 Opcional, para enriquecer el producto en `config/products.yaml` (nombre cuidado,
-competidores, presentaciones, `industry`) y en `config/assumptions.yaml`
-(supuestos de inversion por slug). Sin supuestos, el producto igual muestra su
-analisis de mercado, con un aviso de lo que falta.
+presentaciones, `industry`) y en `config/assumptions.yaml` (supuestos de
+inversion por slug). Sin supuestos, el producto igual muestra su analisis de
+mercado, con un aviso de lo que falta. Los competidores no se declaran: salen de
+`exporting-economies_<hs6>.xlsx`.
 
 El pipeline detecta los productos automaticamente (busqueda recursiva en data/).

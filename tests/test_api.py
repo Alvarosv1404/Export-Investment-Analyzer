@@ -173,14 +173,14 @@ class TestAnalysis:
         peru = next(r for r in comp["rankings"] if r["is_origin_country"])
         assert peru["volume_kg"] > 0
         assert peru["unit_value_usd"] == pytest.approx(peru["value_usd"] / peru["volume_kg"], rel=1e-6)
-        # HHI de la oferta: arandano tiene 7 exportadores comparados, no puede ser nulo.
+        # HHI de la oferta: arandano compara varios exportadores, no puede ser nulo.
         assert comp["hhi"] is not None and comp["hhi"] > 0
         assert comp["hhi_category"]
         assert comp["hhi_interpretation"]
 
-    def test_productos_sin_lista_derivan_competidores_de_la_data(self, client):
-        """Un producto sin `competitors` en products.yaml igual trae competencia:
-        se derivan del Excel (los mayores exportadores), no se inventan."""
+    def test_competidores_se_derivan_de_la_data(self, client):
+        """Los competidores no se declaran a mano: se derivan del Excel (los
+        mayores exportadores del ultimo anio), sin inventar paises."""
         comp = client.get("/api/analysis/naranja_fresca").json()["competitors"]
         assert comp["available"] is True
         assert comp["competitor_source"] == "data"
@@ -207,6 +207,7 @@ class TestAnalysis:
 
         comp = competitors.share_trends("080510", 604, [604])
         assert comp["available"] is True
+        assert comp["competitor_source"] == "config"
         assert comp["hhi"] is None
         assert comp["coverage_warning"]
 

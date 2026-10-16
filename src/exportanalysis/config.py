@@ -89,6 +89,9 @@ class Product(BaseModel):
     # data/ no lo trae hasta que se cura en products.yaml. Sirve para agrupar y
     # ensenar de que sector es cada producto, no para validar.
     industry: str | None = None
+    # Escape hatch opcional. Por defecto va vacio y los competidores se derivan de
+    # la data (los mayores exportadores del Excel). Solo se llena si se quiere
+    # imponer un conjunto propio de paises (codigos M49).
     competitors: list[int] = Field(default_factory=list)
     # Presentaciones opcionales. Si se omite, el producto tiene una sola (su hs6).
     presentations: list[Presentation] = Field(default_factory=list)

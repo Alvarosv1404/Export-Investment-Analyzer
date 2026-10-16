@@ -218,7 +218,6 @@ products:
     hs6: "180110"          # HS-6: la unidad de analisis
     nandina: "1801100000"  # partida SUNAT de 10 digitos, para el arancel
     unit: "kg"
-    competitors: [170, 76, 218, 484, 818]
 ```
 
 Y sus supuestos en `config/assumptions.yaml`:
@@ -272,12 +271,12 @@ Como se leen:
   volumen **por competidor** sale del Excel opcional `kg_exporting-economies`;
   sin ese archivo, las columnas de volumen y precio de la tabla de competencia
   quedan `n/d`, no en cero.
-- **Los competidores salen de la data, no de una lista inventada.** El bloque de
-  competencia compara a Peru contra los mayores exportadores del ultimo anio con
-  data, leidos del mismo Excel (`exporting-economies`), sin Peru ni la fila
-  "World". Si un producto declara su propia lista en `products.yaml`
-  (`competitors: [...]`), esa manda; si no, se deriva sola. Asi un producto
-  recien agregado ya trae competencia sin tocar la config.
+- **Los competidores salen de la data, no de una lista escrita a mano.** El
+  bloque de competencia compara a Peru contra los mayores exportadores del
+  ultimo anio con data, leidos del mismo Excel (`exporting-economies`), sin Peru
+  ni la fila "World". No hay que declarar nada: un producto recien agregado ya
+  trae competencia. (`products.yaml` todavia acepta un campo `competitors` como
+  escape hatch, pero ningun producto lo usa: el default es la data.)
 - La fila de total "World" se excluye en **todos** los calculos. Tratarla como un
   pais duplicaba el total mundial y dejaba el share de cada exportador a la mitad
   (un 50% fantasma en el grafico de participacion).
@@ -560,8 +559,7 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
   Con un solo exportador comparable queda en `n/d`, no en 10.000.
 - El conjunto de competidores se deriva de la data (ver "De donde salen los
   datos"): son los mayores exportadores del ultimo anio, no un grupo curado a
-  mano. Cuando un producto declara su lista en `products.yaml`, esa manda. El
-  campo `competitor_source` de la API dice cual de las dos se uso.
+  mano. El campo `competitor_source` de la API lo deja explicito.
 - El headroom es una cota superior teorica: asume que el crecimiento se le
   quita a los exportadores actuales. No modela demanda incremental, barreras de
   entrada ni reaccion de la competencia.
