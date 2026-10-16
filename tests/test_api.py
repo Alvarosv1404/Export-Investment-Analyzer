@@ -173,6 +173,16 @@ class TestAnalysis:
         peru = next(r for r in comp["rankings"] if r["is_origin_country"])
         assert peru["volume_kg"] > 0
         assert peru["unit_value_usd"] == pytest.approx(peru["value_usd"] / peru["volume_kg"], rel=1e-6)
+        # HHI de la oferta: arandano tiene 7 exportadores comparados, no puede ser nulo.
+        assert comp["hhi"] is not None and comp["hhi"] > 0
+        assert comp["hhi_category"]
+        assert comp["hhi_interpretation"]
+
+    def test_hhi_competidores_nulo_con_un_solo_pais(self, client):
+        """Sin al menos dos exportadores comparados no hay concentracion que medir."""
+        comp = client.get("/api/analysis/naranja_fresca").json()["competitors"]
+        assert comp["available"] is True
+        assert comp["hhi"] is None
 
     def test_analisis_usa_demanda_importadora_y_proyeccion_de_dos_anios(self, client):
         data = client.get("/api/analysis/cafe_verde").json()

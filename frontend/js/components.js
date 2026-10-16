@@ -278,6 +278,7 @@ export function competitors(c) {
         ${kpi('HHI competidores', c.hhi ? `${c.hhi} pts` : 'n/d', c.hhi_category || '')}
       </div>
       ${c.coverage_warning ? `<div class="alert warn">${escapeHTML(c.coverage_warning)}</div>` : ''}
+      ${c.hhi_interpretation ? `<p class="note"><b>HHI (${escapeHTML(c.hhi_category)}):</b> ${escapeHTML(c.hhi_interpretation)}</p>` : ''}
       <div class="table-scroll">${table(
         [
           { label: '#' },

@@ -502,7 +502,7 @@ npm run lint             # ruff + eslint
 O por separado:
 
 ```bash
-python -m pytest         # 150 tests del modelo, arancel y API
+python -m pytest         # 151 tests del modelo, arancel y API
 python -m ruff check src tests scripts
 node scripts/check-api.mjs --external   # contra un backend ya levantado
 ```
@@ -535,6 +535,10 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
 - El `share` de competidores se calcula sobre el subconjunto de paises que
   reportan en el ano, no sobre el mercado mundial completo. El reporte emite un
   aviso cuando la cobertura es parcial.
+- El `HHI competidores` mide que tan repartida esta la oferta entre esos paises
+  comparados (mismos cortes que el HHI de destinos: <1.500 baja, hasta 2.500
+  moderada, >2.500 alta). Es una lectura de la oferta, no del riesgo de clientes.
+  Con un solo exportador comparable queda en `n/d`, no en 10.000.
 - El headroom es una cota superior teorica: asume que el crecimiento se le
   quita a los exportadores actuales. No modela demanda incremental, barreras de
   entrada ni reaccion de la competencia.

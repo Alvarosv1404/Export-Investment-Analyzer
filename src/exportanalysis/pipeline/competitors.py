@@ -15,7 +15,22 @@ from __future__ import annotations
 
 import pandas as pd
 
-from . import excel_analysis
+from . import excel_analysis, market
+
+# Lectura del HHI cuando describe la oferta (exportadores) en vez de la demanda
+# (destinos). Los cortes son los mismos que `market.calculate_hhi`; cambia lo que
+# significa: aqui mide que tan repartida esta la oferta entre los competidores.
+_HHI_READING = {
+    "Baja concentración": (
+        "Oferta repartida entre varios exportadores: el mercado no lo domina un solo pais."
+    ),
+    "Concentración moderada": (
+        "Unos pocos exportadores concentran buena parte de la oferta del producto."
+    ),
+    "Alta concentración": (
+        "Pocos exportadores dominan la oferta del producto: entrar compite contra incumbentes fuertes."
+    ),
+}
 
 
 def export_comparison(hs6: str, reporter: int, competitors: list[int]) -> pd.DataFrame:
@@ -110,6 +125,16 @@ def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:
     )
     latest["rank"] = latest.index + 1
 
+    # HHI de la oferta: que tan repartido esta el mercado entre los exportadores
+    # comparados. Se calcula sobre las participaciones del anio de referencia,
+    # igual que el share, no sobre el mercado mundial completo. Con un solo
+    # pais no hay concentracion que medir: queda sin dato en vez de un 10.000
+    # enganoso.
+    if latest["country_code"].nunique() >= 2:
+        hhi_info = market.calculate_hhi(latest["share"])
+    else:
+        hhi_info = {"hhi": None, "category": "", "interpretation": ""}
+
     # Cobertura: cuantos de los paises comparados tienen data ese ano. Un share
     # calculado sobre la mitad del mercado subestima el total y por eso el share.
     total_countries = frame["country_code"].nunique()
@@ -148,6 +173,11 @@ def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:
             "ganando" if share_change and share_change > 0.01
             else "perdiendo" if share_change and share_change < -0.01
             else "estable"
+        ),
+        "hhi": hhi_info["hhi"],
+        "hhi_category": hhi_info["category"],
+        "hhi_interpretation": (
+            _HHI_READING.get(hhi_info["category"], "") if hhi_info["hhi"] is not None else ""
         ),
         "rankings": latest[
             ["country", "country_code", "value_usd", "volume_kg", "share", "unit_value_usd", "rank", "is_origin_country"]
