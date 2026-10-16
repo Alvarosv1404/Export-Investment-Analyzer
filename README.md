@@ -400,7 +400,8 @@ analisis y el que muestra el slider siempre coinciden.
 > Un producto cuyo precio FOB de mercado este por debajo de ese piso pierde
 > dinero en cada kilo y su VAN sera negativo sin importar el volumen ni el
 > crecimiento. Con el catalogo actual, los productos con FOB por encima del piso
-> (cafe, cacao, arandano) pueden dar VAN positivo; el resto se mantiene negativo
+> (cafe, cacao, arandano y, al limite, conservas de pescado) pueden dar VAN
+> positivo; el resto (11 de 15) se mantiene negativo
 > hasta que el piso del costo (o el rango entero) se ajuste a su realidad. Es
 > comportamiento esperado del modelo, no un error de calculo.
 
