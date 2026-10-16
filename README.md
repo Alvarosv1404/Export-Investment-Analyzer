@@ -137,7 +137,7 @@ puerto esta ocupado, en vez de un `Errno 10048` de uvicorn.
 | Ruta | Que hace |
 |---|---|
 | `GET /` | Reporte completo con los bloques del analisis y graficos |
-| `GET /api/products` | Catalogo de productos configurados |
+| `GET /api/products` | Catalogo de productos configurados, cada uno con sus `assumptions` para precargar el simulador |
 | `GET /api/analysis/{slug}` | Analisis completo en JSON |
 | `GET /api/analysis/{slug}?target_share=0.12` | Con participacion de mercado objetivo explicita |
 | `GET /api/analysis/{slug}?price_usd_per_kg=6.5` | Con precio FOB de venta explicito |
@@ -369,6 +369,41 @@ antes de tomar una decision.
 El reporte distingue siempre entre dato y supuesto, y marca de donde salio la
 curva de ocupacion de la planta (`ramp_source`).
 
+### Simulador: precarga por producto y rangos fijos
+
+El simulador no arranca con los mismos numeros para todo el catalogo.
+`GET /api/products` devuelve, para cada producto, sus **supuestos efectivos**
+de `config/assumptions.yaml` (capacidad, CAPEX, costos, OPEX, capital de
+trabajo y tasa de descuento). El frontend usa esos valores para **precargar el
+volumen, el OPEX y el COK** de cada producto.
+
+Solo se precargan esos tres: el **CAPEX** y el **costo variable** quedan como
+los definas tu, porque son los que se negocian y cotizan caso por caso.
+
+Los sliders tienen **rangos fijos** (el ejercicio se evalua dentro de ellos):
+
+| Supuesto | Rango | Unidad |
+|---|---|---|
+| Inversion inicial (CAPEX) | 1,000,000 - 3,000,000 | USD |
+| Costo variable total | 4,800 - 7,800 | USD/t (4.8 - 7.8 USD/kg) |
+| Volumen del año 1 | 200 - 800 | t |
+| Crecimiento del volumen | 10 - 55 | % |
+| Costos fijos del año 1 | 200,000 - 600,000 | USD |
+| COK / tasa de descuento | 7 - 16 | % |
+
+Los rangos viven en un solo lugar (`SIMULATOR_RANGES` en
+`frontend/js/components.js`) y el precargado recorta los defaults a esos
+limites con `snapToRange` (`frontend/js/main.js`): asi el numero que usa el
+analisis y el que muestra el slider siempre coinciden.
+
+> **Consecuencia del piso de costo.** El costo variable arranca en 4.8 USD/kg.
+> Un producto cuyo precio FOB de mercado este por debajo de ese piso pierde
+> dinero en cada kilo y su VAN sera negativo sin importar el volumen ni el
+> crecimiento. Con el catalogo actual, los productos con FOB por encima del piso
+> (cafe, cacao, arandano) pueden dar VAN positivo; el resto se mantiene negativo
+> hasta que el piso del costo (o el rango entero) se ajuste a su realidad. Es
+> comportamiento esperado del modelo, no un error de calculo.
+
 ---
 
 ## Como esta armado el proyecto
@@ -382,7 +417,7 @@ vite.config.js     build del frontend + proxy hacia la API
 
 frontend/          interfaz web (Vite, JavaScript modular, sin framework)
   index.html
-  css/app.css
+  css/app.css      tema "campo": verdes de hoja, tierras y trigo (un solo archivo)
   js/
     main.js        orquestacion; el estado vive en la URL
     api.js         llamadas a /api, sin URLs hardcodeadas
@@ -456,7 +491,7 @@ npm run lint             # ruff + eslint
 O por separado:
 
 ```bash
-python -m pytest         # 61 tests del modelo, arancel y API
+python -m pytest         # 147 tests del modelo, arancel y API
 python -m ruff check src tests scripts
 node scripts/check-api.mjs --external   # contra un backend ya levantado
 ```
