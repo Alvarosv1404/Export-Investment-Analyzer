@@ -74,7 +74,13 @@ Opcional para calcular volume y precio unitario de los competidores:
 - El Excel opcional de cantidades importadas se combina con `importing-economies_<hs6>.xlsx` por país y año. Las unidades Tons se convierten a kg; filas sin unidad compatible se dejan sin dato.
 - El Excel opcional de cantidades exportadas (`kg_exporting-economies_<hs6>.xlsx`) llena el volumen (kg) y el precio unitario (valor / volumen) de cada competidor. Si falta el archivo, esas dos columnas quedan vacías: la ausencia de dato no es un cero.
 - Las cantidades importadas describen la demanda total reportada por cada destino y no deben confundirse con las exportaciones peruanas a ese destino.
-- `reporterCd`/`partnerCd` son codigos M49; `partnerCd = 0` es el total "World".
+- `reporterCd`/`partnerCd` son codigos M49; en estos archivos el partner es
+  siempre World (`partnerCd = 0`) y la fila `reporterCd = 0` es el total
+  agregado "World", que se excluye de todos los calculos.
+- Los competidores no se declaran a mano: son los mayores exportadores del
+  ultimo anio con data, leidos de `exporting-economies_<hs6>.xlsx`. Si el
+  producto declara su lista en `config/products.yaml` (`competitors: [...]`),
+  esa manda.
 - La busqueda de archivos ignora cualquier carpeta `_cache`.
 
 ## Agregar nuevo producto

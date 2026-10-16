@@ -5,7 +5,7 @@ Por que existe
 Leer un .xlsx con pandas significa descomprimir el zip y parsear su XML: cuesta
 entre decenas y cientos de milisegundos por archivo. Ademas, un solo analisis
 lee el MISMO archivo varias veces (world_exports se pide en share_trends, en
-headroom, en auto_competitors y en export_comparison), y cada request HTTP
+headroom, en resolve_competitors y en world_share_by_year), y cada request HTTP
 repetia todo ese trabajo aunque la data en data/ no hubiera cambiado. Este
 modulo cachea el DataFrame ya parseado, en memoria y solo por la vida del
 proceso, que es justo lo que necesita una app que sirve reportes sobre data

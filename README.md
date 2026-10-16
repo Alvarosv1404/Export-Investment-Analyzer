@@ -263,7 +263,8 @@ Opcionales, con la misma forma (una columna por ano + `<ano>_unit`):
 Como se leen:
 
 - `reporterCd` / `partnerCd` son codigos **M49** (`config/countries.yaml`);
-  `604` es Peru y `partnerCd = 0` es la fila de total "World".
+  `604` es Peru. En estos archivos el partner es siempre World (`partnerCd = 0`)
+  y la fila `reporterCd = 0` es el **total agregado** "World", no un pais.
 - El valor se convierte a USD (los archivos vienen en miles) y la cantidad a
   kilos cuando Trade Map la publica en toneladas.
 - El volumen **historico por destino** solo existe en el snapshot 2025; en los
@@ -271,6 +272,15 @@ Como se leen:
   volumen **por competidor** sale del Excel opcional `kg_exporting-economies`;
   sin ese archivo, las columnas de volumen y precio de la tabla de competencia
   quedan `n/d`, no en cero.
+- **Los competidores salen de la data, no de una lista inventada.** El bloque de
+  competencia compara a Peru contra los mayores exportadores del ultimo anio con
+  data, leidos del mismo Excel (`exporting-economies`), sin Peru ni la fila
+  "World". Si un producto declara su propia lista en `products.yaml`
+  (`competitors: [...]`), esa manda; si no, se deriva sola. Asi un producto
+  recien agregado ya trae competencia sin tocar la config.
+- La fila de total "World" se excluye en **todos** los calculos. Tratarla como un
+  pais duplicaba el total mundial y dejaba el share de cada exportador a la mitad
+  (un 50% fantasma en el grafico de participacion).
 - El precio de venta del modelo sale del valor FOB ponderado por kilo de 2025.
   Se puede sobrescribir con `price_usd_per_kg` y el reporte dice de donde
   salio (`calculado de históricos`, `ajustado por el usuario` o `unit value del
@@ -510,7 +520,7 @@ npm run lint             # ruff + eslint
 O por separado:
 
 ```bash
-python -m pytest         # 151 tests del modelo, arancel y API
+python -m pytest         # 154 tests del modelo, arancel y API
 python -m ruff check src tests scripts
 node scripts/check-api.mjs --external   # contra un backend ya levantado
 ```
@@ -542,11 +552,16 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
 
 - El `share` de competidores se calcula sobre el subconjunto de paises que
   reportan en el ano, no sobre el mercado mundial completo. El reporte emite un
-  aviso cuando la cobertura es parcial.
+  aviso cuando la cobertura es parcial, y otro cuando no hay con quien comparar
+  (un "100%" seria solo Peru, no dominio de mercado).
 - El `HHI competidores` mide que tan repartida esta la oferta entre esos paises
   comparados (mismos cortes que el HHI de destinos: <1.500 baja, hasta 2.500
   moderada, >2.500 alta). Es una lectura de la oferta, no del riesgo de clientes.
   Con un solo exportador comparable queda en `n/d`, no en 10.000.
+- El conjunto de competidores se deriva de la data (ver "De donde salen los
+  datos"): son los mayores exportadores del ultimo anio, no un grupo curado a
+  mano. Cuando un producto declara su lista en `products.yaml`, esa manda. El
+  campo `competitor_source` de la API dice cual de las dos se uso.
 - El headroom es una cota superior teorica: asume que el crecimiento se le
   quita a los exportadores actuales. No modela demanda incremental, barreras de
   entrada ni reaccion de la competencia.

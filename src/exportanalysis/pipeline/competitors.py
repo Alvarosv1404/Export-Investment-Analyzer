@@ -32,9 +32,62 @@ _HHI_READING = {
     ),
 }
 
+# Cuantos exportadores se comparan cuando el producto no declara su lista. La
+# tabla de competencia es una comparacion corta, no el ranking mundial entero
+# (ese ya lo muestra el bloque de participacion, con su propio top).
+DEFAULT_PEER_COUNT = 6
+
+
+def _top_exporters(hs6: str, reporter: int, top_n: int = DEFAULT_PEER_COUNT) -> list[int]:
+    """Los mayores exportadores del ultimo anio con dato, sin Peru ni la fila World.
+
+    Sale del mismo Excel `exporting-economies` que el bloque de participacion
+    mundial: la competencia se lee de la data, no se declara a mano. Si no hay
+    data, devuelve una lista vacia; nunca se inventa un competidor.
+    """
+    try:
+        world = excel_analysis.world_exports(hs6)
+    except FileNotFoundError:
+        return []
+    if world.empty:
+        return []
+
+    frame = world[world["partnerCd"].astype(int) == 0].copy()
+    if frame.empty:
+        return []
+    frame["country_code"] = frame["reporterCd"].astype(int)
+    frame = frame[(frame["country_code"] != 0) & (frame["country_code"] != reporter)]
+    frame = frame.dropna(subset=["fob_usd"])
+    if frame.empty:
+        return []
+
+    latest = max(frame["year"].dropna().astype(int).unique().tolist())
+    latest_frame = frame[frame["year"] == latest]
+    ranked = (
+        latest_frame.groupby("country_code", as_index=False)["fob_usd"]
+        .sum()
+        .sort_values("fob_usd", ascending=False)
+    )
+    return [int(code) for code in ranked["country_code"].head(top_n)]
+
+
+def resolve_competitors(
+    hs6: str, reporter: int, competitors: list[int]
+) -> tuple[list[int], str]:
+    """Competidores a comparar y su origen: `config` si el producto los declara,
+    `data` si se derivan del Excel (los mayores exportadores reales).
+
+    La lista declarada manda si existe; si no, la data decide. Asi un producto
+    recien agregado ya trae competencia sin tocar `products.yaml`.
+    """
+    if competitors:
+        return list(competitors), "config"
+    return _top_exporters(hs6, reporter), "data"
+
 
 def export_comparison(hs6: str, reporter: int, competitors: list[int]) -> pd.DataFrame:
     """Exportaciones del producto por pais competidor, anio a anio."""
+    peers, _ = resolve_competitors(hs6, reporter, competitors)
     try:
         world = excel_analysis.world_exports(hs6)
     except FileNotFoundError:
@@ -44,7 +97,7 @@ def export_comparison(hs6: str, reporter: int, competitors: list[int]) -> pd.Dat
 
     # En `exporting-economies` cada fila es un pais exportador con partner=World.
     world = world[world["partnerCd"].astype(int) == 0].copy()
-    codes = [reporter, *[c for c in competitors if c != reporter]]
+    codes = [reporter, *[c for c in peers if c != reporter]]
     world["country_code"] = world["reporterCd"].astype(int)
     world = world[world["country_code"].isin(codes)]
     if world.empty:
@@ -94,8 +147,13 @@ def _attach_export_volumes(hs6: str, grouped: pd.DataFrame) -> pd.DataFrame:
 
 
 def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:
-    """Evolucion de la participacion de mercado del pais de origen y su ranking."""
-    frame = export_comparison(hs6, reporter, competitors)
+    """Evolucion de la participacion de mercado del pais de origen y su ranking.
+
+    Si el producto no declara competidores, se derivan de la data (ver
+    `resolve_competitors`). El campo `competitor_source` dice de donde salieron.
+    """
+    peers, source = resolve_competitors(hs6, reporter, competitors)
+    frame = export_comparison(hs6, reporter, peers)
     if frame.empty:
         return {"available": False, "message": "Sin datos comparables entre los exportadores."}
 
@@ -141,6 +199,23 @@ def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:
     reporting = latest["country_code"].nunique()
     coverage = reporting / total_countries if total_countries else 0.0
 
+    # Aviso de cobertura. Con un solo exportador comparado un "100%" es solo
+    # Peru, no dominio de mercado: se dice explicitamente en vez de dejar que el
+    # numero hable solo.
+    if total_countries < 2:
+        coverage_warning = (
+            "No hay otro exportador con data para comparar: el share que ves es solo "
+            "Perú, no el mercado mundial. Falta la data de exportadores en el Excel."
+        )
+    elif coverage < 0.99:
+        coverage_warning = (
+            f"Solo {reporting} de {total_countries} exportadores comparados reportan "
+            f"{latest_year}. El share está calculado sobre ese subconjunto, no sobre "
+            "el mercado completo: interprétalo con cuidado."
+        )
+    else:
+        coverage_warning = None
+
     origin_latest = latest[latest["is_origin_country"]]
     origin_share = float(origin_latest["share"].iloc[0]) if not origin_latest.empty else None
     origin_rank = int(origin_latest["rank"].iloc[0]) if not origin_latest.empty else None
@@ -159,15 +234,9 @@ def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:
         "origin_countries": reporting,
         "compared_countries": total_countries,
         "coverage_pct": coverage * 100,
-        "coverage_warning": (
-            None
-            if coverage >= 0.99
-            else (
-                f"Solo {reporting} de {total_countries} exportadores comparados reportan "
-                f"{latest_year}. El share está calculado sobre ese subconjunto, no sobre "
-                "el mercado completo: interprétalo con cuidado."
-            )
-        ),
+        "coverage_warning": coverage_warning,
+        "competitor_source": source,
+        "competitor_count": len(peers),
         "share_change": share_change,
         "share_trend": (
             "ganando" if share_change and share_change > 0.01

@@ -47,6 +47,16 @@ def test_world_exports_and_imports_readable():
     assert "year" in wi.columns
 
 
+def test_world_exports_excluye_la_fila_total_world():
+    """La fila reporter=0 (World) es el agregado de todos los paises, no un pais.
+
+    Si se cuela, el bloque de participacion la trata como un pais que concentra
+    el 50% del mercado y parte en dos el share de todos los demas.
+    """
+    we = excel_analysis.world_exports("081040")
+    assert (we["reporterCd"].astype(int) != 0).all()
+
+
 def test_world_export_quantities_normaliza_tons_a_kg():
     """El volumen de los competidores sale del Excel opcional de cantidades exportadas.
 

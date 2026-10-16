@@ -178,11 +178,37 @@ class TestAnalysis:
         assert comp["hhi_category"]
         assert comp["hhi_interpretation"]
 
-    def test_hhi_competidores_nulo_con_un_solo_pais(self, client):
-        """Sin al menos dos exportadores comparados no hay concentracion que medir."""
+    def test_productos_sin_lista_derivan_competidores_de_la_data(self, client):
+        """Un producto sin `competitors` en products.yaml igual trae competencia:
+        se derivan del Excel (los mayores exportadores), no se inventan."""
         comp = client.get("/api/analysis/naranja_fresca").json()["competitors"]
         assert comp["available"] is True
+        assert comp["competitor_source"] == "data"
+        assert comp["compared_countries"] >= 2
+        assert comp["hhi"] is not None and comp["hhi"] > 0
+        assert any(not r["is_origin_country"] for r in comp["rankings"])
+
+    def test_participacion_mundial_excluye_la_fila_total_world(self, client):
+        """La fila "World" del Excel es el total, no un pais. Si se cuela como
+        pais, duplica el total mundial y parte en dos el share de cada exportador."""
+        sby = client.get("/api/analysis/naranja_fresca").json()["share_by_year"]
+        last = sby["by_year"][-1]
+        labels = [s["label"] for s in last["slices"]]
+        assert "World" not in labels
+        assert sum(s["share"] for s in last["slices"]) == pytest.approx(1.0, abs=1e-4)
+
+    def test_hhi_competidores_nulo_con_un_solo_pais(self):
+        """Sin al menos dos exportadores comparados no hay concentracion que medir.
+
+        Se ejercita la funcion directamente con una lista de un solo pais: por la
+        via de la API ya no ocurre, porque los competidores se derivan de la data.
+        """
+        from exportanalysis.pipeline import competitors
+
+        comp = competitors.share_trends("080510", 604, [604])
+        assert comp["available"] is True
         assert comp["hhi"] is None
+        assert comp["coverage_warning"]
 
     def test_analisis_usa_demanda_importadora_y_proyeccion_de_dos_anios(self, client):
         data = client.get("/api/analysis/cafe_verde").json()

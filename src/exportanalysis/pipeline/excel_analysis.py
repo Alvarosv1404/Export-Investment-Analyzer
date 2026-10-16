@@ -207,7 +207,12 @@ def peru_exports_trade(hs6: str, nandina: str | None = None) -> pd.DataFrame:
 
 
 def world_exports(hs6: str) -> pd.DataFrame:
-    """Exportaciones por pais exportador (partner = World), serie historica."""
+    """Exportaciones por pais exportador (partner = World), serie historica.
+
+    Se excluye la fila de total "World" (reporter 0): es el agregado de todos los
+    paises, no un pais. Dejarla adentro duplicaba el total mundial y partia en dos
+    la participacion de cada exportador (el bug del bloque de participacion).
+    """
     p = _find(hs6, "exporting-economies_{hs6}.xlsx")
     df = read_excel_cached(p)
     year_cols = _year_columns(df)
@@ -220,11 +225,16 @@ def world_exports(hs6: str) -> pd.DataFrame:
     )
     df_m["year"] = df_m["year"].astype(str).str.split(" ", n=1).str[0].astype(int)
     df_m["fob_usd"] = pd.to_numeric(df_m["fob_usd_thousand"], errors="coerce") * 1000.0
-    return df_m
+    reporter_code = pd.to_numeric(df_m["reporterCd"], errors="coerce")
+    return df_m[reporter_code != 0].reset_index(drop=True)
 
 
 def world_imports(hs6: str) -> pd.DataFrame:
-    """Importaciones por pais importador (partner = World), serie historica."""
+    """Importaciones por pais importador (partner = World), serie historica.
+
+    Igual que `world_exports`, se excluye la fila de total "World" (reporter 0)
+    para que ningun consumidor sume el agregado como si fuera un pais.
+    """
     p = _find(hs6, "importing-economies_{hs6}.xlsx")
     df = read_excel_cached(p)
     year_cols = _year_columns(df)
@@ -237,7 +247,8 @@ def world_imports(hs6: str) -> pd.DataFrame:
     )
     df_m["year"] = df_m["year"].astype(str).str.split(" ", n=1).str[0].astype(int)
     df_m["cif_usd"] = pd.to_numeric(df_m["cif_usd_thousand"], errors="coerce") * 1000.0
-    return df_m
+    reporter_code = pd.to_numeric(df_m["reporterCd"], errors="coerce")
+    return df_m[reporter_code != 0].reset_index(drop=True)
 
 
 def world_import_quantities(hs6: str) -> pd.DataFrame:

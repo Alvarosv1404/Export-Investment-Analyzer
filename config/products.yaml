@@ -11,6 +11,10 @@
 # para enriquecerlo (competidores, presentaciones, un nombre cuidado). Si un HS6
 # ya esta declarado aqui, esta declaracion manda sobre lo detectado en data/.
 #
+#   competitors -> paises (M49) a comparar contra Peru. OPCIONAL: si lo omites,
+#           los competidores se derivan de la data (los mayores exportadores del
+#           Excel). Declara la lista solo si quieres imponer un conjunto propio.
+#
 # ORDENA LA DATA POR INDUSTRIA: si agrupas las carpetas por rubro, la industria
 # tambien se infiere sola del nombre de la carpeta que las contiene:
 #

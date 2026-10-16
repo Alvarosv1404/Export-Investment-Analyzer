@@ -270,7 +270,7 @@ export function competitors(c) {
   )
   return `
     <section class="card">
-      <h2>4. Competencia regional</h2>
+      <h2>4. Competencia internacional</h2>
       <div class="kpis">
         ${kpi('Puesto de Perú', `#${c.origin_rank}`, `de ${c.origin_countries} con data`)}
         ${kpi('Participación', pct(c.origin_share), String(c.latest_year))}
@@ -278,6 +278,7 @@ export function competitors(c) {
         ${kpi('HHI competidores', c.hhi ? `${c.hhi} pts` : 'n/d', c.hhi_category || '')}
       </div>
       ${c.coverage_warning ? `<div class="alert warn">${escapeHTML(c.coverage_warning)}</div>` : ''}
+      ${c.competitor_source === 'data' ? `<p class="note">Competidores = los mayores exportadores del último año con data (${escapeHTML(String(c.competitor_count))}), leídos del Excel. No hay lista fija para este producto.</p>` : ''}
       ${c.hhi_interpretation ? `<p class="note"><b>HHI (${escapeHTML(c.hhi_category)}):</b> ${escapeHTML(c.hhi_interpretation)}</p>` : ''}
       <div class="table-scroll">${table(
         [
