@@ -276,8 +276,9 @@ Como se leen:
   salio (`calculado de históricos`, `ajustado por el usuario` o `unit value del
   Excel`).
 
-Para agregar o reemplazar data, copia los cuatro Excel en la carpeta del
-producto con exactamente esos nombres. Ver `data/README.md`.
+Para agregar o reemplazar data, copia los cuatro Excel requeridos en la carpeta
+del producto con exactamente esos nombres. Los dos opcionales de cantidades se
+agregan igual, con sus nombres. Ver `data/README.md`.
 
 ### Aranceles: carga manual, y por que
 
@@ -457,14 +458,14 @@ scripts/
   tariff_helper.py  que buscar en Trade Map, y escribir el CSV sin editarlo a mano
   smoke_test.py    el analisis completo en texto
 
-tests/             test_financials.py, test_landed_cost.py, test_api.py
+tests/             9 archivos: modelo financiero, data, API, comparacion y screener
 ```
 
 El circuito que cierra el modelo:
 
 ```
 Trade Map (Excel local) ─> mercado (volumen, FOB, precio, destinos)
-                         ─> competidores (share, ranking, headroom)
+                         ─> competidores (share, ranking, HHI, headroom)
                          ─> volumen implicito ─> curva de ocupacion de la planta
                          ─> P&L, flujo de caja, VAN, TIR, payback, sensibilidad
 ```
