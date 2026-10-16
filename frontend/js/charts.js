@@ -21,7 +21,7 @@ function init() {
     return false
   }
   Chart.defaults.font.family = 'system-ui, sans-serif'
-  Chart.defaults.color = '#94a3b8'
+  Chart.defaults.color = '#7d8a6b'
   return true
 }
 
@@ -42,8 +42,8 @@ export function series(canvas, m) {
         {
           label: 'Valor FOB',
           data: m.series.map((r) => r.fob_usd),
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37,99,235,.08)',
+          borderColor: '#3a7d44',
+          backgroundColor: 'rgba(58,125,68,.10)',
           fill: true,
           tension: 0.25,
           yAxisID: 'y',
@@ -51,7 +51,7 @@ export function series(canvas, m) {
         {
           label: 'Volumen (kg)',
           data: m.series.map((r) => r.volume_kg),
-          borderColor: '#059669',
+          borderColor: '#2f8f4e',
           tension: 0.25,
           yAxisID: 'y1',
         },
@@ -83,7 +83,7 @@ export function destinations(canvas, rows) {
     type: 'bar',
     data: {
       labels: top.map((d) => d.partner_name),
-      datasets: [{ label: 'Exportaciones FOB', data: top.map((d) => d.fob_usd), backgroundColor: '#7c3aed' }],
+      datasets: [{ label: 'Exportaciones FOB', data: top.map((d) => d.fob_usd), backgroundColor: '#7a5c3e' }],
     },
     options: {
       indexAxis: 'y',
@@ -104,7 +104,7 @@ export function competitors(canvas, c) {
         {
           label: 'Share de mercado',
           data: c.rankings.map((r) => r.share * 100),
-          backgroundColor: c.rankings.map((r) => (r.is_origin_country ? '#dc2626' : '#94a3b8')),
+          backgroundColor: c.rankings.map((r) => (r.is_origin_country ? '#c0422a' : '#7d8a6b')),
         },
       ],
     },
@@ -123,7 +123,7 @@ export function headroom(canvas, h) {
     data: {
       labels: h.ladder.map((r) => `${(r.target_share * 100).toFixed(1)}%`),
       datasets: [
-        { label: 'Facturación adicional', data: h.ladder.map((r) => r.headroom_usd), backgroundColor: '#0891b2' },
+        { label: 'Facturación adicional', data: h.ladder.map((r) => r.headroom_usd), backgroundColor: '#2f6f9f' },
       ],
     },
     options: {
@@ -148,7 +148,7 @@ export function cashflows(canvas, inv) {
         {
           label: 'Flujo de caja libre',
           data: flows,
-          backgroundColor: flows.map((v) => (v >= 0 ? '#059669' : '#dc2626')),
+          backgroundColor: flows.map((v) => (v >= 0 ? '#2f8f4e' : '#c0422a')),
         },
       ],
     },
@@ -156,15 +156,15 @@ export function cashflows(canvas, inv) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#0f172a',
-          titleColor: '#f8fafc',
-          bodyColor: '#e2e8f0',
+          backgroundColor: '#26301c',
+          titleColor: '#faf8ef',
+          bodyColor: '#e6e0cc',
           callbacks: { label: (c) => money(c.parsed.y) },
         },
       },
       scales: {
-        y: { ticks: { color: '#cbd5e1', callback: compact }, grid: { color: '#334155' } },
-        x: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+        y: { ticks: { color: '#b9c2a6', callback: compact }, grid: { color: '#3a4630' } },
+        x: { ticks: { color: '#b9c2a6' }, grid: { color: '#3a4630' } },
       },
     },
   })
@@ -195,7 +195,7 @@ export function tornado(canvas, sens) {
           data: t.map((row) =>
             row.low_delta_npv_usd < -zeroGap ? [row.low_delta_npv_usd, -zeroGap] : null,
           ),
-          backgroundColor: '#ef4444',
+          backgroundColor: '#c0422a',
           borderRadius: 4,
           barThickness: 12,
         },
@@ -204,7 +204,7 @@ export function tornado(canvas, sens) {
           data: t.map((row) =>
             row.high_delta_npv_usd > zeroGap ? [zeroGap, row.high_delta_npv_usd] : null,
           ),
-          backgroundColor: '#10b981',
+          backgroundColor: '#2f8f4e',
           borderRadius: 4,
           barThickness: 12,
         },
@@ -216,9 +216,9 @@ export function tornado(canvas, sens) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#0f172a',
-          titleColor: '#f8fafc',
-          bodyColor: '#e2e8f0',
+          backgroundColor: '#26301c',
+          titleColor: '#faf8ef',
+          bodyColor: '#e6e0cc',
           callbacks: {
             label: (context) => {
               const row = t[context.dataIndex]
@@ -234,14 +234,14 @@ export function tornado(canvas, sens) {
         x: {
           min: -span,
           max: span,
-          ticks: { color: '#cbd5e1', callback: compact },
+          ticks: { color: '#b9c2a6', callback: compact },
           grid: {
-            color: (context) => (context.tick.value === 0 ? '#f8fafc' : '#334155'),
+            color: (context) => (context.tick.value === 0 ? '#faf8ef' : '#3a4630'),
             lineWidth: (context) => (context.tick.value === 0 ? 2 : 1),
           },
           title: { display: true, text: 'Cambio del VAN frente al caso base (USD)' },
         },
-        y: { ticks: { color: '#cbd5e1' }, grid: { display: false } },
+        y: { ticks: { color: '#b9c2a6' }, grid: { display: false } },
       },
     },
   })
@@ -253,7 +253,7 @@ export function comparisonChart(canvas, data) {
   const prods = data.products.filter((p) => p.available && p.series?.length)
   if (!prods.length) return
   const years = Array.from({ length: 10 }, (_, i) => 2016 + i)
-  const colors = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#f59e0b', '#0891b2', '#db2777', '#65a30d']
+  const colors = ['#3a7d44', '#2f8f4e', '#c0422a', '#7a5c3e', '#c47f17', '#2f6f9f', '#b05c8a', '#8a9a3b']
   const datasets = prods.map((p, i) => ({
     label: p.name || p.slug,
     data: years.map((y) => {
@@ -283,7 +283,7 @@ function comparisonLatestChart(canvas, data) {
   if (!canvas || !data?.products?.length) return
   const products = data.products.filter((product) => product.available && product.series?.length)
   if (!products.length) return
-  const colors = ['#2563eb', '#f97316', '#64748b', '#059669', '#7c3aed', '#eab308', '#0891b2', '#db2777']
+  const colors = ['#3a7d44', '#c47f17', '#6b7358', '#2f8f4e', '#7a5c3e', '#d1a52a', '#2f6f9f', '#b05c8a']
   const latest = products.map((product) => {
     const row = product.series.find((year) => year.year === product.latest_year)
     return { product, value: row?.fob_usd ?? null }
@@ -321,7 +321,7 @@ function comparisonGrowthChart(canvas, data) {
   const products = data.products.filter((product) => product.available && product.series?.length)
   if (!products.length) return
   const years = Array.from({ length: 10 }, (_, i) => 2016 + i)
-  const colors = ['#2563eb', '#f97316', '#64748b', '#059669', '#7c3aed', '#eab308', '#0891b2', '#db2777']
+  const colors = ['#3a7d44', '#c47f17', '#6b7358', '#2f8f4e', '#7a5c3e', '#d1a52a', '#2f6f9f', '#b05c8a']
   new Chart(canvas, {
     type: 'line',
     data: {
@@ -355,7 +355,7 @@ function comparisonCagrChart(canvas, data) {
   const products = data.products.filter((product) => product.available && product.series?.length)
   if (!products.length) return
   const years = Array.from({ length: 10 }, (_, i) => 2016 + i)
-  const colors = ['#2563eb', '#f97316', '#64748b', '#059669', '#7c3aed', '#eab308', '#0891b2', '#db2777']
+  const colors = ['#3a7d44', '#c47f17', '#6b7358', '#2f8f4e', '#7a5c3e', '#d1a52a', '#2f6f9f', '#b05c8a']
   new Chart(canvas, {
     type: 'line',
     data: {
@@ -407,7 +407,7 @@ function rankingChart(canvas, data) {
         {
           label: 'Puntaje',
           data: products.map((product) => product.score),
-          backgroundColor: products.map((_, index) => (index < 3 ? '#2563eb' : '#94a3b8')),
+          backgroundColor: products.map((_, index) => (index < 3 ? '#3a7d44' : '#7d8a6b')),
           borderRadius: 5,
         },
       ],
@@ -418,9 +418,9 @@ function rankingChart(canvas, data) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#0f172a',
-          titleColor: '#f8fafc',
-          bodyColor: '#e2e8f0',
+          backgroundColor: '#26301c',
+          titleColor: '#faf8ef',
+          bodyColor: '#e6e0cc',
           callbacks: {
             label: (context) => {
               const product = products[context.dataIndex]
@@ -454,8 +454,8 @@ function sunatPriceChart(canvas, s) {
         {
           label: 'Precio promedio USD/kg',
           data: rows.map((r) => r.price_usd_per_kg),
-          borderColor: '#0d9488',
-          backgroundColor: 'rgba(13,148,136,.12)',
+          borderColor: '#2f6f9f',
+          backgroundColor: 'rgba(47,111,159,.14)',
           fill: true,
           tension: 0.25,
         },
@@ -479,7 +479,7 @@ export function monteCarloChart(canvas, mc) {
   }
   const labels = mc.histogram.map((b) => b.label)
   const data = mc.histogram.map((b) => b.count)
-  const colors = mc.histogram.map((b) => (b.is_negative ? 'rgba(239, 68, 68, 0.7)' : 'rgba(16, 185, 129, 0.7)'))
+  const colors = mc.histogram.map((b) => (b.is_negative ? 'rgba(192,66,42,0.7)' : 'rgba(47,143,78,0.7)'))
   new Chart(canvas, {
     type: 'bar',
     data: {
@@ -491,7 +491,7 @@ export function monteCarloChart(canvas, mc) {
           backgroundColor: colors,
           borderRadius: 6,
           borderWidth: 1,
-          borderColor: '#e2e8f0',
+          borderColor: '#e6e0cc',
         },
       ],
     },
@@ -524,8 +524,8 @@ export function monteCarloChart(canvas, mc) {
 export function shareDonut(canvas, yearData) {
   if (!canvas || !yearData?.slices?.length) return
   const palette = [
-    '#2563eb', '#059669', '#d97706', '#7c3aed', '#0891b2',
-    '#db2777', '#65a30d', '#ea580c', '#4f46e5', '#94a3b8',
+    '#3a7d44', '#2f8f4e', '#c47f17', '#7a5c3e', '#2f6f9f',
+    '#b05c8a', '#8a9a3b', '#ea580c', '#4f46e5', '#7d8a6b',
   ]
   new Chart(canvas, {
     type: 'doughnut',
@@ -535,11 +535,11 @@ export function shareDonut(canvas, yearData) {
         {
           data: yearData.slices.map((s) => +(s.share * 100).toFixed(2)),
           backgroundColor: yearData.slices.map((s, i) => {
-            if (s.is_peru) return '#dc2626'
-            if (s.is_rest) return '#cbd5e1'
+            if (s.is_peru) return '#c0422a'
+            if (s.is_rest) return '#b9c2a6'
             return palette[i % palette.length]
           }),
-          borderColor: '#1e293b',
+          borderColor: '#26301c',
           borderWidth: 2,
         },
       ],
@@ -618,7 +618,7 @@ export function projectionChart(canvas, proj) {
 
   // Etiquetas y colores segun metodo
   let trendLabel = 'Tendencia'
-  let trendColor = '#d97706'
+  let trendColor = '#c47f17'
   let titleText = 'Proyección FOB'
   let subtitleText = ''
 
@@ -637,8 +637,8 @@ export function projectionChart(canvas, proj) {
     {
       label: 'Exportación FOB (dato)',
       data: histData,
-      borderColor: '#2563eb',
-      backgroundColor: 'rgba(37,99,235,.08)',
+      borderColor: '#3a7d44',
+      backgroundColor: 'rgba(58,125,68,.10)',
       fill: true,
       tension: 0.25,
       spanGaps: true,
@@ -661,7 +661,7 @@ export function projectionChart(canvas, proj) {
     datasets.push({
       label: 'Proyección',
       data: forecastData,
-      borderColor: '#f97316',
+      borderColor: '#c47f17',
       borderDash: [6, 5],
       borderWidth: 2,
       pointRadius: 3,
@@ -689,7 +689,7 @@ export function projectionChart(canvas, proj) {
           display: true,
           text: subtitleText,
           font: { size: 11, style: 'italic' },
-          color: '#475569',
+          color: '#5d6a4c',
           padding: { bottom: 6 },
         } : { display: false },
         tooltip: {
@@ -723,7 +723,7 @@ export function renderAll(result) {
   projectionChart(get('chartProjection'), result.projection)
 }
 
-const SCENARIO_COLORS = { pessimistic: '#dc2626', base: '#0284c7', optimistic: '#059669' }
+const SCENARIO_COLORS = { pessimistic: '#c0422a', base: '#2f6f9f', optimistic: '#2f8f4e' }
 
 export function scenarioChart(canvas, investment) {
   if (!canvas) return
@@ -738,15 +738,15 @@ export function scenarioChart(canvas, investment) {
         {
           label: 'VAN (US$)',
           data: items.map((item) => item.npv_usd),
-          backgroundColor: items.map((item) => SCENARIO_COLORS[item.key] || '#64748b'),
+          backgroundColor: items.map((item) => SCENARIO_COLORS[item.key] || '#6b7358'),
         },
       ],
     },
     options: {
       plugins: { legend: { display: false } },
       scales: {
-        y: { ticks: { color: '#cbd5e1', callback: compact }, grid: { color: '#334155' } },
-        x: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' } },
+        y: { ticks: { color: '#b9c2a6', callback: compact }, grid: { color: '#3a4630' } },
+        x: { ticks: { color: '#b9c2a6' }, grid: { color: '#3a4630' } },
       },
     },
   })
