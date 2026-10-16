@@ -164,6 +164,16 @@ class TestAnalysis:
         data = client.get("/api/analysis/cafe_verde").json()
         assert data["market"]["series"][0]["value_yoy"] is None
 
+    def test_competencia_trae_volumen_y_precio_por_competidor(self, client):
+        """El volumen/precio de los competidores sale del Excel de cantidades exportadas."""
+        comp = client.get("/api/analysis/arandano").json()["competitors"]
+        assert comp["available"] is True
+        con_volumen = [r for r in comp["rankings"] if r["volume_kg"]]
+        assert con_volumen, "ningun competidor trae volumen"
+        peru = next(r for r in comp["rankings"] if r["is_origin_country"])
+        assert peru["volume_kg"] > 0
+        assert peru["unit_value_usd"] == pytest.approx(peru["value_usd"] / peru["volume_kg"], rel=1e-6)
+
     def test_analisis_usa_demanda_importadora_y_proyeccion_de_dos_anios(self, client):
         data = client.get("/api/analysis/cafe_verde").json()
         assert data["import_demand"]["available"] is True

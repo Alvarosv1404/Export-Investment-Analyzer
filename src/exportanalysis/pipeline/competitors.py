@@ -5,9 +5,10 @@ El calculo que interesa para decidir invertir no es "el mercado crece", es
 en un mercado contra el share de sus vecinos, leyendo el Excel local de
 exportadores mundiales (`exporting-economies_<hs6>.xlsx`).
 
-Trade Map publica ahi solo valor (USD Thousand), no volumen. Por eso el
-`volume_kg` y el precio unitario de los competidores salen `None`: es un dato
-que la fuente no da, no un cero.
+Trade Map publica ahi solo valor (USD Thousand), no volumen. El volumen y el
+precio unitario de cada competidor salen del Excel opcional de cantidades
+exportadas (`kg_exporting-economies_<hs6>.xlsx`). Si no esta, quedan `None`: es
+un dato que la fuente no dio, no un cero.
 """
 
 from __future__ import annotations
@@ -39,14 +40,42 @@ def export_comparison(hs6: str, reporter: int, competitors: list[int]) -> pd.Dat
         .agg(value_usd=("fob_usd", "sum"))
         .rename(columns={"reporterLabel": "country"})
     )
-    grouped["volume_kg"] = pd.NA
-    grouped["unit_value_usd"] = pd.NA
     # El groupby se come la bandera; se re-deriva del codigo.
     grouped["is_origin_country"] = grouped["country_code"] == reporter
+    grouped = _attach_export_volumes(hs6, grouped)
 
     totals = grouped.groupby("year")["value_usd"].transform("sum")
     grouped["share"] = grouped["value_usd"] / totals.replace(0, pd.NA)
     return grouped.sort_values(["year", "value_usd"], ascending=[True, False]).reset_index(drop=True)
+
+
+def _attach_export_volumes(hs6: str, grouped: pd.DataFrame) -> pd.DataFrame:
+    """Suma volumen (kg) y precio unitario del Excel de cantidades exportadas.
+
+    La cantidad viene de `kg_exporting-economies_<hs6>.xlsx` (opcional). Si el
+    archivo no existe, o el pais/anio no trae cantidad convertible, la columna
+    queda vacia: es un hueco de la fuente, no un cero. El precio unitario solo
+    se calcula donde hay volumen positivo (`valor / volumen`).
+    """
+    grouped["volume_kg"] = pd.NA
+    grouped["unit_value_usd"] = pd.NA
+    try:
+        quantities = excel_analysis.world_export_quantities(hs6)
+    except FileNotFoundError:
+        return grouped
+    if quantities.empty:
+        return grouped
+
+    quantities = quantities.rename(columns={"reporter_code": "country_code"})
+    grouped = grouped.merge(
+        quantities[["country_code", "year", "quantity_kg"]],
+        on=["country_code", "year"],
+        how="left",
+    )
+    volume = pd.to_numeric(grouped["quantity_kg"], errors="coerce")
+    grouped["volume_kg"] = volume
+    grouped["unit_value_usd"] = grouped["value_usd"] / volume.where(volume > 0)
+    return grouped.drop(columns=["quantity_kg"])
 
 
 def share_trends(hs6: str, reporter: int, competitors: list[int]) -> dict:

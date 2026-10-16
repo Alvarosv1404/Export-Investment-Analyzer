@@ -253,14 +253,24 @@ El proyecto no consulta ninguna API. Cada producto es una carpeta
 | `perus-exports-to-world-by-importer_<hs6>.xlsx` | Exportaciones peruanas por destino, serie por ano | USD Thousand |
 | `perus-exports-to-world-in-2025-by-importer_<hs6>.xlsx` | Snapshot 2025 por destino, con cantidad y precio unitario | kUSD, Tons, USD/Tons |
 
+Opcionales, con la misma forma (una columna por ano + `<ano>_unit`):
+
+| Archivo | Que aporta | Unidad |
+|---|---|---|
+| `kg_importing-economies_<hs6>.xlsx` | Cantidades importadas por pais y ano: la demanda mundial que proyecta el modelo | Tons/kg |
+| `kg_exporting-economies_<hs6>.xlsx` | Cantidades exportadas por pais y ano: el volumen y el precio unitario de cada competidor | Tons/kg |
+
 Como se leen:
 
 - `reporterCd` / `partnerCd` son codigos **M49** (`config/countries.yaml`);
   `604` es Peru y `partnerCd = 0` es la fila de total "World".
 - El valor se convierte a USD (los archivos vienen en miles) y la cantidad a
-  kilos cuando Trade Map la publica en toneladas. El volumen solo existe en el
-  snapshot 2025; en los demas anos queda `null`, que es un hueco real de la
-  fuente, no un cero.
+  kilos cuando Trade Map la publica en toneladas.
+- El volumen **historico por destino** solo existe en el snapshot 2025; en los
+  demas anos queda `null`, que es un hueco real de la fuente, no un cero. El
+  volumen **por competidor** sale del Excel opcional `kg_exporting-economies`;
+  sin ese archivo, las columnas de volumen y precio de la tabla de competencia
+  quedan `n/d`, no en cero.
 - El precio de venta del modelo sale del valor FOB ponderado por kilo de 2025.
   Se puede sobrescribir con `price_usd_per_kg` y el reporte dice de donde
   salio (`calculado de históricos`, `ajustado por el usuario` o `unit value del
@@ -492,7 +502,7 @@ npm run lint             # ruff + eslint
 O por separado:
 
 ```bash
-python -m pytest         # 147 tests del modelo, arancel y API
+python -m pytest         # 150 tests del modelo, arancel y API
 python -m ruff check src tests scripts
 node scripts/check-api.mjs --external   # contra un backend ya levantado
 ```

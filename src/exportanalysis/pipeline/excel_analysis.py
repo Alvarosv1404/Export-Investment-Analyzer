@@ -5,11 +5,14 @@ cuatro Excel que Trade Map exporta por producto, sin red, sin claves y sin
 cache: `data/<hs6> <nombre>/`.
 
 Nombres de archivo esperados (exactos):
-    1. exporting-economies_<hs6>.xlsx                 exportadores mundiales
-    2. importing-economies_<hs6>.xlsx                 importadores mundiales
+    1. exporting-economies_<hs6>.xlsx                 exportadores mundiales (valor)
+    2. importing-economies_<hs6>.xlsx                 importadores mundiales (valor)
     3. perus-exports-to-world-by-importer_<hs6>.xlsx  serie historica por destino (USD Thousand)
     4. perus-exports-to-world-in-2025-by-importer_<hs6>.xlsx  snapshot 2025 (Value kUSD, Quantity, Unit Value)
-    5. kg_importing-economies_<hs6>.xlsx                cantidades importadas por destino y anio
+
+Opcionales, para el volumen (cantidad) por pais:
+    5. kg_importing-economies_<hs6>.xlsx              cantidades importadas por pais y anio
+    6. kg_exporting-economies_<hs6>.xlsx              cantidades exportadas por pais y anio
 """
 from __future__ import annotations
 
@@ -51,6 +54,13 @@ TRADEMAP_FILES: dict[str, str] = {
     "snapshot_2025": "perus-exports-to-world-in-2025-by-importer_{hs6}.xlsx",
 }
 
+# Archivos opcionales de cantidades. No entran en TRADEMAP_FILES (que son los 4
+# base, con valor): aportan volumen y un producto puede correr sin ellos. Los dos
+# comparten forma: una columna por anio + su `<anio>_unit`, con la cantidad en
+# Tons o kg. El de exportadores es el que llena el volumen de los competidores.
+_IMPORT_QUANTITY_PATTERN = "kg_importing-economies_{hs6}.xlsx"
+_EXPORT_QUANTITY_PATTERN = "kg_exporting-economies_{hs6}.xlsx"
+
 
 def data_files_status(hs6: str, nandina: str | None = None) -> dict:
     """Que archivos de un producto estan realmente en data/.
@@ -80,13 +90,22 @@ def data_files_status(hs6: str, nandina: str | None = None) -> dict:
         "trademap_count": sum(present.values()),
         "trademap_expected": len(TRADEMAP_FILES),
         "importer_quantities": _has_import_quantities(hs6),
+        "exporter_quantities": _has_export_quantities(hs6),
         "sunat": sunat,
     }
 
 
 def _has_import_quantities(hs6: str) -> bool:
     try:
-        _find(hs6, "kg_importing-economies_{hs6}.xlsx")
+        _find(hs6, _IMPORT_QUANTITY_PATTERN)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def _has_export_quantities(hs6: str) -> bool:
+    try:
+        _find(hs6, _EXPORT_QUANTITY_PATTERN)
         return True
     except FileNotFoundError:
         return False
@@ -223,7 +242,29 @@ def world_imports(hs6: str) -> pd.DataFrame:
 
 def world_import_quantities(hs6: str) -> pd.DataFrame:
     """Cantidad importada por pais y anio, normalizada a kilos."""
-    p = _find(hs6, "kg_importing-economies_{hs6}.xlsx")
+    return _country_quantities(hs6, _IMPORT_QUANTITY_PATTERN)
+
+
+def world_export_quantities(hs6: str) -> pd.DataFrame:
+    """Cantidad exportada por pais y anio, normalizada a kilos.
+
+    Es lo que llena el volumen y el precio unitario de los competidores en el
+    bloque de competencia regional. Si el Excel opcional no esta, lanza
+    `FileNotFoundError`: el llamador deja el dato vacio en vez de inventar un
+    cero, porque la ausencia de archivo no significa ausencia de comercio.
+    """
+    return _country_quantities(hs6, _EXPORT_QUANTITY_PATTERN)
+
+
+def _country_quantities(hs6: str, pattern: str) -> pd.DataFrame:
+    """Cantidad por pais reportero y anio, normalizada a kilos.
+
+    Sirve para los dos archivos de cantidades (importadas y exportadas): misma
+    forma (una columna por anio + `<anio>_unit`) y mismas unidades. Se excluye
+    la fila de total "World" (reporter 0). Las filas cuya unidad no es Tons ni
+    kg (p. ej. `Mixed` o `No quantity`) quedan sin dato tras el dropna.
+    """
+    p = _find(hs6, pattern)
     df = read_excel_cached(p)
     reporter_code = pd.to_numeric(df["reporterCd"], errors="coerce")
     partner_code = pd.to_numeric(df["partnerCd"], errors="coerce")
@@ -324,11 +365,11 @@ def data_token(hs6: str, nandina: str | None = None) -> tuple:
             parts.append((pattern, _find(hs6, pattern).stat().st_mtime_ns))
         except FileNotFoundError:
             parts.append((pattern, None))
-    quantity_pattern = "kg_importing-economies_{hs6}.xlsx"
-    try:
-        parts.append((quantity_pattern, _find(hs6, quantity_pattern).stat().st_mtime_ns))
-    except FileNotFoundError:
-        parts.append((quantity_pattern, None))
+    for quantity_pattern in (_IMPORT_QUANTITY_PATTERN, _EXPORT_QUANTITY_PATTERN):
+        try:
+            parts.append((quantity_pattern, _find(hs6, quantity_pattern).stat().st_mtime_ns))
+        except FileNotFoundError:
+            parts.append((quantity_pattern, None))
     if nandina:
         try:
             parts.append(("sunat", _find_nandina_file(nandina).stat().st_mtime_ns))

@@ -47,6 +47,28 @@ def test_world_exports_and_imports_readable():
     assert "year" in wi.columns
 
 
+def test_world_export_quantities_normaliza_tons_a_kg():
+    """El volumen de los competidores sale del Excel opcional de cantidades exportadas.
+
+    Peru exporta arandano en toneladas; si el factor Tons->kg no se aplicara, el
+    valor quedaria mil veces mas chico. El umbral lo detecta.
+    """
+    q = excel_analysis.world_export_quantities("081040")
+    assert {"reporter_code", "reporter_name", "year", "quantity_kg"} <= set(q.columns)
+    assert len(q) > 0
+    peru = q[(q["reporter_code"] == 604) & (q["year"] == 2025)]
+    assert len(peru) == 1
+    assert peru["quantity_kg"].iloc[0] > 1_000_000
+
+
+def test_world_export_quantities_sin_archivo_no_rompe():
+    """Sin el Excel de cantidades exportadas, el lector avisa con FileNotFoundError."""
+    import pytest
+
+    with pytest.raises(FileNotFoundError):
+        excel_analysis.world_export_quantities("000000")
+
+
 def test_peru_exports_trade_tiene_fila_world():
     df = excel_analysis.peru_exports_trade("081040")
     assert {"year", "partner_code", "partner_name", "is_world", "fob_usd", "net_weight_kg"} <= set(df.columns)

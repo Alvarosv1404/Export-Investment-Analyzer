@@ -56,6 +56,10 @@ Opcional para calcular la demanda importadora por destino:
 
 5. kg_importing-economies_<hs6>.xlsx - Cantidades importadas por pais y anio. La hoja debe tener columnas anuales y sus unidades (`<año>_unit`).
 
+Opcional para calcular volume y precio unitario de los competidores:
+
+6. kg_exporting-economies_<hs6>.xlsx - Cantidades exportadas por pais y anio. Misma forma que el anterior (columnas anuales y `<año>_unit`).
+
 ## Fuentes
 
 - Trade Map (ITC) - datos publicos de comercio internacional
@@ -68,6 +72,7 @@ Opcional para calcular la demanda importadora por destino:
   pipeline la normaliza a kilos. El volumen solo existe en 2025: en los demas
   anos queda vacio, no en cero.
 - El Excel opcional de cantidades importadas se combina con `importing-economies_<hs6>.xlsx` por país y año. Las unidades Tons se convierten a kg; filas sin unidad compatible se dejan sin dato.
+- El Excel opcional de cantidades exportadas (`kg_exporting-economies_<hs6>.xlsx`) llena el volumen (kg) y el precio unitario (valor / volumen) de cada competidor. Si falta el archivo, esas dos columnas quedan vacías: la ausencia de dato no es un cero.
 - Las cantidades importadas describen la demanda total reportada por cada destino y no deben confundirse con las exportaciones peruanas a ese destino.
 - `reporterCd`/`partnerCd` son codigos M49; `partnerCd = 0` es el total "World".
 - La busqueda de archivos ignora cualquier carpeta `_cache`.
@@ -77,6 +82,10 @@ Opcional para calcular la demanda importadora por destino:
 Lo minimo (sin tocar codigo):
 1. Crear `data/<Industria>/<hs6> <nombre>/`
 2. Colocar los 4 archivos con nombres exactos
+
+Opcional, para enriquecer el analisis:
+- `kg_importing-economies_<hs6>.xlsx`: agrega la demanda importadora por destino.
+- `kg_exporting-economies_<hs6>.xlsx`: agrega volumen y precio unitario de cada competidor.
 
 Opcional, para enriquecer el producto en `config/products.yaml` (nombre cuidado,
 competidores, presentaciones, `industry`) y en `config/assumptions.yaml`
