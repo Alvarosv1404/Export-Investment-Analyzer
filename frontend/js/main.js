@@ -33,7 +33,7 @@ import {
   ranking,
   sensitivity,
   monteCarloRisk,
-  SIMULATOR_RANGES,
+  rangosDe,
   simulatorPanel,
   sources,
   sunatPrice,
@@ -130,22 +130,34 @@ function snapToRange(value, { min, max, step }) {
 
 /**
  * Valores iniciales del simulador para un producto: salen de sus supuestos del
- * catalogo (config/assumptions.yaml) y se recortan a los rangos fijos de los
- * sliders. Se precargan el volumen inicial (su capacidad), el OPEX y el COK.
- * El CAPEX y el costo variable quedan como estan: son los que el usuario ajusta.
+ * catalogo (config/assumptions.yaml) y se recortan a los rangos de sus sliders.
+ * Se precargan el volumen inicial (su capacidad), el OPEX y el COK, y ademas el
+ * CAPEX y el costo variable por defecto de su ficha (el usuario los ajusta
+ * despues). Los rangos de CAPEX y costo tambien son por producto: ver `rangosDe`.
  *
- * Sin esto todos los productos arrancaban iguales y en el extremo mas
- * desfavorable (200 t y 10%), lo que hacia que el primer VAN saliera negativo.
+ * Sin esto todos los productos arrancaban iguales, con un costo por tonelada
+ * entre 4,800 y 7,800 que dejaba fuera a los productos de FOB bajo, y el primer
+ * VAN salia negativo aunque el negocio real fuera viable.
  */
 function productFinancialDefaults(product) {
   const assumptions = product?.assumptions || {}
+  const ranges = rangosDe(product)
   const defaults = {}
-  const volumeTons = snapToRange((assumptions.capacity_kg_year || 0) / 1000, SIMULATOR_RANGES.year1Volume)
+  const volumeTons = snapToRange((assumptions.capacity_kg_year || 0) / 1000, ranges.year1Volume)
   if (volumeTons !== null) defaults.year1Volume = String(volumeTons)
-  const opex = snapToRange(assumptions.opex_fixed_usd_year, SIMULATOR_RANGES.opex)
+  const opex = snapToRange(assumptions.opex_fixed_usd_year, ranges.opex)
   if (opex !== null) defaults.opex = String(opex)
-  const waccPct = snapToRange((assumptions.discount_rate || 0) * 100, SIMULATOR_RANGES.discountRate)
+  const waccPct = snapToRange((assumptions.discount_rate || 0) * 100, ranges.discountRate)
   if (waccPct !== null) defaults.discountRate = String(waccPct)
+  const capex = snapToRange(assumptions.capex_usd, ranges.capex)
+  if (capex !== null) defaults.capex = String(capex)
+  // El slider es el costo TOTAL por tonelada: compra + proceso de la ficha.
+  const costPerKg =
+    Number(assumptions.purchase_cost_usd_per_kg || 0) + Number(assumptions.variable_cost_usd_per_kg || 0)
+  if (costPerKg > 0) {
+    const costPerTon = snapToRange(costPerKg * 1000, ranges.variableCost)
+    if (costPerTon !== null) defaults.variableCost = String(costPerTon)
+  }
   return defaults
 }
 

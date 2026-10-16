@@ -799,18 +799,54 @@ function hasFinancialInputs(state) {
 
 // --- Panel del Simulador Interactivo y Exportación ----------------------------
 /**
- * Rangos de los sliders del simulador. Viven en un solo lugar para que el
- * precargado por producto (main.js) recorte los defaults a los MISMOS limites
- * que el control: si no, el valor usado por el analisis y el que muestra el
- * slider podrian no coincidir. Son los rangos fijados para el ejercicio.
+ * Rangos base de los sliders del simulador (valores del ejercicio). Cuatro
+ * variables son iguales para todo el catalogo: volumen, crecimiento, OPEX y COK.
+ *
+ * El CAPEX y el costo variable NO pueden ser un rango unico: casi todos los
+ * productos tienen un FOB de mercado por debajo de 4.8 USD/kg, y un piso fijo de
+ * 4,800 USD/t (4.8 USD/kg) forzaba costo > precio en cada kilo, con VAN negativo
+ * sin importar el volumen. Por eso esos dos se anclan a la ficha del producto en
+ * `rangosDe`; los valores de aqui quedan como respaldo cuando no hay ficha.
  */
 export const SIMULATOR_RANGES = {
-  capex: { min: 1000000, max: 3000000, step: 10000 },
-  variableCost: { min: 4800, max: 7800, step: 10 }, // USD por tonelada
   year1Volume: { min: 200, max: 800, step: 10 }, // toneladas
   annualGrowth: { min: 10, max: 55, step: 0.5 },
   opex: { min: 200000, max: 600000, step: 5000 },
   discountRate: { min: 7, max: 16, step: 0.1 },
+  capex: { min: 1000000, max: 3000000, step: 10000 }, // respaldo sin ficha
+  variableCost: { min: 4800, max: 7800, step: 10 }, // respaldo sin ficha (USD/t)
+}
+
+/** Redondea los extremos a multiplos del paso para que el slider quede alineado. */
+function alignRange(min, max, step) {
+  return { min: Math.floor(min / step) * step, max: Math.ceil(max / step) * step, step }
+}
+
+/**
+ * Rangos de slider para un producto. El CAPEX y el costo variable salen de su
+ * ficha (`config/assumptions.yaml`, via `/api/products`): el costo total (compra
+ * + proceso) +-50% y el CAPEX -40%/+40%, con la ficha como valor por defecto.
+ * El resto usa el rango base. Sin ficha de costo o CAPEX, cae al rango base para
+ * no dejar el slider sin recorrido.
+ */
+export function rangosDe(product) {
+  const assumptions = product?.assumptions || {}
+  const costPerKg =
+    Number(assumptions.purchase_cost_usd_per_kg || 0) + Number(assumptions.variable_cost_usd_per_kg || 0)
+  const capex = Number(assumptions.capex_usd || 0)
+  const ranges = { ...SIMULATOR_RANGES }
+  if (costPerKg > 0) {
+    const costPerTon = costPerKg * 1000
+    ranges.variableCost = alignRange(
+      costPerTon * 0.5,
+      costPerTon * 1.5,
+      SIMULATOR_RANGES.variableCost.step,
+    )
+  }
+  if (capex > 0) {
+    ranges.capex = alignRange(capex * 0.6, capex * 1.4, SIMULATOR_RANGES.capex.step)
+  }
+  return ranges
 }
 
 const sliderRange = ({ min, max, step }) => ({ min: String(min), max: String(max), step: String(step) })
@@ -818,6 +854,10 @@ const sliderRange = ({ min, max, step }) => ({ min: String(min), max: String(max
 export function simulatorPanel(result, state) {
   const pricing = result?.pricing || {}
   const slug = result?.slug || ''
+  const product = (state?.products || []).find((item) => item.slug === slug)
+  const ranges = rangosDe(product)
+  const num = (value) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)
+  const usdPerKg = (value) => (value / 1000).toFixed(2)
   const year1VolumeVal = state.year1Volume || ''
   const growthVal = state.annualGrowth || ''
   const varVal = state.variableCost || ''
@@ -885,12 +925,12 @@ export function simulatorPanel(result, state) {
             <span class="kpi-note">${escapeHTML(pricing.origin || 'Se necesita un Excel con valor y cantidad.')}</span>
           </div>
           <div class="simulator-fields">
-            ${field('simCapex', 'Inversión inicial (USD)', capexVal, sliderRange(SIMULATOR_RANGES.capex))}
-            ${field('simVar', 'Costo variable total por tonelada (USD/t)', varVal, { ...sliderRange(SIMULATOR_RANGES.variableCost), hint: 'Rango solicitado: 4,800 - 7,800 USD/t (equivale a 4.8 - 7.8 USD/kg).' })}
-            ${field('simYear1Volume', 'Volumen del año 1 (toneladas)', year1VolumeVal, { ...sliderRange(SIMULATOR_RANGES.year1Volume), hint: 'Toneladas FOB del primer año (200-800 t).' })}
-            ${field('simAnnualGrowth', 'Crecimiento del volumen (%)', growthVal, sliderRange(SIMULATOR_RANGES.annualGrowth))}
-            ${field('simOpex', 'Costos fijos del año 1 (USD)', opexVal, sliderRange(SIMULATOR_RANGES.opex))}
-            ${field('simWacc', 'COK / tasa de descuento (%)', waccVal, sliderRange(SIMULATOR_RANGES.discountRate))}
+            ${field('simCapex', 'Inversión inicial (USD)', capexVal, { ...sliderRange(ranges.capex), hint: `Rango anclado a la ficha del producto: ${num(ranges.capex.min)} - ${num(ranges.capex.max)} USD.` })}
+            ${field('simVar', 'Costo variable total por tonelada (USD/t)', varVal, { ...sliderRange(ranges.variableCost), hint: `Costo total (compra + proceso) ±50%: ${num(ranges.variableCost.min)} - ${num(ranges.variableCost.max)} USD/t (${usdPerKg(ranges.variableCost.min)} - ${usdPerKg(ranges.variableCost.max)} USD/kg).` })}
+            ${field('simYear1Volume', 'Volumen del año 1 (toneladas)', year1VolumeVal, { ...sliderRange(ranges.year1Volume), hint: 'Toneladas FOB del primer año (200-800 t).' })}
+            ${field('simAnnualGrowth', 'Crecimiento del volumen (%)', growthVal, sliderRange(ranges.annualGrowth))}
+            ${field('simOpex', 'Costos fijos del año 1 (USD)', opexVal, sliderRange(ranges.opex))}
+            ${field('simWacc', 'COK / tasa de descuento (%)', waccVal, sliderRange(ranges.discountRate))}
           </div>
         </div>
 

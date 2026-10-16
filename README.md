@@ -379,41 +379,48 @@ antes de tomar una decision.
 El reporte distingue siempre entre dato y supuesto, y marca de donde salio la
 curva de ocupacion de la planta (`ramp_source`).
 
-### Simulador: precarga por producto y rangos fijos
+### Simulador: precarga y rangos por producto
 
 El simulador no arranca con los mismos numeros para todo el catalogo.
 `GET /api/products` devuelve, para cada producto, sus **supuestos efectivos**
 de `config/assumptions.yaml` (capacidad, CAPEX, costos, OPEX, capital de
 trabajo y tasa de descuento). El frontend usa esos valores para **precargar el
-volumen, el OPEX y el COK** de cada producto.
+volumen, el OPEX, el COK, el CAPEX y el costo variable** de cada producto.
 
-Solo se precargan esos tres: el **CAPEX** y el **costo variable** quedan como
-los definas tu, porque son los que se negocian y cotizan caso por caso.
-
-Los sliders tienen **rangos fijos** (el ejercicio se evalua dentro de ellos):
+Cuatro variables usan un **rango fijo** (el ejercicio se evalua dentro de ellos):
 
 | Supuesto | Rango | Unidad |
 |---|---|---|
-| Inversion inicial (CAPEX) | 1,000,000 - 3,000,000 | USD |
-| Costo variable total | 4,800 - 7,800 | USD/t (4.8 - 7.8 USD/kg) |
 | Volumen del año 1 | 200 - 800 | t |
 | Crecimiento del volumen | 10 - 55 | % |
 | Costos fijos del año 1 | 200,000 - 600,000 | USD |
 | COK / tasa de descuento | 7 - 16 | % |
 
-Los rangos viven en un solo lugar (`SIMULATOR_RANGES` en
-`frontend/js/components.js`) y el precargado recorta los defaults a esos
-limites con `snapToRange` (`frontend/js/main.js`): asi el numero que usa el
+El **CAPEX** y el **costo variable total** se anclan a la ficha del producto,
+porque un rango unico no sirve para todo el catalogo:
+
+| Supuesto | Rango por producto | Valor por defecto |
+|---|---|---|
+| Inversion inicial (CAPEX) | ficha −40% / +40% | CAPEX de la ficha |
+| Costo variable total | ficha (compra + proceso) ±50% | costo de la ficha |
+
+El costo variable del slider es el **costo total por tonelada** (compra +
+proceso), en USD/t. Se precarga con la suma de la ficha y el slider deja
+moverlo ±50%. Si un producto no tiene ficha, ambos caen al rango base
+(CAPEX 1M-3M, costo 4,800-7,800 USD/t).
+
+Los rangos viven en `SIMULATOR_RANGES` (base) y `rangosDe(product)` (por
+producto) en `frontend/js/components.js`, y el precargado recorta los defaults a
+esos limites con `snapToRange` (`frontend/js/main.js`): asi el numero que usa el
 analisis y el que muestra el slider siempre coinciden.
 
-> **Consecuencia del piso de costo.** El costo variable arranca en 4.8 USD/kg.
-> Un producto cuyo precio FOB de mercado este por debajo de ese piso pierde
-> dinero en cada kilo y su VAN sera negativo sin importar el volumen ni el
-> crecimiento. Con el catalogo actual, los productos con FOB por encima del piso
-> (cafe, cacao, arandano y, al limite, conservas de pescado) pueden dar VAN
-> positivo; el resto (11 de 15) se mantiene negativo
-> hasta que el piso del costo (o el rango entero) se ajuste a su realidad. Es
-> comportamiento esperado del modelo, no un error de calculo.
+> **Por que el costo no es un rango fijo.** Un piso unico de 4.8 USD/kg dejaba
+> fuera a 11 de 15 productos: su FOB de mercado esta por debajo de ese piso, y
+> con costo ≥ piso cada kilo pierde dinero, con VAN negativo sin importar el
+> volumen ni el crecimiento, aunque el negocio real sea viable. Anclando el
+> rango a la ficha, el default refleja el costo real del producto. Si un
+> producto no cierra a esos supuestos, el VAN sale negativo igual: es la
+> respuesta honesta del modelo, no un error de calculo.
 
 ---
 
