@@ -33,6 +33,7 @@ import {
   ranking,
   sensitivity,
   monteCarloRisk,
+  SIMULATOR_RANGES,
   simulatorPanel,
   sources,
   sunatPrice,
@@ -112,6 +113,40 @@ function analysisOpts() {
     discountRate: waccFraction,
     projectionMethod: state.projectionMethod,
   }
+}
+
+/**
+ * Recorta un valor a un rango de slider (min/max/step) y lo alinea al paso, para
+ * que el numero que usa el analisis y el que muestra el control sean el mismo.
+ * Devuelve null si el valor no es un numero.
+ */
+function snapToRange(value, { min, max, step }) {
+  if (!Number.isFinite(value)) return null
+  const decimals = String(step).includes('.') ? String(step).split('.')[1].length : 0
+  const bounded = Math.min(Math.max(value, min), max)
+  const snapped = Math.round(bounded / step) * step
+  return Number(Math.min(Math.max(snapped, min), max).toFixed(decimals))
+}
+
+/**
+ * Valores iniciales del simulador para un producto: salen de sus supuestos del
+ * catalogo (config/assumptions.yaml) y se recortan a los rangos fijos de los
+ * sliders. Se precargan el volumen inicial (su capacidad), el OPEX y el COK.
+ * El CAPEX y el costo variable quedan como estan: son los que el usuario ajusta.
+ *
+ * Sin esto todos los productos arrancaban iguales y en el extremo mas
+ * desfavorable (200 t y 10%), lo que hacia que el primer VAN saliera negativo.
+ */
+function productFinancialDefaults(product) {
+  const assumptions = product?.assumptions || {}
+  const defaults = {}
+  const volumeTons = snapToRange((assumptions.capacity_kg_year || 0) / 1000, SIMULATOR_RANGES.year1Volume)
+  if (volumeTons !== null) defaults.year1Volume = String(volumeTons)
+  const opex = snapToRange(assumptions.opex_fixed_usd_year, SIMULATOR_RANGES.opex)
+  if (opex !== null) defaults.opex = String(opex)
+  const waccPct = snapToRange((assumptions.discount_rate || 0) * 100, SIMULATOR_RANGES.discountRate)
+  if (waccPct !== null) defaults.discountRate = String(waccPct)
+  return defaults
 }
 
 function showError(message) {
@@ -783,6 +818,14 @@ async function load() {
   if (!state.slug && state.products.length) {
     state.slug = state.products[0].slug
     syncURL()
+  }
+
+  // Precarga por producto: solo si la URL no trae supuestos guardados. Un link
+  // compartido con evaluation_inputs=1 conserva exactamente lo que el usuario ya
+  // tenia; en cambio, al cambiar de producto se recargan SUS supuestos.
+  const selectedProduct = state.products.find((product) => product.slug === state.slug)
+  if (selectedProduct && !hasSavedFinancialInputs) {
+    Object.assign(state, productFinancialDefaults(selectedProduct))
   }
 
   document.getElementById('controls').innerHTML = renderControls()

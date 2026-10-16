@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from ..config import load_catalog
+from ..config import load_assumptions, load_catalog
 from ..pipeline import comparison, screener
 from ..pipeline.analyze import analyze_product
 from .dossier import generate_excel_dossier
@@ -63,6 +63,27 @@ def _json_safe(value):
     return value
 
 
+# Supuestos del config que el simulador usa para precargarse por producto. El
+# frontend los recorta a los rangos de sus sliders; aca solo se entregan los
+# valores efectivos (defaults de assumptions.yaml + override del producto) para
+# que los defaults no sean los mismos numeros para todo el catalogo.
+_UI_ASSUMPTION_KEYS = (
+    "capacity_kg_year",
+    "capex_usd",
+    "variable_cost_usd_per_kg",
+    "purchase_cost_usd_per_kg",
+    "opex_fixed_usd_year",
+    "working_capital_usd",
+    "discount_rate",
+)
+
+
+def _ui_assumptions(slug: str) -> dict:
+    """Supuestos efectivos de un producto, sin los campos que no tengan valor."""
+    effective = load_assumptions().effective(slug)
+    return {key: effective[key] for key in _UI_ASSUMPTION_KEYS if effective.get(key) is not None}
+
+
 @app.get("/api/products")
 def list_products() -> dict:
     """Catalogo de productos configurados."""
@@ -77,6 +98,7 @@ def list_products() -> dict:
                 "nandina": p.nandina,
                 "industry": p.industry,
                 "presentations": [pres.model_dump() for pres in p.presentations],
+                "assumptions": _ui_assumptions(p.slug),
             }
             for p in catalog.products
         ],

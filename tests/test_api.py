@@ -98,6 +98,16 @@ class TestProducts:
             assert len(product["hs6"]) == 6
         assert any(p.get("industry") for p in data["products"]) is True
 
+    def test_catalogo_trae_supuestos_para_precargar_el_simulador(self, client):
+        data = client.get("/api/products").json()
+        cafe = next(p for p in data["products"] if p["slug"] == "cafe_verde")
+        assumptions = cafe["assumptions"]
+        # Los supuestos del config viajan con el catalogo para que el simulador
+        # arranque con cifras del producto, no con las mismas para todos.
+        assert assumptions["capacity_kg_year"] == 500000
+        assert assumptions["capex_usd"] == 4200000
+        assert assumptions["discount_rate"] == 0.12
+
     def test_sin_parametros_obligatorios(self, client):
         assert client.get("/api/products").status_code == 200
 
