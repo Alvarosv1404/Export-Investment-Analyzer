@@ -266,6 +266,36 @@ El proceso corre como usuario sin privilegios (`appuser`, uid 10001) y el
 > tener wheels de esas versiones exactas. Para desarrollo usa `pip install -e
 > ".[dev]"` como siempre.
 
+### Desplegar en Fly.io (misma imagen Docker)
+
+La app esta publicada en **https://export-investment-analyzer-peru.fly.dev**
+(region `gru`, 512 MB, una maquina que se apaga sola sin trafico).
+
+`fly.toml` describe el servicio: construye con el `Dockerfile` del repo,
+enruta el puerto `8000` (el mismo del `EXPOSE` y del `CMD`) y usa `/health`
+como chequeo. La app no necesita base de datos, disco ni variables de entorno.
+
+```bash
+fly deploy --remote-only    # compila en la nube y crea/actualiza la maquina
+fly status                  # estado y resultado del chequeo
+fly logs                    # logs en vivo
+```
+
+Detalles utiles:
+
+- **Region.** `gru` (Sao Paulo) es la mas cercana a Peru que ofrece Fly; no
+  existen `bog` ni `mia`. Otras opciones: `iad`, `ewr`, `dfw`, `lax`, `sjc`.
+  Cambiar con `fly regions set <codigo> --app export-investment-analyzer-peru`.
+- **Memoria.** 512 MB porque el pico medido sirviendo los 15 productos fue
+  136 MiB y pandas/pyarrow piden mas al parsear un Excel grande; con 256 MB la
+  maquina puede morir por OOM.
+- **Costo.** `auto_stop_machines = 'stop'` y `min_machines_running = 0` apagan la
+  maquina sin trafico; la primera peticion despues de un rato tarda ~4-10 s en
+  arrancar. Para tenerla siempre encendida, cambiar esos dos valores en
+  `fly.toml` y volver a desplegar.
+- **Una sola maquina.** `fly scale count 1` (Fly crea dos por defecto para alta
+  disponibilidad; para una demo la segunda solo duplica el gasto).
+
 ---
 
 ## Agregar un producto

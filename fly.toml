@@ -1,0 +1,46 @@
+# Configuracion de Fly.io: UI + API en un solo contenedor (mismo origen).
+#
+# El build lo hace el Dockerfile del repo (multi-etapa: Node compila el
+# frontend y Python sirve dist/ + la API).
+#
+# Puerto: el CMD del Dockerfile escucha en ${PORT:-8000}. Aca NO se define PORT,
+# asi que uvicorn usa 8000 y Fly enruta ese mismo puerto (internal_port). Si
+# cambias uno, cambia el otro; el HEALTHCHECK del Dockerfile tambien lee PORT.
+#
+# Region: `gru` (Sao Paulo) es la mas cercana a Peru que ofrece Fly.
+# Cambiarla: `fly regions set <codigo> --app export-investment-analyzer-peru`
+# (ver la lista con `fly platform regions`).
+#
+# Memoria: 512 MB. El pico medido sirviendo los 15 productos fue 136 MiB, pero
+# pandas/pyarrow pueden pedir mas al parsear un Excel grande; 256 MB es riesgoso
+# (OOM kill de la maquina).
+#
+# Costo: con auto_stop la maquina se apaga sola cuando no hay trafico y arranca
+# al primer pedido (~4 s de arranque en frio). Para tenerla siempre encendida:
+# auto_stop_machines = false y min_machines_running = 1.
+
+app = 'export-investment-analyzer-peru'
+primary_region = 'gru'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '25s'
+    method = 'GET'
+    path = '/health'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
