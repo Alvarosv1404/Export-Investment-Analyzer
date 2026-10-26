@@ -21,11 +21,14 @@ mas comun en este tipo de analisis.
 
 ## Catalogo actual
 
-15 productos. Doce estan declarados en `config/products.yaml`; los otros tres se
-descubren solos desde `data/` (el HS6 sale del nombre de la carpeta). En todos,
-los competidores se derivan del Excel: no hay listas de paises escritas a mano.
+15 productos. **La data de comercio de los quince sale de los Excel en `data/`**:
+`config/products.yaml` no trae ni una cifra, solo la ficha del producto. Doce
+tienen ficha curada en `products.yaml` (nombre, presentaciones, industria,
+partida NANDINA); los otros tres se arman solos con el nombre de su carpeta y
+la partida del Excel de SUNAT. En todos, los competidores se derivan del Excel:
+no hay listas de paises escritas a mano.
 
-| Producto | Slug (URL) | HS6 | Industria | Origen |
+| Producto | Slug (URL) | HS6 | Industria | Ficha del producto |
 |---|---|---|---|---|
 | Café verde | `cafe_verde` | 090111 | Agricola | `products.yaml` |
 | Cacao | `cacao_en_grano` | 180100 | Agricola | `products.yaml` |
@@ -39,13 +42,17 @@ los competidores se derivan del Excel: no hay listas de paises escritas a mano.
 | Jengibre | `jengibre` | 091011 | Agricola | `products.yaml` |
 | Pota y calamar | `pota_calamar` | 030743 | Pesquero | `products.yaml` |
 | Conservas de pescado | `conservas_pescado` | 160414 | Pesquero | `products.yaml` |
-| Naranja fresca | `naranja_fresca` | 080510 | Agricola | `data/` |
-| Aceite de pescado crudo | `aceite_de_pescado_crudo` | 150420 | Agroindustria | `data/` |
-| Alcachofas en conserva | `alcachofas_en_conserva` | 200599 | Agroindustria | `data/` |
+| Naranja fresca | `naranja_fresca` | 080510 | Agricola | auto desde `data/` |
+| Aceite de pescado crudo | `aceite_de_pescado_crudo` | 150420 | Agroindustria | auto desde `data/` |
+| Alcachofas en conserva | `alcachofas_en_conserva` | 200599 | Agroindustria | auto desde `data/` |
 
-> Los tres productos de `data/` se llaman asi por el nombre de su carpeta. El
-> HS6 manda: `200599` es un codigo mas ancho que "alcachofas en conserva" (ver
-> "Avisos honestos").
+> La columna *Ficha* dice donde estan el nombre, las presentaciones y la
+> industria, **no de donde salen los datos**. Un producto `auto` no tiene entrada
+> en `products.yaml` ni supuestos en `assumptions.yaml`: el nombre se toma de la
+> carpeta, la partida del nombre del Excel de SUNAT (`2005991000.xlsx`) y el
+> reporte muestra su mercado avisando que faltan supuestos de inversion, en vez
+> de inventar un VAN. El HS6 manda: `200599` es un codigo mas ancho que
+> "alcachofas en conserva" (ver "Avisos honestos").
 
 ---
 
@@ -515,8 +522,11 @@ cotizaciones**. Antes de mirar el VAN reemplaza al menos:
 - `opex_fixed_usd_year` → planilla, alquiler, servicios
 - `discount_rate` → tu WACC
 
-Hay escenarios piloto de ejemplo para **todos los productos del catalogo** en
+Hay escenarios piloto de ejemplo para **12 de los 15 productos** en
 `config/assumptions.yaml`, para que el reporte y el modelo puedan ejecutarse.
+Los tres que no tienen ficha (los `auto` de la tabla de arriba) muestran su
+analisis de mercado sin bloque de inversion: la API devuelve `assumptions_missing`
+con lo que falta, en vez de inventar un VAN.
 Son cifras hipoteticas, no cotizaciones ni datos publicados, y no validan la
 rentabilidad. Sustituyelas por cotizaciones de proveedores y costos reales
 antes de tomar una decision.
@@ -527,10 +537,12 @@ curva de ocupacion de la planta (`ramp_source`).
 ### Simulador: precarga y rangos por producto
 
 El simulador no arranca con los mismos numeros para todo el catalogo.
-`GET /api/products` devuelve, para cada producto, sus **supuestos efectivos**
-de `config/assumptions.yaml` (capacidad, CAPEX, costos, OPEX, capital de
-trabajo y tasa de descuento). El frontend usa esos valores para **precargar el
-volumen, el OPEX, el COK, el CAPEX y el costo variable** de cada producto.
+`GET /api/products` devuelve, para cada producto **con ficha**, sus **supuestos
+efectivos** de `config/assumptions.yaml` (capacidad, CAPEX, costos, OPEX, capital
+de trabajo y tasa de descuento). Los tres `auto` devuelven solo la tasa de
+descuento por defecto, asi que usan los rangos base (ver abajo). El frontend usa
+esos valores para **precargar el volumen, el OPEX, el COK, el CAPEX y el costo
+variable** de cada producto.
 
 Cuatro variables usan un **rango fijo** (el ejercicio se evalua dentro de ellos):
 
