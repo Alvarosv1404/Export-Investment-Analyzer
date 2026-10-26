@@ -60,6 +60,10 @@ Opcional para calcular volume y precio unitario de los competidores:
 
 6. kg_exporting-economies_<hs6>.xlsx - Cantidades exportadas por pais y anio. Misma forma que el anterior (columnas anuales y `<año>_unit`).
 
+Opcional para el bloque SUNAT (precio real por kilo, con peso neto):
+
+7. `<nandina>.xlsx` - Exportaciones SUNAT por destino, **una hoja por anio**. El nombre del archivo es la partida NANDINA de 10 digitos (p. ej. `0901119000.xlsx`) y se busca en cualquier carpeta bajo `data/`. Solo se leen las hojas cuyo nombre son 4 digitos (`2024`, `2025`, ...). Dentro de cada hoja se ubican por nombre las columnas `Pais de Destino`, `Valor FOB(dolares)` y `Peso Neto(Kilos)`; el orden no importa. Con eso el modelo calcula FOB / peso neto real, que es el precio por kilo mas confiable. Si falta, el bloque SUNAT del reporte queda como no disponible (no en cero) y el ranking muestra el chip `sin SUNAT`.
+
 ## Fuentes
 
 - Trade Map (ITC) - datos publicos de comercio internacional
@@ -90,6 +94,7 @@ Lo minimo (sin tocar codigo):
 Opcional, para enriquecer el analisis:
 - `kg_importing-economies_<hs6>.xlsx`: agrega la demanda importadora por destino.
 - `kg_exporting-economies_<hs6>.xlsx`: agrega volumen y precio unitario de cada competidor.
+- `<nandina>.xlsx`: agrega el bloque SUNAT con el precio real por kilo (FOB / peso neto).
 
 Opcional, para enriquecer el producto en `config/products.yaml` (nombre cuidado,
 presentaciones, `industry`) y en `config/assumptions.yaml` (supuestos de

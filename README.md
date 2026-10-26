@@ -158,6 +158,7 @@ puerto esta ocupado, en vez de un `Errno 10048` de uvicorn.
 | `npm run tariffs` | Checklist de que buscar en Trade Map, con los destinos reales |
 | `npm run tariffs:fill` | Pregunta los aranceles y escribe `tariffs.csv` |
 | `npm run check:ports` | Revisa que los puertos esten libres |
+| `npm run preview` | Sirve `dist/` localmente, para revisar el build sin la API de Vite |
 | `npm run setup` | Instala dependencias y crea la plantilla |
 
 ## Endpoints
@@ -170,6 +171,8 @@ puerto esta ocupado, en vez de un `Errno 10048` de uvicorn.
 | `GET /api/analysis/{slug}?target_share=0.12` | Con participacion de mercado objetivo explicita |
 | `GET /api/analysis/{slug}?price_usd_per_kg=6.5` | Con precio FOB de venta explicito |
 | `GET /api/comparison?slugs=cafe_verde,uva_fresca` | Comparacion seleccionada con serie 2016-2025, variacion anual y CAGR desde 2016 |
+| `GET /api/ranking?slugs=cafe_verde,uva_fresca` | Screener: ordena los productos por puntaje ponderado (pesos en `config/scoring.yaml`). Sin `slugs`, rankea el catalogo completo |
+| `GET /api/analysis/{slug}/export/excel` | Dossier Ejecutivo en Excel (`.xlsx`); acepta los mismos supuestos que el analisis |
 | `GET /health` | Sonda de salud |
 | `GET /docs` | Swagger UI interactivo |
 
@@ -180,6 +183,14 @@ exportaciones y crecimiento interanual, junto con tablas anuales y CAGR
 2016-2025. Son exportaciones FOB del Peru reportadas en Trade Map, no valores
 importados de los mercados destino. Si el Excel no contiene un dato anual, se
 muestra como `n/d` y no se interpreta como cero.
+
+Esa misma vista trae el **ranking de productos** ("¿por cual de estos
+empezar?"): ordena los productos marcados por un puntaje ponderado
+(`config/scoring.yaml`) que usa solo datos historicos publicados -tamano de
+mercado, crecimiento, diversidad de destinos y estabilidad exportadora-, sin
+supuestos de inversion. Cada fila muestra ademas la cobertura de fuentes
+(cuantos Excel de Trade Map tiene y si tiene el de SUNAT). El analisis de cada
+producto tiene un boton para descargar el **Dossier Ejecutivo en Excel**.
 
 ## Correr sin navegador
 
@@ -371,6 +382,18 @@ Opcionales, con la misma forma (una columna por ano + `<ano>_unit`):
 | `kg_importing-economies_<hs6>.xlsx` | Cantidades importadas por pais y ano: la demanda mundial que proyecta el modelo | Tons/kg |
 | `kg_exporting-economies_<hs6>.xlsx` | Cantidades exportadas por pais y ano: el volumen y el precio unitario de cada competidor | Tons/kg |
 
+Opcional, con otra forma, para el bloque SUNAT:
+
+| Archivo | Que aporta | Unidad |
+|---|---|---|
+| `<nandina>.xlsx` | Exportaciones SUNAT por destino, **una hoja por ano** (hojas llamadas `2024`, `2025`, ...). Trae el peso neto real, asi que da el precio por kilo mas confiable. El nombre es la partida NANDINA de 10 digitos (p. ej. `0901119000.xlsx`) | USD, kg |
+
+Se buscan las hojas cuyo nombre son 4 digitos (el ano) y dentro las columnas
+`Pais de Destino`, `Valor FOB(dolares)` y `Peso Neto(Kilos)`, ubicadas por
+nombre y no por orden. Si el archivo no esta, el bloque SUNAT del reporte queda
+como no disponible; no se rellena con cero. Su presencia es el chip `SUNAT` del
+ranking.
+
 Como se leen:
 
 - `reporterCd` / `partnerCd` son codigos **M49** (`config/countries.yaml`);
@@ -549,13 +572,16 @@ analisis y el que muestra el slider siempre coinciden.
 ## Como esta armado el proyecto
 
 ```
-config/            productos, supuestos, paises  (todo declarativo)
+config/            productos, supuestos, paises y pesos del ranking (declarativo)
 dev.config.json    puertos de desarrollo (fuente unica de verdad)
 package.json       scripts npm; los puertos NO se escriben aqui
 eslint.config.js   reglas de ESLint 9 para el frontend y los scripts .mjs
 vite.config.js     build del frontend + proxy hacia la API
-constraints.txt    versiones exactas de Python para el build de Docker
+constraints.txt    versiones exactas de Python (build de Docker y de Render)
 Dockerfile         build multi-etapa (Node compila, Python sirve UI + API)
+fly.toml           deploy en Fly.io (puerto 8000, healthcheck, 512 MB)
+render.yaml        API en Render (mismo lock que Docker)
+netlify.toml       UI en Netlify (build estatico + proxy de /api)
 
 frontend/          interfaz web (Vite, JavaScript modular, sin framework)
   index.html
@@ -570,7 +596,7 @@ frontend/          interfaz web (Vite, JavaScript modular, sin framework)
     chart.umd.min.js  Chart.js vendorizado (v4.4.3): Vite lo copia a dist/
 
 src/exportanalysis/
-  sources/         trademap_excel.py, manual_tariffs.py, sunat.py (offline)
+  sources/         trademap_excel.py, manual_tariffs.py, sunat.py (scraper retirado, sin uso)
   pipeline/        market.py, competitors.py, excel_analysis.py, analyze.py
   model/           financials.py, valuation.py, unit_economics.py
   api/main.py      FastAPI; sirve el build de Vite y expone la API JSON
@@ -633,6 +659,9 @@ npm test                 # verifica la API y luego corre pytest
 npm run lint             # ruff + eslint
 ```
 
+`npm test` es `test:api` + `test:py`, y `npm run lint` es `lint:web` +
+`lint:py`: si solo quieres una mitad, corre esa.
+
 O por separado:
 
 ```bash
@@ -686,7 +715,12 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
   del nombre de la carpeta en `data/`. Ejemplo: `200599` es "las demas hortalizas
   preparadas o conservadas", que incluye bastante mas que "alcachofas en
   conserva". Cuando compares cifras, mira el HS6, no solo el titulo.
-- El headroom es una cota superior teorica: asume que el crecimiento se le
+- **El puntaje del ranking es relativo a la seleccion.** Cada dimension se
+  normaliza 0-100 entre los productos marcados, asi que agregar o quitar uno
+  cambia los puntajes (y hasta el orden) aunque los datos no cambien. Sirve para
+  comparar un conjunto, no como nota absoluta del producto. Tampoco usa
+  supuestos financieros: solo exportaciones historicas publicadas.
+- **El headroom es una cota superior teorica:** asume que el crecimiento se le
   quita a los exportadores actuales. No modela demanda incremental, barreras de
   entrada ni reaccion de la competencia.
 - **El simulador es un ejercicio acotado, no una prediccion de escala.** El

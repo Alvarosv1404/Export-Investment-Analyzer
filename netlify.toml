@@ -9,4 +9,6 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # Node 20 termino su soporte en abril de 2026. Se usa 22, la misma rama con
+  # la que el Dockerfile compila el frontend (node:22.23.4-alpine).
+  NODE_VERSION = "22"
