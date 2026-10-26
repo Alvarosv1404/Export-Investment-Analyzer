@@ -28,7 +28,9 @@ const WEB_HOST = dev.web_host || dev.host
 export default defineConfig({
   root: 'frontend',
   base: './',
-  publicDir: false,
+  // Vite copia public/ tal cual a dist/. Ahi vive Chart.js (vendorizado) para
+  // que la UI funcione sin internet; no entra al bundle.
+  publicDir: 'public',
   build: {
     outDir: '../dist',
     emptyOutDir: true,

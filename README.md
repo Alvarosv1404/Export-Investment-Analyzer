@@ -496,6 +496,8 @@ frontend/          interfaz web (Vite, JavaScript modular, sin framework)
     components.js  los bloques del reporte
     charts.js      graficos con Chart.js
     format.js      formato de moneda, porcentaje y volumen
+  public/assets/
+    chart.umd.min.js  Chart.js vendorizado (v4.4.3): Vite lo copia a dist/
 
 src/exportanalysis/
   sources/         trademap_excel.py, manual_tariffs.py, sunat.py (offline)
@@ -547,9 +549,10 @@ planta, no la demanda.
 - **El frontend no usa framework.** Son bloques fijos y sin estado;
   introducir React seria mas ceremonia que ayuda. El estado vive en la URL, asi
   que cualquier vista es compartible con un link.
-- **Chart.js va por CDN, no por npm.** Es una libreria estable de 200 KB que no
-  necesita versionarse con el proyecto. Para uso sin conexion, copiala a
-  `frontend/vendor/` y cambia el `<script>` por una ruta local.
+- **Chart.js va vendorizado, no por npm.** Es una libreria estable de ~200 KB;
+  vive en `frontend/public/assets/chart.umd.min.js` y Vite la copia tal cual a
+  `dist/assets/`. No entra al bundle ni sale a internet, asi que la UI funciona
+  sin conexion. Para actualizarla, ver el comentario de `frontend/js/charts.js`.
 
 ---
 
@@ -584,7 +587,7 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
 | `Errno 10048` al arrancar | El puerto de `dev.config.json` esta ocupado. `npm run check:ports` dice quien. |
 | La web carga pero `/api` da 404 | El proxy apunta a un puerto que no coincide. Verifica que `dev.config.json` tenga el puerto que corre `npm run check:ports`. |
 | `ModuleNotFoundError: exportanalysis` | Falta `pip install -e .` o falta `PYTHONPATH=src`. `npm run setup` lo resuelve. |
-| El grafico no aparece | Chart.js se carga por CDN: sin conexion a internet el `<script>` falla. Ver la nota de Chart.js arriba. |
+| El grafico no aparece | Chart.js no se cargo. Verifica que exista `frontend/public/assets/chart.umd.min.js` y que `dist/assets/` lo tenga: si falta, corre `npm run build`. |
 | La pagina sale sin estilos | Falta `npm install` o `npm run build` (la raiz responde 503 sin build). Revisa que `frontend/css/app.css` exista. |
 | El backend tarda en el primer request | Normal la primera vez: lee y normaliza los Excel de Trade Map. Despues el sistema operativo los tiene en cache. |
 | `Sin datos de comercio para este producto` | Falta el Excel del producto o el HS-6 no coincide con la carpeta. Verifica los nombres en `data/<hs6> <nombre>/`. |

@@ -177,7 +177,11 @@ def peru_exports_trade(hs6: str, nandina: str | None = None) -> pd.DataFrame:
             if pd.notna(kg) and pd.notna(code)
         }
         is_latest = melted["year"] == 2025
-        melted.loc[is_latest, "net_weight_kg"] = melted.loc[is_latest, "partner_code"].map(qty)
+        # pandas 3.1 dejo de permitir el upcast silencioso: asignar una serie
+        # nullable (Float64 con NA) sobre una columna float64 lanza TypeError.
+        # Se convierte explicito a float64 con NaN para no depender de eso.
+        mapped = melted.loc[is_latest, "partner_code"].map(qty)
+        melted.loc[is_latest, "net_weight_kg"] = mapped.to_numpy(dtype="float64", na_value=np.nan)
     except (FileNotFoundError, KeyError, ValueError):
         pass
 

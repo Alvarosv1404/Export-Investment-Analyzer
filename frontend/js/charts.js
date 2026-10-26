@@ -1,13 +1,14 @@
 /**
  * Graficos del reporte.
  *
- * Chart.js se carga desde CDN en index.html, no como dependencia de npm. Es
- * una libreria de 200 KB que no se versiona con el proyecto y cuya API es
- * estable; meterla al bundle anade un paso de build y un lockfile por un
- * beneficio que no se necesita en un reporte interno.
+ * Chart.js se carga como script global desde frontend/public/assets/
+ * chart.umd.min.js (v4.4.3, UMD), no como dependencia de npm. Es una libreria
+ * de ~200 KB con API estable y no entra al bundle: se vendorizo para que la UI
+ * funcione sin internet, que es la promesa de la app.
  *
- * Si el reporte se va a usar sin conexion, lo correcto es copiarla a
- * frontend/vendor/chart.umd.min.js y cambiar el <script> por una ruta local.
+ * Para actualizarla: descargar de
+ * https://cdn.jsdelivr.net/npm/chart.js@<version>/dist/chart.umd.min.js,
+ * reemplazar el archivo y actualizar la version de este comentario.
  */
 
 import { compactUSD, fullUSD } from './format.js'

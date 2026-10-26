@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Análisis de exportación e inversión</title>
     <link rel="stylesheet" href="./css/app.css" />
-    <!-- Chart.js desde CDN. Ver el comentario en js/charts.js: si el reporte
-         se usa sin conexion, copiarlo a frontend/vendor/ y usar ruta local. -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <!-- Chart.js vendorizado (v4.4.3, UMD) para que la UI funcione sin internet.
+         Vive en frontend/public/assets/ y Vite lo copia a dist/assets/.
+         Para actualizarlo, ver el comentario en js/charts.js. -->
+    <script src="/assets/chart.umd.min.js"></script>
   </head>
   <body>
     <header class="site-header">
