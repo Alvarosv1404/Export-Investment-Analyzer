@@ -228,10 +228,43 @@ sale de la API. Por eso el despliegue son dos piezas enlazadas por un proxy.
 3. Despliega. La UI queda en `https://algo.netlify.app` y los datos los sirve
    la API de Render a traves del proxy.
 
-Sin Netlify tambien funciona en un solo servicio: si el host corre FastAPI sobre
-un `dist/` ya construido, `main.py` sirve UI y API con la misma URL. En ese caso
-el build necesita Node (Vite), asi que en Render iria un `Dockerfile` con Node +
-Python, en vez del runtime nativo de Python.
+Sin Netlify tambien funciona en un solo servicio, y para eso el repo trae
+`Dockerfile`: Node compila la UI y Python sirve UI + API con la misma URL (ver
+*Docker*, abajo). En Render alcanza con elegir *Deploy from Dockerfile*.
+
+### Docker (UI + API en un solo contenedor)
+
+```bash
+docker build -t export-investment-analyzer:latest .
+docker run --rm -p 8000:8000 export-investment-analyzer:latest
+```
+
+Queda en `http://localhost:8000`. Respeta `PORT`:
+`docker run --rm -e PORT=9000 -p 9000:9000 ...`.
+
+El build es reproducible:
+
+- `python:3.12.15-slim` y `node:22.23.4-alpine`, con tag de parche exacto (no
+  `3.12-slim`/`22-alpine` a secas, que cambian con el tiempo).
+- `npm ci`, que respeta `package-lock.json`.
+- `constraints.txt`, con las versiones de Python que se validaron (154 tests y
+  los 15 productos). Sin el, `pandas>=2.2` resolvia a cualquier version nueva:
+  un build trajo pandas 3.1 y rompio la API.
+
+Para actualizar el lock:
+
+```bash
+docker run --rm export-investment-analyzer:latest python -m pip freeze
+```
+
+y reemplazar la lista de `constraints.txt` (sin la linea del paquete editable).
+
+El proceso corre como usuario sin privilegios (`appuser`, uid 10001) y el
+`HEALTHCHECK` pega en `/health`.
+
+> `constraints.txt` es solo para Docker: tu Python local puede ser mas nuevo y no
+> tener wheels de esas versiones exactas. Para desarrollo usa `pip install -e
+> ".[dev]"` como siempre.
 
 ---
 
@@ -486,6 +519,8 @@ dev.config.json    puertos de desarrollo (fuente unica de verdad)
 package.json       scripts npm; los puertos NO se escriben aqui
 eslint.config.js   reglas de ESLint 9 para el frontend y los scripts .mjs
 vite.config.js     build del frontend + proxy hacia la API
+constraints.txt    versiones exactas de Python para el build de Docker
+Dockerfile         build multi-etapa (Node compila, Python sirve UI + API)
 
 frontend/          interfaz web (Vite, JavaScript modular, sin framework)
   index.html

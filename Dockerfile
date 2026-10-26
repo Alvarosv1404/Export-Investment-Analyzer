@@ -10,8 +10,12 @@
 #   encontraria ni config/, ni data/, ni dist/. Por eso se instala en modo
 #   editable, igual que hace render.yaml.
 
+# Versiones fijas: tag de parche exacto (no `22-alpine` a secas) para que un
+# rebuild no cambie Node/Python por detras. Las de Python ademas estan en
+# constraints.txt; las de Node, en package-lock.json (via `npm ci`).
+
 # ---------- Etapa 1: build del frontend ----------
-FROM node:22-alpine AS frontend
+FROM node:22.23.4-alpine AS frontend
 
 WORKDIR /build
 
@@ -27,7 +31,7 @@ COPY frontend ./frontend
 RUN npm run build
 
 # ---------- Etapa 2: runtime (Python) ----------
-FROM python:3.12-slim AS runtime
+FROM python:3.12.15-slim AS runtime
 
 # 3.12 y no 3.14: pyproject pide >=3.11 y en 3.12 hay wheels estables de
 # pandas/numpy/pyarrow. Es tambien la version que usa render.yaml.
@@ -41,11 +45,16 @@ WORKDIR /app
 
 # Capa cacheable: primero la metadata y un paquete vacio, para instalar las
 # dependencias sin depender del codigo. Asi, cambiar src/ no reinstala pandas.
-COPY pyproject.toml ./
-RUN pip install --upgrade pip setuptools wheel \
+#
+# constraints.txt fija las versiones exactas que se validaron. Sin el, `pip`
+# resolvia los rangos de pyproject.toml (pandas>=2.2) y un build podia traer
+# pandas 3.1, que rompia la API. pip/setuptools/wheel tambien van con version
+# exacta para que la imagen sea reproducible.
+COPY pyproject.toml constraints.txt ./
+RUN pip install "pip==26.2.2" "setuptools==84.2.1" "wheel==0.48.0" \
  && mkdir -p src/exportanalysis \
  && : > src/exportanalysis/__init__.py \
- && pip install -e .
+ && pip install -e . -c constraints.txt
 
 # Codigo real: reemplaza el paquete vacio. El enlace editable ya apunta a
 # /app/src, asi que no hace falta reinstalar.
