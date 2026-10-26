@@ -4,15 +4,19 @@
 # relativos al paquete), asi que no necesita disco ni base de datos.
 # El plan `free` duerme tras ~15 min de inactividad; la primera peticion tarda
 # en despertar. Usa /health para comprobar que esta viva.
+#
+# Las versiones estan fijadas igual que en Docker, para que los dos caminos
+# instalen lo mismo: Python 3.12.15 (la misma del Dockerfile) y
+# constraints.txt con el lock del arbol de dependencias.
 services:
   - type: web
     name: export-investment-analyzer-api
     runtime: python
     plan: free
     region: oregon
-    buildCommand: pip install -e .
+    buildCommand: pip install -e . -c constraints.txt
     startCommand: uvicorn exportanalysis.api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: "3.12.4"
+        value: "3.12.15"

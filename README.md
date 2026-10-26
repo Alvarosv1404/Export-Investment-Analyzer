@@ -208,10 +208,15 @@ sale de la API. Por eso el despliegue son dos piezas enlazadas por un proxy.
 
 1. **API en Render.** Crea un *Web Service* desde el repositorio. El
    `render.yaml` ya lo define todo (`runtime: python`, `plan: free`,
-   `pip install -e .`, `uvicorn`). Al terminar copia su URL
+   `pip install -e . -c constraints.txt`, `uvicorn`). Al terminar copia su URL
    (`https://algo.onrender.com`) y comprueba que responde en `/health`.
    El plan gratis duerme tras ~15 min de inactividad: la primera peticion tarda
    ~30-60 s en despertarla, asi que visitá la URL antes de entrar a Netlify.
+
+   Render no usa Docker, pero instala exactamente lo mismo: Python `3.12.15`
+   (el `PYTHON_VERSION` del blueprint, igual que la imagen `python:3.12.15-slim`)
+   y el mismo `constraints.txt`. Asi un cambio de version no puede hacer que la
+   API de Render y la de Docker respondan distinto.
 
 2. **UI en Netlify.** Sitio nuevo conectado al mismo repositorio. Netlify lee
    `netlify.toml` (build `npm ci && npm run build:netlify`, publica `dist`).
