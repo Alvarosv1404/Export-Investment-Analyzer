@@ -1,7 +1,8 @@
 # Supuestos del modelo de inversion.
 #
 # SEPARACION IMPORTANTE:
-#   - La data de mercado (volumen, FOB, precio, arancel) viene de APIs publicas.
+#   - La data de mercado (volumen, FOB, precio) viene de los Excel locales de
+#     Trade Map, y el arancel del CSV editable. Todo offline, sin APIs.
 #   - Los supuestos de aqui (CAPEX, OPEX, precio de compra, WACC) son TUYOS.
 #     No se pueden obtener de ninguna API. Empieza con rangos Orders of Magnitude
 #     y calibra con tu cotizacion real. El reporte siempre marca cuales valores

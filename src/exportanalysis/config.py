@@ -378,8 +378,8 @@ def load_catalog() -> Catalog:
     """Catalogo efectivo: products.yaml + productos descubiertos en data/.
 
     products.yaml sigue mandando: si un HS6 ya esta declarado ahi, se conserva
-    su metadata curada (nombre, competidores, presentaciones). Lo que aparece
-    en data/ y no esta en el yaml se agrega solo, con lo minimo.
+    su metadata curada (nombre, presentaciones, industry, nandina). Lo que
+    aparece en data/ y no esta en el yaml se agrega solo, con lo minimo.
     """
     catalog = Catalog(**_read_yaml("products.yaml"))
     known_hs6 = {product.hs6 for product in catalog.products}

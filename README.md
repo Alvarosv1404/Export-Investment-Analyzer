@@ -1,8 +1,8 @@
 # Export Investment Analyzer
 
 Motor de analisis para evaluar inversiones en exportacion: mercado, competencia
-y viabilidad financiera (VAN/TIR) con datos publicos. La familia inicial de
-productos es la agroexportacion peruana.
+y viabilidad financiera (VAN/TIR) con datos publicos. El catalogo inicial cubre
+agroexportacion y pesca peruana.
 
 Aplicacion web para responder una pregunta concreta: **si invierto en exportar
 un producto, cuanto dinero puedo hacer y con que evidencia.**
@@ -18,6 +18,34 @@ Combina dos cosas que normalmente viven separadas:
 La separacion es el punto. El reporte marca cada numero como
 *dato publicado* o como *supuesto tuyo*, porque confundir los dos es el error
 mas comun en este tipo de analisis.
+
+## Catalogo actual
+
+15 productos. Doce estan declarados en `config/products.yaml`; los otros tres se
+descubren solos desde `data/` (el HS6 sale del nombre de la carpeta). En todos,
+los competidores se derivan del Excel: no hay listas de paises escritas a mano.
+
+| Producto | Slug (URL) | HS6 | Industria | Origen |
+|---|---|---|---|---|
+| Café verde | `cafe_verde` | 090111 | Agricola | `products.yaml` |
+| Cacao | `cacao_en_grano` | 180100 | Agricola | `products.yaml` |
+| Arandano | `arandano` | 081040 | Agricola | `products.yaml` |
+| Uva | `uva_fresca` | 080610 | Agricola | `products.yaml` |
+| Palta | `palta_fresca` | 080440 | Agricola | `products.yaml` |
+| Esparrago | `esparrago_fresco` | 070920 | Agricola | `products.yaml` |
+| Mango | `mango_fresco` | 080450 | Agricola | `products.yaml` |
+| Quinua | `quinua` | 100850 | Agricola | `products.yaml` |
+| Aji y paprika | `aji_paprika` | 090421 | Agricola | `products.yaml` |
+| Jengibre | `jengibre` | 091011 | Agricola | `products.yaml` |
+| Pota y calamar | `pota_calamar` | 030743 | Pesquero | `products.yaml` |
+| Conservas de pescado | `conservas_pescado` | 160414 | Pesquero | `products.yaml` |
+| Naranja fresca | `naranja_fresca` | 080510 | Agricola | `data/` |
+| Aceite de pescado crudo | `aceite_de_pescado_crudo` | 150420 | Agroindustria | `data/` |
+| Alcachofas en conserva | `alcachofas_en_conserva` | 200599 | Agroindustria | `data/` |
+
+> Los tres productos de `data/` se llaman asi por el nombre de su carpeta. El
+> HS6 manda: `200599` es un codigo mas ancho que "alcachofas en conserva" (ver
+> "Avisos honestos").
 
 ---
 
@@ -209,18 +237,34 @@ Python, en vez del runtime nativo de Python.
 
 ## Agregar un producto
 
-Todo vive en `config/products.yaml`. Un producto nuevo son ocho lineas:
+Hay dos caminos.
+
+**El mas simple: solo data.** Deja la carpeta del producto en
+`data/<hs6> <nombre>/` con sus cuatro Excel de Trade Map. El producto aparece
+solo en el catalogo: el HS6 sale del nombre de la carpeta o de los archivos. Ver
+`data/README.md`.
+
+**Si quieres curarlo** (nombre, presentaciones, industria), agregalo como un item
+de la lista `products:` en `config/products.yaml`:
 
 ```yaml
 products:
-  cacao_en_grano:
+  - slug: cacao_en_grano
     name: "Cacao en grano"
-    hs6: "180110"          # HS-6: la unidad de analisis
-    nandina: "1801100000"  # partida SUNAT de 10 digitos, para el arancel
+    hs6: "180100"          # HS-6: la unidad de analisis
+    nandina: "1801001900"  # partida SUNAT de 10 digitos, para el arancel
     unit: "kg"
+    industry: Agricola
+    presentations:
+      - {hs6: "180100", label: "Grano entero o partido, crudo"}
 ```
 
-Y sus supuestos en `config/assumptions.yaml`:
+No declares competidores: se derivan de `exporting-economies_<hs6>.xlsx` (los
+mayores exportadores del ultimo anio). El campo `competitors` existe como escape
+hatch, pero el default es la data.
+
+Y sus supuestos en `config/assumptions.yaml` (este si es un diccionario por
+slug):
 
 ```yaml
 products:
@@ -449,7 +493,7 @@ frontend/          interfaz web (Vite, JavaScript modular, sin framework)
   js/
     main.js        orquestacion; el estado vive en la URL
     api.js         llamadas a /api, sin URLs hardcodeadas
-    components.js  los 8 bloques del reporte
+    components.js  los bloques del reporte
     charts.js      graficos con Chart.js
     format.js      formato de moneda, porcentaje y volumen
 
@@ -467,7 +511,7 @@ scripts/
   tariff_helper.py  que buscar en Trade Map, y escribir el CSV sin editarlo a mano
   smoke_test.py    el analisis completo en texto
 
-tests/             9 archivos: modelo financiero, data, API, comparacion y screener
+tests/             9 archivos: modelo financiero, data, API, comparacion, arancel/precio y screener
 ```
 
 El circuito que cierra el modelo:
@@ -500,7 +544,7 @@ planta, no la demanda.
 - **La biseccion de los umbrales espera funciones crecientes.** El VAN sube
   con el precio y con la ocupacion, asi que si `f(mid) > 0` la raiz esta por
   debajo de `mid`.
-- **El frontend no usa framework.** Son ocho bloques fijos y sin estado;
+- **El frontend no usa framework.** Son bloques fijos y sin estado;
   introducir React seria mas ceremonia que ayuda. El estado vive en la URL, asi
   que cualquier vista es compartible con un link.
 - **Chart.js va por CDN, no por npm.** Es una libreria estable de 200 KB que no
@@ -560,9 +604,25 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
 - El conjunto de competidores se deriva de la data (ver "De donde salen los
   datos"): son los mayores exportadores del ultimo anio, no un grupo curado a
   mano. El campo `competitor_source` de la API lo deja explicito.
+- **Ese ranking mide valor exportado, e incluye reexportacion.** Trade Map no
+  separa produccion propia de reexportacion: paises como Paises Bajos, Belgica o
+  Alemania aparecen por su rol de hub. Eso puede mejorar la posicion relativa de
+  Peru, porque compite contra un flujo bruto y no contra produccion. Es la data
+  tal cual; el modelo no la corrige ni la recorta.
+- **El HS6 puede ser mas ancho que el nombre comercial.** El nombre suele venir
+  del nombre de la carpeta en `data/`. Ejemplo: `200599` es "las demas hortalizas
+  preparadas o conservadas", que incluye bastante mas que "alcachofas en
+  conserva". Cuando compares cifras, mira el HS6, no solo el titulo.
 - El headroom es una cota superior teorica: asume que el crecimiento se le
   quita a los exportadores actuales. No modela demanda incremental, barreras de
   entrada ni reaccion de la competencia.
+- **El simulador es un ejercicio acotado, no una prediccion de escala.** El
+  volumen se mueve entre 200 y 800 t y los costos fijos entre 200,000 y 600,000
+  USD, mientras el CAPEX y el costo variable salen de la ficha del producto. Si
+  la planta de la ficha es mucho mas grande que ese volumen, el VAN puede salir
+  negativo por **escala** aunque el margen por kilo sea bueno. No es un error de
+  calculo: es el tamano del ejercicio. Para evaluar otra escala, cambia el
+  volumen o la ficha.
 - La curva de aprendizaje esta indexada al ano, no a la produccion acumulada.
   Si tienes volumen historico, reescribir esa funcion vale la pena: es una de
   las palancas mas fuertes del modelo.
