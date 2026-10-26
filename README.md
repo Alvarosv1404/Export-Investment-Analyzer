@@ -21,38 +21,38 @@ mas comun en este tipo de analisis.
 
 ## Catalogo actual
 
-15 productos. **La data de comercio de los quince sale de los Excel en `data/`**:
-`config/products.yaml` no trae ni una cifra, solo la ficha del producto. Doce
-tienen ficha curada en `products.yaml` (nombre, presentaciones, industria,
-partida NANDINA); los otros tres se arman solos con el nombre de su carpeta y
-la partida del Excel de SUNAT. En todos, los competidores se derivan del Excel:
-no hay listas de paises escritas a mano.
+15 productos. **Toda la informacion sale de `data/`**: cada producto existe
+porque tiene su carpeta con los Excel, y de ahi salen las cifras, el HS6, la
+industria, la partida y hasta el nombre. `config/products.yaml` no es una fuente
+de datos: es una capa opcional de curaduria que solo cambia como se muestra el
+producto (nombre presentable y presentaciones). No tiene una sola cifra.
 
-| Producto | Slug (URL) | HS6 | Industria | Ficha del producto |
+| Producto | Slug (URL) | HS6 | Industria | Ficha curada |
 |---|---|---|---|---|
-| Café verde | `cafe_verde` | 090111 | Agricola | `products.yaml` |
-| Cacao | `cacao_en_grano` | 180100 | Agricola | `products.yaml` |
-| Arandano | `arandano` | 081040 | Agricola | `products.yaml` |
-| Uva | `uva_fresca` | 080610 | Agricola | `products.yaml` |
-| Palta | `palta_fresca` | 080440 | Agricola | `products.yaml` |
-| Esparrago | `esparrago_fresco` | 070920 | Agricola | `products.yaml` |
-| Mango | `mango_fresco` | 080450 | Agricola | `products.yaml` |
-| Quinua | `quinua` | 100850 | Agricola | `products.yaml` |
-| Aji y paprika | `aji_paprika` | 090421 | Agricola | `products.yaml` |
-| Jengibre | `jengibre` | 091011 | Agricola | `products.yaml` |
-| Pota y calamar | `pota_calamar` | 030743 | Pesquero | `products.yaml` |
-| Conservas de pescado | `conservas_pescado` | 160414 | Pesquero | `products.yaml` |
-| Naranja fresca | `naranja_fresca` | 080510 | Agricola | auto desde `data/` |
-| Aceite de pescado crudo | `aceite_de_pescado_crudo` | 150420 | Agroindustria | auto desde `data/` |
-| Alcachofas en conserva | `alcachofas_en_conserva` | 200599 | Agroindustria | auto desde `data/` |
+| Café verde | `cafe_verde` | 090111 | Agricola | si |
+| Cacao | `cacao_en_grano` | 180100 | Agricola | si |
+| Arandano | `arandano` | 081040 | Agricola | si |
+| Uva | `uva_fresca` | 080610 | Agricola | si |
+| Palta | `palta_fresca` | 080440 | Agricola | si |
+| Esparrago | `esparrago_fresco` | 070920 | Agricola | si |
+| Mango | `mango_fresco` | 080450 | Agricola | si |
+| Quinua | `quinua` | 100850 | Agricola | si |
+| Aji y paprika | `aji_paprika` | 090421 | Agricola | si |
+| Jengibre | `jengibre` | 091011 | Agricola | si |
+| Pota y calamar | `pota_calamar` | 030743 | Pesquero | si |
+| Conservas de pescado | `conservas_pescado` | 160414 | Pesquero | si |
+| Naranja fresca | `naranja_fresca` | 080510 | Agricola | no (nombre de carpeta) |
+| Aceite de pescado crudo | `aceite_de_pescado_crudo` | 150420 | Agroindustria | no (nombre de carpeta) |
+| Alcachofas en conserva | `alcachofas_en_conserva` | 200599 | Agroindustria | no (nombre de carpeta) |
 
-> La columna *Ficha* dice donde estan el nombre, las presentaciones y la
-> industria, **no de donde salen los datos**. Un producto `auto` no tiene entrada
-> en `products.yaml` ni supuestos en `assumptions.yaml`: el nombre se toma de la
-> carpeta, la partida del nombre del Excel de SUNAT (`2005991000.xlsx`) y el
-> reporte muestra su mercado avisando que faltan supuestos de inversion, en vez
-> de inventar un VAN. El HS6 manda: `200599` es un codigo mas ancho que
-> "alcachofas en conserva" (ver "Avisos honestos").
+> Los tres sin ficha se llaman asi por su carpeta y no tienen supuestos en
+> `assumptions.yaml`: el reporte muestra su mercado avisando que faltan
+> supuestos de inversion, en vez de inventar un VAN. La ficha curada no cambia
+> ninguna cifra: solo pone un nombre presentable y las presentaciones
+> (variantes). Al reves tambien vale: declarar un producto en `products.yaml`
+> sin su carpeta en `data/` lo agrega al catalogo, pero no hay nada que
+> analizar y el reporte falla por falta de data. El HS6 manda: `200599` es un
+> codigo mas ancho que "alcachofas en conserva" (ver "Avisos honestos").
 
 ---
 
