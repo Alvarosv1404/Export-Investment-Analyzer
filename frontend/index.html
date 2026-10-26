@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Análisis de exportación e inversión</title>
     <link rel="stylesheet" href="./css/app.css" />
+    <!-- Iconos. El SVG es el principal; el .ico y el PNG son respaldo (algunos
+         navegadores y el "agregar a inicio" de iOS no leen SVG). Los tres se
+         generan desde el SVG con scripts/make_favicon.py. Viven en public/
+         porque FastAPI solo sirve dist/assets/ (ver src/exportanalysis/api/main.py). -->
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="icon" href="/assets/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <meta name="theme-color" content="#3a7d44" />
     <!-- Chart.js vendorizado (v4.4.3, UMD) para que la UI funcione sin internet.
          Vive en frontend/public/assets/ y Vite lo copia a dist/assets/.
          Para actualizarlo, ver el comentario en js/charts.js. -->

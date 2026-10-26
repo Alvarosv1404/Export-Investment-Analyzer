@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Análisis de exportación e inversión">
+  <title>Análisis de exportación e inversión</title>
+  <!-- La hoja de la cabecera (frontend/index.html), sola y encuadrada, sobre el
+       verde de marca (variable leaf de app.css).
+       Sin el tallo a proposito: a 16 px mide menos de 1 px y se ve como una
+       muesca. La hoja va escalada y centrada para ocupar ~62% del lienzo.
+       Regenerar el PNG y el ICO: python scripts/make_favicon.py -->
+  <rect width="64" height="64" rx="15" fill="#3a7d44"/>
+  <g transform="translate(2.86 6.33) scale(2.33)">
+    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" fill="#eef7e3"/>
+  </g>
+</svg>

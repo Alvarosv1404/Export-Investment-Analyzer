@@ -270,7 +270,7 @@ El build es reproducible:
 - `python:3.12.15-slim` y `node:22.23.4-alpine`, con tag de parche exacto (no
   `3.12-slim`/`22-alpine` a secas, que cambian con el tiempo).
 - `npm ci`, que respeta `package-lock.json`.
-- `constraints.txt`, con las versiones de Python que se validaron (154 tests y
+- `constraints.txt`, con las versiones de Python que se validaron (162 tests y
   los 15 productos). Sin el, `pandas>=2.2` resolvia a cualquier version nueva:
   un build trajo pandas 3.1 y rompio la API.
 
@@ -606,6 +606,9 @@ frontend/          interfaz web (Vite, JavaScript modular, sin framework)
     format.js      formato de moneda, porcentaje y volumen
   public/assets/
     chart.umd.min.js  Chart.js vendorizado (v4.4.3): Vite lo copia a dist/
+    favicon.svg       icono de la app (hoja sobre verde); es el original
+    favicon.ico       el mismo icono en 16/32/48 px, de respaldo
+    apple-touch-icon.png  el mismo icono en 180x180, para "agregar a inicio" en iOS
 
 src/exportanalysis/
   sources/         trademap_excel.py, manual_tariffs.py, sunat.py (scraper retirado, sin uso)
@@ -620,8 +623,9 @@ scripts/
   check-api.mjs    verifica el contrato de la API
   tariff_helper.py  que buscar en Trade Map, y escribir el CSV sin editarlo a mano
   smoke_test.py    el analisis completo en texto
+  make_favicon.py  regenera el PNG y el ICO desde favicon.svg (necesita Pillow)
 
-tests/             9 archivos: modelo financiero, data, API, comparacion, arancel/precio y screener
+tests/             10 archivos: modelo financiero, data, API, comparacion, arancel/precio, screener e iconos
 ```
 
 El circuito que cierra el modelo:
@@ -661,6 +665,12 @@ planta, no la demanda.
   vive en `frontend/public/assets/chart.umd.min.js` y Vite la copia tal cual a
   `dist/assets/`. No entra al bundle ni sale a internet, asi que la UI funciona
   sin conexion. Para actualizarla, ver el comentario de `frontend/js/charts.js`.
+- **El favicon vive bajo `assets/`, no en la raiz.** La API monta un solo
+  `StaticFiles` en `dist/assets/`, asi que `/favicon.ico` daria 404. Los tres
+  formatos se sirven desde `/assets/` y funcionan igual en Netlify. El SVG es el
+  original y el PNG/ICO se generan con `scripts/make_favicon.py`, que lee ese
+  SVG en vez de duplicar la geometria. La hoja va sin tallo a proposito: a 16 px
+  el tallo mide menos de un pixel y se ve como una muesca.
 
 ---
 
@@ -677,7 +687,7 @@ npm run lint             # ruff + eslint
 O por separado:
 
 ```bash
-python -m pytest         # 154 tests del modelo, arancel y API
+python -m pytest         # 162 tests del modelo, arancel y API
 python -m ruff check src tests scripts
 node scripts/check-api.mjs --external   # contra un backend ya levantado
 ```
@@ -699,6 +709,7 @@ el backend, espera el health check, corre las verificaciones y lo apaga.
 | La web carga pero `/api` da 404 | El proxy apunta a un puerto que no coincide. Verifica que `dev.config.json` tenga el puerto que corre `npm run check:ports`. |
 | `ModuleNotFoundError: exportanalysis` | Falta `pip install -e .` o falta `PYTHONPATH=src`. `npm run setup` lo resuelve. |
 | El grafico no aparece | Chart.js no se cargo. Verifica que exista `frontend/public/assets/chart.umd.min.js` y que `dist/assets/` lo tenga: si falta, corre `npm run build`. |
+| La pestana muestra el icono generico (un mundo) | Falta el build o los iconos. Verifica que `dist/assets/favicon.svg` exista y corre `npm run build`; si ya esta, el navegador puede tener el icono viejo en cache (recarga forzada). |
 | La pagina sale sin estilos | Falta `npm install` o `npm run build` (la raiz responde 503 sin build). Revisa que `frontend/css/app.css` exista. |
 | El backend tarda en el primer request | Normal la primera vez: lee y normaliza los Excel de Trade Map. Despues el sistema operativo los tiene en cache. |
 | `Sin datos de comercio para este producto` | Falta el Excel del producto o el HS-6 no coincide con la carpeta. Verifica los nombres en `data/<hs6> <nombre>/`. |
