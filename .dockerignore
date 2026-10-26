@@ -1,0 +1,55 @@
+# --- Control de versiones ---
+.git
+.gitignore
+.gitattributes
+.github
+
+# --- Python: entornos virtuales y caches ---
+.venv/
+.venv-1/
+venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+*.whl
+
+# --- Node ---
+node_modules/
+.vite/
+
+# --- Build del frontend: se regenera dentro de la imagen ---
+# (evita copiar un dist/ viejo, por ejemplo compilado en Windows)
+dist/
+
+# --- Tests y utilidades de desarrollo (no se necesitan en runtime) ---
+tests/
+scripts/
+eslint.config.js
+
+# --- Despliegue que no aplica dentro del contenedor ---
+netlify.toml
+render.yaml
+.env
+.env.local
+
+# --- Documentacion ---
+README.md
+**/*.md
+
+# --- SO / editores ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Caches de datos reproducibles ---
+data/raw/_cache/
+data/raw/tariffs/_cache/
+
+# --- Archivos de Docker ---
+Dockerfile
+.dockerignore
