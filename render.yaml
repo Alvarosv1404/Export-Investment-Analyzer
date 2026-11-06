@@ -12,7 +12,11 @@
 # (importar pandas es lo que pesa). Las instancias web free NO caducan a los 30
 # dias; lo que caduca es Postgres free, que este proyecto no usa.
 #
-# Region `oregon` (US West) es la mas cercana a Peru de las que ofrece Render.
+# Region: Render no tiene Sudamerica (la `gru` de Sao Paulo era de Fly.io).
+# Sus regiones son Oregon, Ohio, Virginia, Frankfurt y Singapur. Se usa
+# `virginia` (US East) porque el cable submarino de Lima entra por Miami y da
+# menos latencia que US West. Si ya creaste el servicio en otra region, hay que
+# borrarlo y recrearlo: Render no permite cambiarla.
 #
 # El plan free no permite discos persistentes, y aqui no hacen falta: todo el
 # estado vive en el repositorio.
@@ -21,7 +25,7 @@ services:
     name: export-investment-analyzer
     runtime: docker
     plan: free
-    region: oregon
+    region: virginia
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health

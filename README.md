@@ -229,9 +229,15 @@ Es la ruta recomendada: **un unico servicio gratuito** sirve la UI y la API.
    servicio `export-investment-analyzer`.
 
    Si prefieres no usar Blueprint: **New -> Web Service**, elige el repo,
-   *Language: Docker*, plan *Free*, region *Oregon* y *Health Check Path*
+   *Language: Docker*, plan *Free*, region *Virginia* y *Health Check Path*
    `/health`. El `Dockerfile` y el `CMD` ya respetan el `PORT` que inyecta
    Render.
+
+   Sobre la region: Render no tiene Sudamerica (Sao Paulo era de Fly.io). De
+   sus cinco regiones, *Virginia* es la mejor para Peru porque el cable
+   submarino de Lima entra por Miami; *Oregon* queda al otro lado del
+   continente. Render no permite cambiar la region despues: si ya creaste el
+   servicio en otra, borralo y vuelve a aplicar el blueprint.
 
 2. El build compila la UI con Node 22 e instala Python 3.12.15 con
    `constraints.txt`. La primera vez tarda unos minutos.
