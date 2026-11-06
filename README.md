@@ -219,22 +219,57 @@ un CDN sin reconfiguracion.
 Sin `dist/` no hay interfaz: la raiz (`/`) responde **503** con un mensaje que
 pide correr `npm run build`. La API JSON (`/api/...`) funciona igual sin build.
 
-### Desplegar en Netlify (UI) + Render (API)
+### Desplegar en Render (Docker, un solo enlace)
+
+Es la ruta recomendada: **un unico servicio gratuito** sirve la UI y la API.
+
+1. En el panel de Render: **New -> Blueprint**, conecta el repositorio
+   `Export-Investment-Analyzer` y pulsa **Apply**. Render lee `render.yaml`
+   (`runtime: docker`, `plan: free`, `healthCheckPath: /health`) y crea el
+   servicio `export-investment-analyzer`.
+
+   Si prefieres no usar Blueprint: **New -> Web Service**, elige el repo,
+   *Language: Docker*, plan *Free*, region *Oregon* y *Health Check Path*
+   `/health`. El `Dockerfile` y el `CMD` ya respetan el `PORT` que inyecta
+   Render.
+
+2. El build compila la UI con Node 22 e instala Python 3.12.15 con
+   `constraints.txt`. La primera vez tarda unos minutos.
+
+3. La app queda en `https://export-investment-analyzer.onrender.com` (Render
+   agrega un sufijo si el nombre ya esta ocupado). Comprueba `/health`.
+
+4. Cada push a `master` vuelve a desplegar (`autoDeploy: true`).
+
+El plan free duerme el servicio tras ~15 min sin visitas: la primera peticion
+tarda ~30-60 s (importar pandas es lo que pesa). Para mantenerlo despierto,
+un ping gratuito (cron-job.org o UptimeRobot) cada 10 min contra `/health`:
+24/7 son 744 h y el plan free da 750 h/mes.
+
+Las instancias web free **no caducan a los 30 dias**; lo que caduca en Render
+es Postgres free, y este proyecto no usa base de datos.
+
+> **No uses Vercel aqui**: `pandas`/`pyarrow` y los Excel de `data/` superan
+> sus limites de bundle y el build se vuelve fragil.
+
+### Desplegar en Netlify (UI) + Render (API), alternativa
 
 Netlify sirve solo estaticos y **no puede correr Python**, y todo el analisis
-sale de la API. Por eso el despliegue son dos piezas enlazadas por un proxy.
+sale de la API. Por eso esta variante son dos piezas enlazadas por un proxy.
+Solo tiene sentido si quieres la UI en un dominio de Netlify; para un unico
+enlace usa el despliegue Docker de arriba.
 
-1. **API en Render.** Crea un *Web Service* desde el repositorio. El
-   `render.yaml` ya lo define todo (`runtime: python`, `plan: free`,
-   `pip install -e . -c constraints.txt`, `uvicorn`). Al terminar copia su URL
-   (`https://algo.onrender.com`) y comprueba que responde en `/health`.
-   El plan gratis duerme tras ~15 min de inactividad: la primera peticion tarda
-   ~30-60 s en despertarla, asi que visitá la URL antes de entrar a Netlify.
-
-   Render no usa Docker, pero instala exactamente lo mismo: Python `3.12.15`
-   (el `PYTHON_VERSION` del blueprint, igual que la imagen `python:3.12.15-slim`)
-   y el mismo `constraints.txt`. Asi un cambio de version no puede hacer que la
-   API de Render y la de Docker respondan distinto.
+1. **API en Render.** Crea un *Web Service* directamente (no Blueprint, porque
+   `render.yaml` ya apunta al servicio Docker). Elige *Language: Python 3*,
+   build `pip install -e . -c constraints.txt`, start
+   `uvicorn exportanalysis.api.main:app --host 0.0.0.0 --port $PORT`, plan
+   *Free* y health check `/health`. Define la variable
+   `PYTHON_VERSION=3.12.15`, la misma de la imagen `python:3.12.15-slim`, para
+   que la API de Render y la de Docker instalen lo mismo con `constraints.txt`.
+   Al terminar copia su URL (`https://algo.onrender.com`) y comprueba que
+   responde en `/health`. El plan gratis duerme tras ~15 min de inactividad: la
+   primera peticion tarda ~30-60 s en despertarla, asi que visitá la URL antes
+   de entrar a Netlify.
 
 2. **UI en Netlify.** Sitio nuevo conectado al mismo repositorio. Netlify lee
    `netlify.toml` (build `npm ci && npm run build:netlify`, publica `dist`).
@@ -251,9 +286,9 @@ sale de la API. Por eso el despliegue son dos piezas enlazadas por un proxy.
 3. Despliega. La UI queda en `https://algo.netlify.app` y los datos los sirve
    la API de Render a traves del proxy.
 
-Sin Netlify tambien funciona en un solo servicio, y para eso el repo trae
-`Dockerfile`: Node compila la UI y Python sirve UI + API con la misma URL (ver
-*Docker*, abajo). En Render alcanza con elegir *Deploy from Dockerfile*.
+Para un solo servicio no hace falta Netlify: el `Dockerfile` del repo ya
+compila la UI y sirve UI + API con la misma URL. Es la ruta recomendada al
+principio de esta seccion.
 
 ### Docker (UI + API en un solo contenedor)
 
@@ -289,10 +324,13 @@ El proceso corre como usuario sin privilegios (`appuser`, uid 10001) y el
 > tener wheels de esas versiones exactas. Para desarrollo usa `pip install -e
 > ".[dev]"` como siempre.
 
-### Desplegar en Fly.io (misma imagen Docker)
+### Desplegar en Fly.io (misma imagen Docker), historico
 
-La app esta publicada en **https://export-investment-analyzer-peru.fly.dev**
-(region `gru`, 512 MB, una maquina que se apaga sola sin trafico).
+La app estuvo publicada en **https://export-investment-analyzer-peru.fly.dev**
+(region `gru`, 512 MB, una maquina que se apagaba sola sin trafico). Esa URL
+**ya no responde**: Fly suspendio la maquina al agotarse el credito/trial de la
+cuenta. Se deja `fly.toml` como referencia, pero el despliegue vigente es el de
+Render (arriba).
 
 `fly.toml` describe el servicio: construye con el `Dockerfile` del repo,
 enruta el puerto `8000` (el mismo del `EXPOSE` y del `CMD`) y usa `/health`
@@ -592,7 +630,7 @@ vite.config.js     build del frontend + proxy hacia la API
 constraints.txt    versiones exactas de Python (build de Docker y de Render)
 Dockerfile         build multi-etapa (Node compila, Python sirve UI + API)
 fly.toml           deploy en Fly.io (puerto 8000, healthcheck, 512 MB)
-render.yaml        API en Render (mismo lock que Docker)
+render.yaml        servicio Docker en Render (UI + API, plan free)
 netlify.toml       UI en Netlify (build estatico + proxy de /api)
 
 frontend/          interfaz web (Vite, JavaScript modular, sin framework)

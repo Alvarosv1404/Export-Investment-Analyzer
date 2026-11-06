@@ -1,22 +1,28 @@
-# Render Blueprint: la API (Python). La interfaz vive en Netlify.
+# Render Blueprint: UI + API en un solo servicio Docker.
 #
-# La API lee config/ y data/ del propio repositorio (config.py los ubica
-# relativos al paquete), asi que no necesita disco ni base de datos.
-# El plan `free` duerme tras ~15 min de inactividad; la primera peticion tarda
-# en despertar. Usa /health para comprobar que esta viva.
+# El Dockerfile compila el frontend con Node y FastAPI sirve dist/ + la API
+# desde el mismo origen (un solo enlace, sin CORS y sin proxy).
 #
-# Las versiones estan fijadas igual que en Docker, para que los dos caminos
-# instalen lo mismo: Python 3.12.15 (la misma del Dockerfile) y
-# constraints.txt con el lock del arbol de dependencias.
+# La app lee config/ y data/ del propio repositorio (config.py los ubica
+# relativos al paquete), asi que no necesita disco, base de datos ni variables
+# de entorno. Render inyecta PORT y el CMD del Dockerfile lo respeta.
+#
+# Plan `free`: 750 h/mes por workspace, 512 MB / 0.1 CPU. El servicio se duerme
+# tras ~15 min sin trafico y la primera peticion tarda ~30-60 s en despertarlo
+# (importar pandas es lo que pesa). Las instancias web free NO caducan a los 30
+# dias; lo que caduca es Postgres free, que este proyecto no usa.
+#
+# Region `oregon` (US West) es la mas cercana a Peru de las que ofrece Render.
+#
+# El plan free no permite discos persistentes, y aqui no hacen falta: todo el
+# estado vive en el repositorio.
 services:
   - type: web
-    name: export-investment-analyzer-api
-    runtime: python
+    name: export-investment-analyzer
+    runtime: docker
     plan: free
     region: oregon
-    buildCommand: pip install -e . -c constraints.txt
-    startCommand: uvicorn exportanalysis.api.main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.12.15"
+    autoDeploy: true
