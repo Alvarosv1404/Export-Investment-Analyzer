@@ -25,3 +25,9 @@ data/raw/tariffs/_cache/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Diagnosticos locales (pueden contener credenciales o datos del entorno)
+debug_etl.py
+debug_output.txt
+test_health.py
+test_turso.py
